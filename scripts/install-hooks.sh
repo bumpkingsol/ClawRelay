@@ -27,10 +27,13 @@ normalize_commit_url() {
 }
 
 COMMIT_URL=$(normalize_commit_url "$SERVER_URL")
+HOOK_START_MARKER="# >>> OpenClaw Context Bridge >>>"
+HOOK_END_MARKER="# <<< OpenClaw Context Bridge <<<"
+LEGACY_HOOK_MARKER="# OpenClaw Context Bridge - post-commit hook"
 
 HOOK_TEMPLATE=$(mktemp)
 cat > "$HOOK_TEMPLATE" <<'HOOKEOF'
-#!/bin/bash
+__HOOK_START_MARKER__
 # OpenClaw Context Bridge - post-commit hook
 set -euo pipefail
 
@@ -49,6 +52,7 @@ normalize_commit_url() {
 }
 
 SERVER_URL_FILE="$HOME/.context-bridge/server-url"
+SERVER_CA_CERT="$HOME/.context-bridge/server-ca.pem"
 COMMIT_URL="__COMMIT_URL__"
 if [ -f "$SERVER_URL_FILE" ]; then
   CONFIGURED_URL=$(cat "$SERVER_URL_FILE" 2>/dev/null || echo "")
@@ -60,6 +64,11 @@ fi
 AUTH_TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
 if [ -z "$AUTH_TOKEN" ]; then
   exit 0
+fi
+
+CURL_TLS_ARGS=()
+if [[ "$COMMIT_URL" == https://* ]] && [ -f "$SERVER_CA_CERT" ]; then
+  CURL_TLS_ARGS=(--cacert "$SERVER_CA_CERT")
 fi
 
 REPO=$(basename "$(git rev-parse --show-toplevel)")
@@ -88,9 +97,15 @@ print(json.dumps({
 curl -sf -X POST "$COMMIT_URL" \
   -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "$PAYLOAD" &>/dev/null &
+  -d "$PAYLOAD" \
+  "${CURL_TLS_ARGS[@]}" &>/dev/null &
+__HOOK_END_MARKER__
 HOOKEOF
-HOOK_CONTENT=$(sed "s|__COMMIT_URL__|$COMMIT_URL|g" "$HOOK_TEMPLATE")
+HOOK_CONTENT=$(sed \
+  -e "s|__COMMIT_URL__|$COMMIT_URL|g" \
+  -e "s|__HOOK_START_MARKER__|$HOOK_START_MARKER|g" \
+  -e "s|__HOOK_END_MARKER__|$HOOK_END_MARKER|g" \
+  "$HOOK_TEMPLATE")
 rm -f "$HOOK_TEMPLATE"
 
 # Find all git repos in home directory (max depth 3)
@@ -113,22 +128,53 @@ while IFS= read -r GIT_DIR; do
   REPO_PATH=$(dirname "$GIT_DIR")
   REPO_NAME=$(basename "$REPO_PATH")
   
-  # Skip if already has our hook
-  if [ -f "$HOOK_PATH" ] && grep -q "Context Bridge" "$HOOK_PATH" 2>/dev/null; then
-    echo "  Skip: $REPO_NAME (hook already installed)"
-    continue
-  fi
-  
-  # If existing hook, append ours
   if [ -f "$HOOK_PATH" ]; then
-    if { echo "" >> "$HOOK_PATH" && echo "$HOOK_CONTENT" >> "$HOOK_PATH"; } 2>/dev/null; then
-      echo "  Appended: $REPO_NAME"
+    TMP_HOOK=$(mktemp)
+    if awk -v start="$HOOK_START_MARKER" -v end="$HOOK_END_MARKER" -v legacy="$LEGACY_HOOK_MARKER" '
+      $0 == start {
+        skip = 1
+        next
+      }
+      $0 == end {
+        skip = 0
+        next
+      }
+      index($0, legacy) {
+        skip = 1
+        next
+      }
+      !skip {
+        print
+      }
+    ' "$HOOK_PATH" > "$TMP_HOOK" 2>/dev/null; then
+      if [ -s "$TMP_HOOK" ]; then
+        {
+          cat "$TMP_HOOK"
+          echo ""
+          echo "$HOOK_CONTENT"
+        } > "$HOOK_PATH"
+      else
+        {
+          echo "#!/bin/bash"
+          echo ""
+          echo "$HOOK_CONTENT"
+        } > "$HOOK_PATH"
+      fi
+      chmod +x "$HOOK_PATH"
+      rm -f "$TMP_HOOK"
+      echo "  Updated: $REPO_NAME"
       INSTALLED=$((INSTALLED + 1))
     else
+      rm -f "$TMP_HOOK"
       echo "  Skip: $REPO_NAME (unable to update hook)"
     fi
   else
-    if { echo "$HOOK_CONTENT" > "$HOOK_PATH" && chmod +x "$HOOK_PATH"; } 2>/dev/null; then
+    if {
+      echo "#!/bin/bash" > "$HOOK_PATH" &&
+      echo "" >> "$HOOK_PATH" &&
+      echo "$HOOK_CONTENT" >> "$HOOK_PATH" &&
+      chmod +x "$HOOK_PATH";
+    } 2>/dev/null; then
       echo "  Installed: $REPO_NAME"
       INSTALLED=$((INSTALLED + 1))
     else

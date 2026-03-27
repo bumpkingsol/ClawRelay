@@ -36,7 +36,7 @@ CONTEXT_BRIDGE_TOKEN=dev-token python context-receiver.py  # starts on port 7890
 
 ### Mac
 ```bash
-curl -fsSL https://raw.githubusercontent.com/clawrelay-org/openclaw-computer-vision/main/mac-daemon/install.sh | bash
+bash mac-daemon/install.sh https://YOUR_SERVER:7890/context/push /path/to/context-bridge.pem
 ```
 
 ## Security

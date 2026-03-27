@@ -20,6 +20,7 @@ CMD_LOG="$HOME/.context-bridge-cmds.log"
 LOCAL_DB="$CB_DIR/local.db"
 CLIPBOARD_HASH_FILE="$CB_DIR/last-clipboard-hash"
 FSWATCH_LOG="$CB_DIR/fswatch-changes.log"
+SERVER_CA_CERT_FILE="$CB_DIR/server-ca.pem"
 IDLE_THRESHOLD=300  # 5 minutes in seconds
 
 # --- Ensure dirs + local queue DB ---
@@ -45,6 +46,12 @@ if [ -z "$AUTH_TOKEN" ]; then
   fi
 fi
 
+curl_tls_args() {
+  if [[ "$SERVER_URL" == https://* ]] && [ -f "$SERVER_CA_CERT_FILE" ]; then
+    printf '%s\n' "--cacert" "$SERVER_CA_CERT_FILE"
+  fi
+}
+
 queue_payload() {
   local payload="$1"
   sqlite3 "$LOCAL_DB" "INSERT INTO queue (payload) VALUES ($(printf '%s' "$payload" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))"))" 2>/dev/null
@@ -59,12 +66,19 @@ flush_queue() {
   fi
 
   sqlite3 "$LOCAL_DB" "SELECT payload FROM queue ORDER BY id ASC LIMIT 50;" 2>/dev/null | while read -r queued_payload; do
+    local curl_args=()
+    while IFS= read -r arg; do
+      curl_args+=("$arg")
+    done < <(curl_tls_args)
+
     curl -sf -o /dev/null \
       -X POST "$SERVER_URL" \
       -H "Authorization: Bearer $AUTH_TOKEN" \
       -H "Content-Type: application/json" \
       -d "$queued_payload" \
-      --connect-timeout 5 --max-time 10 2>/dev/null && \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      2>/dev/null && \
       sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE payload = '$(echo "$queued_payload" | sed "s/'/''/g")';" 2>/dev/null
   done || true
 }
@@ -72,6 +86,11 @@ flush_queue() {
 send_payload() {
   local payload="$1"
   local http_code
+  local curl_args=()
+
+  while IFS= read -r arg; do
+    curl_args+=("$arg")
+  done < <(curl_tls_args)
 
   http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
     -X POST "$SERVER_URL" \
@@ -80,6 +99,7 @@ send_payload() {
     -d "$payload" \
     --connect-timeout 5 \
     --max-time 10 \
+    "${curl_args[@]}" \
     2>/dev/null || echo "000")
 
   if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then

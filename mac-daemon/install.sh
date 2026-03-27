@@ -1,20 +1,51 @@
 #!/bin/bash
 # OpenClaw Context Bridge - Mac Installer
-# Run: bash install.sh <server-url> <auth-token>
+# Run: bash install.sh <server-url> [auth-token] [tls-cert-file]
 
 set -euo pipefail
 umask 077
 
 SERVER_URL="${1:-}"
-AUTH_TOKEN="${2:-}"
+ARG2="${2:-}"
+ARG3="${3:-}"
+AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
+TLS_CERT_FILE="${CONTEXT_BRIDGE_TLS_CERT_FILE:-}"
 
-if [ -z "$SERVER_URL" ] || [ -z "$AUTH_TOKEN" ]; then
-  echo "Usage: bash install.sh <server-url> <auth-token>"
-  echo "Example: bash install.sh https://your-server:7890/context/push your-secret-token"
+if [ -n "$ARG3" ]; then
+  AUTH_TOKEN="${ARG2:-$AUTH_TOKEN}"
+  TLS_CERT_FILE="$ARG3"
+elif [ -n "$ARG2" ] && [ -f "$ARG2" ]; then
+  TLS_CERT_FILE="$ARG2"
+else
+  AUTH_TOKEN="${ARG2:-$AUTH_TOKEN}"
+fi
+
+if [ -z "$SERVER_URL" ]; then
+  echo "Usage: bash install.sh <server-url> [auth-token] [tls-cert-file]"
+  echo "Example: bash install.sh https://your-server:7890/context/push"
+  echo "Example: bash install.sh https://your-server:7890/context/push ~/Downloads/context-bridge.pem"
+  exit 1
+fi
+
+if [ -z "$AUTH_TOKEN" ]; then
+  printf "Enter Context Bridge auth token: " >&2
+  read -r -s AUTH_TOKEN
+  printf "\n" >&2
+fi
+
+if [ -z "$AUTH_TOKEN" ]; then
+  echo "ERROR: Auth token is required." >&2
+  exit 1
+fi
+
+if [ -n "$TLS_CERT_FILE" ] && [ ! -f "$TLS_CERT_FILE" ]; then
+  echo "ERROR: TLS cert file not found: $TLS_CERT_FILE" >&2
   exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CB_DIR="$HOME/.context-bridge"
+SERVER_CA_CERT_FILE="$CB_DIR/server-ca.pem"
 echo "=== OpenClaw Context Bridge Installer ==="
 
 # 1. Check dependencies
@@ -44,12 +75,20 @@ security add-generic-password -s "context-bridge" -a "token" -w "$AUTH_TOKEN"
 
 # 4. Configure server URL
 echo "[4/8] Configuring server URL..."
-mkdir -p "$HOME/.context-bridge"
-chmod 700 "$HOME/.context-bridge"
-echo "$SERVER_URL" > "$HOME/.context-bridge/server-url"
+mkdir -p "$CB_DIR"
+chmod 700 "$CB_DIR"
+echo "$SERVER_URL" > "$CB_DIR/server-url"
 touch "$HOME/.context-bridge-cmds.log" "$HOME/.context-bridge/fswatch-changes.log" "$HOME/.context-bridge/last-clipboard-hash"
-chmod 600 "$HOME/.context-bridge/server-url"
+chmod 600 "$CB_DIR/server-url"
 chmod 600 "$HOME/.context-bridge-cmds.log" "$HOME/.context-bridge/fswatch-changes.log" "$HOME/.context-bridge/last-clipboard-hash"
+
+if [ -n "$TLS_CERT_FILE" ]; then
+  cp "$TLS_CERT_FILE" "$SERVER_CA_CERT_FILE"
+  chmod 600 "$SERVER_CA_CERT_FILE"
+  echo "  Installed pinned TLS cert: $SERVER_CA_CERT_FILE"
+elif [[ "$SERVER_URL" == https://* ]]; then
+  echo "  No custom TLS cert provided; relying on system trust store"
+fi
 
 # 5. Add shell hooks for terminal command capture
 echo "[5/8] Adding shell command hook..."

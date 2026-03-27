@@ -7,9 +7,10 @@ Type=simple
 User=admin
 WorkingDirectory=/home/user/clawrelay/openclaw-computer-vision/server
 EnvironmentFile=/home/user/clawrelay/.env
-ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 wsgi:app
+ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 --certfile /home/user/clawrelay/data/certs/context-bridge.pem --keyfile /home/user/clawrelay/data/certs/context-bridge-key.pem wsgi:app
 Restart=always
 RestartSec=5
+UMask=0077
 
 # Security hardening
 NoNewPrivileges=true

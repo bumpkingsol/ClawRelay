@@ -41,7 +41,7 @@ GIT_SSH_COMMAND="ssh -i ~/.ssh/github_clawrelay-org" git clone git@github-clawre
 ### 1.2 Install Python dependencies
 
 ```bash
-pip3 install --break-system-packages flask gunicorn
+pip3 install --break-system-packages -r /home/user/clawrelay/openclaw-computer-vision/server/requirements.txt
 ```
 
 ### 1.3 Check for auth token
@@ -49,19 +49,25 @@ pip3 install --break-system-packages flask gunicorn
 The auth token should already be in `/home/user/clawrelay/.env`. Verify:
 
 ```bash
-grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env
+grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env
 ```
 
 If missing, generate one:
 ```bash
+umask 077
 TOKEN=$(openssl rand -hex 32)
+touch /home/user/clawrelay/.env
+chmod 600 /home/user/clawrelay/.env
 echo "CONTEXT_BRIDGE_TOKEN=$TOKEN" >> /home/user/clawrelay/.env
 echo "CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db" >> /home/user/clawrelay/.env
 echo "CONTEXT_BRIDGE_PORT=7890" >> /home/user/clawrelay/.env
-echo "Generated token: $TOKEN"
+echo "Generated token and stored it in /home/user/clawrelay/.env"
 ```
 
-**Save this token - Jonas needs it for the Mac installer.**
+Retrieve the token when needed with:
+```bash
+grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2
+```
 
 ### 1.4 Create data directory
 
@@ -74,13 +80,18 @@ mkdir -p /home/user/clawrelay/memory/activity-digest
 
 ```bash
 CERT_DIR="/home/user/clawrelay/data/certs"
+SERVER_IP="$(hostname -I | awk '{print $1}')"
+SERVER_HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 mkdir -p "$CERT_DIR"
-if [ ! -f "$CERT_DIR/context-bridge.pem" ]; then
+chmod 700 "$CERT_DIR"
+if [ ! -f "$CERT_DIR/context-bridge.pem" ] || ! openssl x509 -in "$CERT_DIR/context-bridge.pem" -noout -ext subjectAltName 2>/dev/null | grep -q "$SERVER_IP"; then
   openssl req -x509 -newkey rsa:4096 \
     -keyout "$CERT_DIR/context-bridge-key.pem" \
     -out "$CERT_DIR/context-bridge.pem" \
     -days 365 -nodes \
-    -subj "/CN=context-bridge/O=OpenClaw"
+    -subj "/CN=$SERVER_HOSTNAME/O=OpenClaw" \
+    -addext "subjectAltName=DNS:$SERVER_HOSTNAME,DNS:localhost,IP:$SERVER_IP,IP:127.0.0.1"
+  chmod 644 "$CERT_DIR/context-bridge.pem"
   chmod 600 "$CERT_DIR/context-bridge-key.pem"
 fi
 ```
@@ -100,24 +111,21 @@ print('DB initialized')
 ### 1.7 Start the receiver
 
 ```bash
-bash /home/user/clawrelay/openclaw-computer-vision/server/start.sh
+bash /home/user/clawrelay/openclaw-computer-vision/server/setup-server.sh
 ```
 
-Or manually:
+Or, if the service is already installed, restart it:
 ```bash
-set -a
-source /home/user/clawrelay/.env
-set +a
-cd /home/user/clawrelay/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db \
-  nohup python3 context-receiver.py >> /tmp/context-bridge-server.log 2>&1 &
+sudo systemctl restart context-bridge
 ```
 
 ### 1.8 Verify the server is running
 
 ```bash
-TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2)
-curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:7890/context/health
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
+  -H "Authorization: Bearer $TOKEN" \
+  https://localhost:7890/context/health
 ```
 
 Expected output:
@@ -128,8 +136,9 @@ Expected output:
 ### 1.9 Test with a simulated push
 
 ```bash
-TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2)
-curl -sf -X POST http://localhost:7890/context/push \
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
+  -X POST https://localhost:7890/context/push \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,14 +154,16 @@ Expected: `{"status": "ok"}`
 
 ### 1.10 Ensure auto-start on reboot
 
-Check crontab:
+Check systemd:
 ```bash
-crontab -l | grep context-bridge
+sudo systemctl status context-bridge
 ```
 
 If missing:
 ```bash
-(crontab -l 2>/dev/null | grep -v "context-receiver"; echo "@reboot /home/user/clawrelay/openclaw-computer-vision/server/start.sh") | crontab -
+sudo cp /home/user/clawrelay/openclaw-computer-vision/server/context-bridge.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now context-bridge
 ```
 
 ### 1.11 Open firewall port (if needed)
@@ -172,7 +183,8 @@ sudo ufw allow 7890/tcp
 
 You need two things from the server:
 1. **Server IP or hostname**: Check with `hostname -I` on the server
-2. **Auth token**: `grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2`
+2. **Auth token**: `grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2`
+3. **TLS cert PEM** (for self-signed deployments): `/home/user/clawrelay/data/certs/context-bridge.pem`
 
 ### 2.2 Clone the repo on Mac
 
@@ -191,10 +203,10 @@ brew install fswatch
 
 ```bash
 cd ~/openclaw-computer-vision
-bash mac-daemon/install.sh https://SERVER_IP:7890/context/push AUTH_TOKEN_HERE
+bash mac-daemon/install.sh https://SERVER_IP:7890/context/push ~/Downloads/context-bridge.pem
 ```
 
-Replace `SERVER_IP` and `AUTH_TOKEN_HERE` with actual values.
+Replace `SERVER_IP` with the actual server IP. The installer will prompt for the auth token securely if you do not pass it as an argument.
 
 ### 2.5 Grant macOS permissions
 
@@ -234,8 +246,10 @@ tail -f /tmp/context-bridge.log
 
 On the **server**, run:
 ```bash
-TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2)
-curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:7890/context/health
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
+  -H "Authorization: Bearer $TOKEN" \
+  https://localhost:7890/context/health
 ```
 
 Should show `"capture_status": "healthy"` and `"total_rows"` increasing.

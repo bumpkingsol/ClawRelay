@@ -4,14 +4,22 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     let menuBarViewModel: MenuBarViewModel
-    private var cancellable: AnyCancellable?
+    let controlCenterViewModel: ControlCenterViewModel
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
-        self.menuBarViewModel = MenuBarViewModel()
-        // Forward changes from the view model so SwiftUI re-evaluates menuBarSymbol
-        cancellable = menuBarViewModel.objectWillChange.sink { [weak self] _ in
+        let runner = BridgeCommandRunner()
+        self.menuBarViewModel = MenuBarViewModel(runner: runner)
+        self.controlCenterViewModel = ControlCenterViewModel(runner: runner)
+
+        // Forward changes from both view models so SwiftUI re-evaluates menuBarSymbol
+        menuBarViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
-        }
+        }.store(in: &cancellables)
+
+        controlCenterViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
     }
 
     var menuBarSymbol: String { menuBarViewModel.snapshot.trackingState.menuBarSymbol }

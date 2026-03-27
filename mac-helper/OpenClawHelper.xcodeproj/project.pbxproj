@@ -24,6 +24,10 @@
 		A10000060000000000000004 /* QuickActionsGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000004 /* QuickActionsGrid.swift */; };
 		A10000060000000000000005 /* HealthStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000005 /* HealthStripView.swift */; };
 		A10000060000000000000006 /* MenuBarViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000006 /* MenuBarViewModelTests.swift */; };
+		A10000070000000000000001 /* ControlCenterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000001 /* ControlCenterViewModel.swift */; };
+		A10000070000000000000002 /* ControlCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000002 /* ControlCenterView.swift */; };
+		A10000070000000000000003 /* OverviewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000003 /* OverviewTabView.swift */; };
+		A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000004 /* DiagnosticsTabView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +62,10 @@
 		A20000060000000000000004 /* QuickActionsGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsGrid.swift; sourceTree = "<group>"; };
 		A20000060000000000000005 /* HealthStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthStripView.swift; sourceTree = "<group>"; };
 		A20000060000000000000006 /* MenuBarViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarViewModelTests.swift; sourceTree = "<group>"; };
+		A20000070000000000000001 /* ControlCenterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterViewModel.swift; sourceTree = "<group>"; };
+		A20000070000000000000002 /* ControlCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterView.swift; sourceTree = "<group>"; };
+		A20000070000000000000003 /* OverviewTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTabView.swift; sourceTree = "<group>"; };
+		A20000070000000000000004 /* DiagnosticsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTabView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000060000000000000001 /* MenuBarViewModel.swift */,
+				A20000070000000000000001 /* ControlCenterViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -173,8 +182,19 @@
 				A20000060000000000000003 /* StatusHeaderView.swift */,
 				A20000060000000000000004 /* QuickActionsGrid.swift */,
 				A20000060000000000000005 /* HealthStripView.swift */,
+				A20000070000000000000002 /* ControlCenterView.swift */,
+				A70000070000000000000001 /* Tabs */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		A70000070000000000000001 /* Tabs */ = {
+			isa = PBXGroup;
+			children = (
+				A20000070000000000000003 /* OverviewTabView.swift */,
+				A20000070000000000000004 /* DiagnosticsTabView.swift */,
+			);
+			path = Tabs;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -281,6 +301,10 @@
 				A10000060000000000000003 /* StatusHeaderView.swift in Sources */,
 				A10000060000000000000004 /* QuickActionsGrid.swift in Sources */,
 				A10000060000000000000005 /* HealthStripView.swift in Sources */,
+				A10000070000000000000001 /* ControlCenterViewModel.swift in Sources */,
+				A10000070000000000000002 /* ControlCenterView.swift in Sources */,
+				A10000070000000000000003 /* OverviewTabView.swift in Sources */,
+				A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

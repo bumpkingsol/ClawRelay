@@ -105,7 +105,9 @@ bash /home/admin/clawd/openclaw-computer-vision/server/start.sh
 
 Or manually:
 ```bash
+set -a
 source /home/admin/clawd/.env
+set +a
 cd /home/admin/clawd/openclaw-computer-vision/server
 CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db \
   nohup python3 context-receiver.py >> /tmp/context-bridge-server.log 2>&1 &
@@ -114,7 +116,8 @@ CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db \
 ### 1.8 Verify the server is running
 
 ```bash
-curl -sf http://localhost:7890/context/health
+TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/admin/clawd/.env | cut -d= -f2)
+curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:7890/context/health
 ```
 
 Expected output:
@@ -231,7 +234,8 @@ tail -f /tmp/context-bridge.log
 
 On the **server**, run:
 ```bash
-curl -sf http://localhost:7890/context/health
+TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/admin/clawd/.env | cut -d= -f2)
+curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:7890/context/health
 ```
 
 Should show `"capture_status": "healthy"` and `"total_rows"` increasing.
@@ -374,7 +378,7 @@ print(f'Purged {deleted} rows')
 
 | Problem | Check | Fix |
 |---------|-------|-----|
-| No data arriving | `curl localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
+| No data arriving | `TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/admin/clawd/.env \| cut -d= -f2) && curl -H "Authorization: Bearer $TOKEN" localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
 | Auth failures | Check token matches on both sides | Regenerate: `openssl rand -hex 32` and update both |
 | AppleScript errors | `tail /tmp/context-bridge-error.log` | Grant Accessibility permission in System Settings |
 | Chrome URLs empty | Check Automation permission | System Settings > Privacy > Automation > Terminal > Chrome |

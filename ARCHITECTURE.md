@@ -244,7 +244,7 @@ No third-party services. No cloud storage. No external APIs except Anthropic (sa
 |----------|--------|------|---------|
 | `/context/push` | POST | Bearer | Receive activity captures |
 | `/context/commit` | POST | Bearer | Receive git commit data |
-| `/context/health` | GET | None | Health check + capture staleness |
+| `/context/health` | GET | Bearer by default | Health check + capture staleness |
 
 ## File Structure
 

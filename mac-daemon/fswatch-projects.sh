@@ -6,6 +6,9 @@
 set -euo pipefail
 umask 077
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/context-common.sh"
+
 LOG="$HOME/.context-bridge/fswatch-changes.log"
 WATCH_DIRS_FILE="$HOME/.context-bridge/watch-dirs"
 mkdir -p "$HOME/.context-bridge"
@@ -82,5 +85,8 @@ fswatch -r \
   --exclude '__pycache__' \
   --include '\.(ts|tsx|js|jsx|py|md|json|astro|css|html|sql|sh)$' \
   "${WATCH_DIRS[@]}" | while read -r changed_file; do
+    if cb_is_paused; then
+      continue
+    fi
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$changed_file" >> "$LOG"
 done

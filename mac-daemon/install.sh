@@ -64,14 +64,16 @@ fi
 # 2. Install daemon scripts (user-owned, no sudo needed)
 echo "[2/8] Installing daemon scripts..."
 mkdir -p "$CB_DIR/bin"
-cp "$SCRIPT_DIR/context-daemon.sh"    "$CB_DIR/bin/context-bridge-daemon.sh"
-cp "$SCRIPT_DIR/fswatch-projects.sh"  "$CB_DIR/bin/context-bridge-fswatch.sh"
-cp "$SCRIPT_DIR/context-common.sh"    "$CB_DIR/bin/context-common.sh"
-cp "$SCRIPT_DIR/context-helperctl.sh" "$CB_DIR/bin/context-helperctl.sh"
+cp "$SCRIPT_DIR/context-daemon.sh"      "$CB_DIR/bin/context-bridge-daemon.sh"
+cp "$SCRIPT_DIR/fswatch-projects.sh"    "$CB_DIR/bin/context-bridge-fswatch.sh"
+cp "$SCRIPT_DIR/context-common.sh"      "$CB_DIR/bin/context-common.sh"
+cp "$SCRIPT_DIR/context-helperctl.sh"   "$CB_DIR/bin/context-helperctl.sh"
+cp "$SCRIPT_DIR/context-shell-hook.zsh" "$CB_DIR/context-shell-hook.zsh"
 chmod 700 "$CB_DIR/bin/context-bridge-daemon.sh" \
           "$CB_DIR/bin/context-bridge-fswatch.sh" \
           "$CB_DIR/bin/context-helperctl.sh"
-chmod 600 "$CB_DIR/bin/context-common.sh"
+chmod 600 "$CB_DIR/bin/context-common.sh" \
+          "$CB_DIR/context-shell-hook.zsh"
 
 # 3. Store auth token in macOS Keychain
 echo "[3/8] Storing auth token in Keychain..."
@@ -97,14 +99,22 @@ fi
 
 # 5. Add shell hooks for terminal command capture
 echo "[5/8] Adding shell command hook..."
-HOOK='# Context Bridge - command logger
-preexec() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$(pwd)|$1" >> ~/.context-bridge-cmds.log; }'
+HOOK_SOURCE='# Context Bridge - command logger
+[ -f "$HOME/.context-bridge/context-shell-hook.zsh" ] && source "$HOME/.context-bridge/context-shell-hook.zsh"'
 
 if [ -f "$HOME/.zshrc" ]; then
-  if ! grep -q "Context Bridge" "$HOME/.zshrc" 2>/dev/null; then
+  # Remove legacy inline preexec if present
+  if grep -q "context-bridge-cmds.log" "$HOME/.zshrc" 2>/dev/null && \
+     ! grep -q "context-shell-hook.zsh" "$HOME/.zshrc" 2>/dev/null; then
+    # Replace old inline hook with source line
+    sed -i '' '/# Context Bridge - command logger/,/^$/d' "$HOME/.zshrc" 2>/dev/null || true
+    sed -i '' '/context-bridge-cmds\.log/d' "$HOME/.zshrc" 2>/dev/null || true
+  fi
+
+  if ! grep -q "context-shell-hook.zsh" "$HOME/.zshrc" 2>/dev/null; then
     echo "" >> "$HOME/.zshrc"
-    echo "$HOOK" >> "$HOME/.zshrc"
-    echo "  Added preexec hook to ~/.zshrc"
+    echo "$HOOK_SOURCE" >> "$HOME/.zshrc"
+    echo "  Added shell hook (sourced from ~/.context-bridge/context-shell-hook.zsh)"
   else
     echo "  Shell hook already exists"
   fi

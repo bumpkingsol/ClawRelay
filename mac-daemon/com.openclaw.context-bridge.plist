@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/usr/local/bin/context-bridge-daemon.sh</string>
+        <string>__CONTEXT_BRIDGE_BIN_DIR__/context-bridge-daemon.sh</string>
     </array>
     
     <!-- Run every 120 seconds (2 minutes) -->

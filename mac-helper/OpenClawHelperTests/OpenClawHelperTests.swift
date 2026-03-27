@@ -2,9 +2,10 @@ import XCTest
 @testable import OpenClawHelper
 
 final class OpenClawHelperTests: XCTestCase {
+    @MainActor
     func testAppModelStartsActive() {
         let model = AppModel()
-        XCTAssertEqual(model.snapshot.trackingState, .active)
+        XCTAssertEqual(model.menuBarViewModel.snapshot.trackingState, .active)
         XCTAssertEqual(model.menuBarSymbol, "eye.circle.fill")
     }
 

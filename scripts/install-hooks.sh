@@ -28,7 +28,8 @@ normalize_commit_url() {
 
 COMMIT_URL=$(normalize_commit_url "$SERVER_URL")
 
-HOOK_CONTENT=$(cat << 'HOOKEOF'
+HOOK_TEMPLATE=$(mktemp)
+cat > "$HOOK_TEMPLATE" <<'HOOKEOF'
 #!/bin/bash
 # OpenClaw Context Bridge - post-commit hook
 set -euo pipefail
@@ -89,16 +90,25 @@ curl -sf -X POST "$COMMIT_URL" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD" &>/dev/null &
 HOOKEOF
-)
-
-# Replace placeholders
-HOOK_CONTENT=$(echo "$HOOK_CONTENT" | sed "s|__COMMIT_URL__|$COMMIT_URL|g")
+HOOK_CONTENT=$(sed "s|__COMMIT_URL__|$COMMIT_URL|g" "$HOOK_TEMPLATE")
+rm -f "$HOOK_TEMPLATE"
 
 # Find all git repos in home directory (max depth 3)
-REPOS=$(find "$HOME" -maxdepth 3 -name ".git" -type d 2>/dev/null)
+REPOS=$(find "$HOME" -maxdepth 3 -name ".git" -type d 2>/dev/null || true)
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  CURRENT_GIT_DIR=$(cd "$(git rev-parse --git-dir)" && pwd)
+  case "$REPOS" in
+    *"$CURRENT_GIT_DIR"*)
+      ;;
+    *)
+      REPOS="${REPOS}${REPOS:+$'\n'}$CURRENT_GIT_DIR"
+      ;;
+  esac
+fi
 
 INSTALLED=0
-for GIT_DIR in $REPOS; do
+while IFS= read -r GIT_DIR; do
+  [ -n "$GIT_DIR" ] || continue
   HOOK_PATH="$GIT_DIR/hooks/post-commit"
   REPO_PATH=$(dirname "$GIT_DIR")
   REPO_NAME=$(basename "$REPO_PATH")
@@ -111,17 +121,23 @@ for GIT_DIR in $REPOS; do
   
   # If existing hook, append ours
   if [ -f "$HOOK_PATH" ]; then
-    echo "" >> "$HOOK_PATH"
-    echo "$HOOK_CONTENT" >> "$HOOK_PATH"
-    echo "  Appended: $REPO_NAME"
+    if { echo "" >> "$HOOK_PATH" && echo "$HOOK_CONTENT" >> "$HOOK_PATH"; } 2>/dev/null; then
+      echo "  Appended: $REPO_NAME"
+      INSTALLED=$((INSTALLED + 1))
+    else
+      echo "  Skip: $REPO_NAME (unable to update hook)"
+    fi
   else
-    echo "$HOOK_CONTENT" > "$HOOK_PATH"
-    chmod +x "$HOOK_PATH"
-    echo "  Installed: $REPO_NAME"
+    if { echo "$HOOK_CONTENT" > "$HOOK_PATH" && chmod +x "$HOOK_PATH"; } 2>/dev/null; then
+      echo "  Installed: $REPO_NAME"
+      INSTALLED=$((INSTALLED + 1))
+    else
+      echo "  Skip: $REPO_NAME (unable to install hook)"
+    fi
   fi
-  
-  INSTALLED=$((INSTALLED + 1))
-done
+done <<EOF
+$REPOS
+EOF
 
 echo ""
 echo "Installed hooks in $INSTALLED repositories."

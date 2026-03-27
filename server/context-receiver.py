@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 # --- Config ---
 DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-bridge.db')
 AUTH_TOKEN = os.environ.get('CONTEXT_BRIDGE_TOKEN', '').strip()
-ALLOW_INSECURE_NO_AUTH = os.environ.get('CONTEXT_BRIDGE_ALLOW_INSECURE_NO_AUTH', '').lower() in ('1', 'true', 'yes')
-PUBLIC_HEALTH = os.environ.get('CONTEXT_BRIDGE_PUBLIC_HEALTH', '').lower() in ('1', 'true', 'yes')
 MAX_CONTENT_LENGTH = int(os.environ.get('CONTEXT_BRIDGE_MAX_CONTENT_LENGTH', '262144'))
 PURGE_HOURS = 48
 
@@ -128,9 +126,6 @@ def purge_old_data():
 
 def verify_auth(req):
     """Check Bearer token."""
-    if not AUTH_TOKEN:
-        return ALLOW_INSECURE_NO_AUTH
-
     auth = req.headers.get('Authorization', '')
     scheme, _, provided = auth.partition(' ')
     if scheme != 'Bearer' or not provided:
@@ -295,7 +290,7 @@ def handoff():
 @app.route('/context/health', methods=['GET'])
 def health():
     """Health check endpoint - also used for capture verification."""
-    if not PUBLIC_HEALTH and not verify_auth(request):
+    if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
 
     try:
@@ -352,13 +347,10 @@ def before_request():
 
 def configure_app():
     """Validate runtime security configuration and initialize storage."""
-    if not AUTH_TOKEN and not ALLOW_INSECURE_NO_AUTH:
+    if not AUTH_TOKEN:
         raise RuntimeError(
             "CONTEXT_BRIDGE_TOKEN must be set; refusing to start without authenticated writes"
         )
-
-    if ALLOW_INSECURE_NO_AUTH:
-        logger.warning("Receiver running with CONTEXT_BRIDGE_ALLOW_INSECURE_NO_AUTH enabled")
 
     init_db()
 

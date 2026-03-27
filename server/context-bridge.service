@@ -7,9 +7,10 @@ Type=simple
 User=admin
 WorkingDirectory=/home/admin/clawd/openclaw-computer-vision/server
 EnvironmentFile=/home/admin/clawd/.env
-ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 wsgi:app
+ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 --certfile /home/admin/clawd/data/certs/context-bridge.pem --keyfile /home/admin/clawd/data/certs/context-bridge-key.pem wsgi:app
 Restart=always
 RestartSec=5
+UMask=0077
 
 # Security hardening
 NoNewPrivileges=true

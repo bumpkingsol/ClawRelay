@@ -48,7 +48,7 @@ echo "$SERVER_URL" > "$HOME/.context-bridge/server-url"
 chmod 600 "$HOME/.context-bridge/server-url"
 
 # Patch daemon with server URL
-sed -i '' "s|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-https://localhost:7890/context/push}\"|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-$SERVER_URL}\"|" /usr/local/bin/context-bridge-daemon.sh
+sudo sed -i '' "s|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-https://localhost:7890/context/push}\"|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-$SERVER_URL}\"|" /usr/local/bin/context-bridge-daemon.sh
 
 # 5. Add shell hooks for terminal command capture
 echo "[5/8] Adding shell command hook..."

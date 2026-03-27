@@ -4,7 +4,7 @@
 # clipboard, file changes, Codex sessions, WhatsApp context
 # Runs every 2 minutes via launchd
 
-set -euo pipefail
+set -eu
 
 # --- Config ---
 SERVER_URL="${CONTEXT_BRIDGE_URL:-https://localhost:7890/context/push}"
@@ -40,14 +40,22 @@ get_idle_seconds() {
 }
 
 is_screen_locked() {
-  python3 -c "
+  # Use CGSession dictionary via ioreg — no Python/Quartz dependency
+  if /usr/bin/python3 -c "
 import Quartz
 d = Quartz.CGSessionCopyCurrentDictionary()
-if d and d.get('CGSSessionScreenIsLocked', 0):
-    print('locked')
-else:
-    print('unlocked')
-" 2>/dev/null || echo "unknown"
+print('locked' if d and d.get('CGSSessionScreenIsLocked', 0) else 'unlocked')
+" 2>/dev/null; then
+    return
+  fi
+  # Fallback: check if screen saver or login window is active
+  if pgrep -x "ScreenSaverEngine" >/dev/null 2>&1 || \
+     pgrep -x "loginwindow" >/dev/null 2>&1 && \
+     ! osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' >/dev/null 2>&1; then
+    echo "locked"
+  else
+    echo "unlocked"
+  fi
 }
 
 idle_seconds=$(get_idle_seconds)

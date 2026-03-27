@@ -45,6 +45,7 @@ def init_db():
             terminal_cmds TEXT,
             notification_app TEXT,
             notification_text TEXT,
+            all_tabs TEXT,
             idle_state TEXT DEFAULT 'active',
             idle_seconds INTEGER DEFAULT 0,
             raw_payload TEXT,
@@ -116,8 +117,8 @@ def push_activity():
     db.execute("""
         INSERT INTO activity_stream 
         (ts, app, window_title, url, file_path, git_repo, git_branch, 
-         terminal_cmds, idle_state, idle_seconds, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         terminal_cmds, all_tabs, idle_state, idle_seconds, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('ts'),
         data.get('app'),
@@ -127,6 +128,7 @@ def push_activity():
         data.get('git_repo'),
         data.get('git_branch'),
         json.dumps(data.get('terminal_cmds', '')) if data.get('terminal_cmds') else None,
+        data.get('all_tabs'),
         data.get('idle_state', 'active'),
         data.get('idle_seconds', 0),
         json.dumps(data)
@@ -165,18 +167,41 @@ def push_commit():
 
 @app.route('/context/health', methods=['GET'])
 def health():
-    """Health check endpoint."""
+    """Health check endpoint - also used for capture verification."""
     try:
         db = get_db()
         count = db.execute("SELECT COUNT(*) FROM activity_stream").fetchone()[0]
         latest = db.execute(
             "SELECT ts FROM activity_stream ORDER BY id DESC LIMIT 1"
         ).fetchone()
+        
+        # Check if captures are arriving (last 10 minutes)
+        recent = db.execute(
+            "SELECT COUNT(*) FROM activity_stream WHERE created_at > datetime('now', '-10 minutes')"
+        ).fetchone()[0]
+        
+        # Check if captures are stale (nothing in last 15 minutes while not idle)
+        last_active = db.execute(
+            "SELECT ts, idle_state FROM activity_stream ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        
+        capture_status = 'healthy'
+        if recent == 0 and count > 0:
+            if last_active and last_active[1] in ('locked', 'away'):
+                capture_status = 'mac_idle'
+            else:
+                capture_status = 'stale'  # daemon may have stopped
+        elif count == 0:
+            capture_status = 'no_data'
+        
         db.close()
         return jsonify({
             'status': 'ok',
+            'capture_status': capture_status,
             'total_rows': count,
-            'latest_activity': latest[0] if latest else None
+            'recent_captures_10min': recent,
+            'latest_activity': latest[0] if latest else None,
+            'latest_idle_state': last_active[1] if last_active else None
         })
     except Exception as e:
         return jsonify({'status': 'error', 'detail': str(e)}), 500

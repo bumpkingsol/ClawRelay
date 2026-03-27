@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenClaw Context Bridge Receiver
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/clawd/openclaw-computer-vision/server
+EnvironmentFile=/home/admin/clawd/.env
+ExecStart=/usr/bin/python3 /home/admin/clawd/openclaw-computer-vision/server/context-receiver.py
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/admin/clawd/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenClaw Context Bridge Receiver
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/user/clawrelay/openclaw-computer-vision/server
+EnvironmentFile=/home/user/clawrelay/.env
+ExecStart=/usr/bin/python3 /home/user/clawrelay/openclaw-computer-vision/server/context-receiver.py
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/user/clawrelay/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

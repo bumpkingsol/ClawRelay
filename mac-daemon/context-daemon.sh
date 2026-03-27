@@ -88,10 +88,23 @@ fi
 ACTIVE_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
 WINDOW_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of first application process whose frontmost is true' 2>/dev/null || echo "")
 
-# --- Chrome URL (if Chrome is active) ---
+# --- Chrome URLs (all open tabs, not just active) ---
 CHROME_URL=""
-if [[ "$ACTIVE_APP" == "Google Chrome" ]]; then
+CHROME_ALL_TABS=""
+if pgrep -x "Google Chrome" >/dev/null 2>&1; then
   CHROME_URL=$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window' 2>/dev/null || echo "")
+  CHROME_ALL_TABS=$(osascript -e '
+    set tabList to {}
+    tell application "Google Chrome"
+      repeat with w in windows
+        repeat with t in tabs of w
+          set end of tabList to (URL of t) & "|" & (title of t)
+        end repeat
+      end repeat
+    end tell
+    set AppleScript'\''s text item delimiters to ";;;"
+    return tabList as text
+  ' 2>/dev/null || echo "")
 fi
 
 # --- File path from editor window title ---
@@ -164,6 +177,7 @@ payload = {
     'app': '$(echo "$ACTIVE_APP" | sed "s/'/\\\\'/g")',
     'window_title': $(echo "$WINDOW_TITLE" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""'),
     'url': '$(echo "$CHROME_URL" | sed "s/'/\\\\'/g")',
+    'all_tabs': $(echo "$CHROME_ALL_TABS" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""'),
     'file_path': '$(echo "$FILE_PATH" | sed "s/'/\\\\'/g")',
     'git_repo': '$GIT_REPO',
     'git_branch': '$GIT_BRANCH',

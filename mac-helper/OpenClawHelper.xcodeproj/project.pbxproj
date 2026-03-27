@@ -10,6 +10,14 @@
 		A10000010000000000000001 /* OpenClawHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* OpenClawHelperApp.swift */; };
 		A10000010000000000000002 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* AppModel.swift */; };
 		A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* OpenClawHelperTests.swift */; };
+		A10000050000000000000001 /* BridgeSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000001 /* BridgeSnapshot.swift */; };
+		A10000050000000000000002 /* PermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000002 /* PermissionStatus.swift */; };
+		A10000050000000000000003 /* BridgeCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000003 /* BridgeCommandRunner.swift */; };
+		A10000050000000000000004 /* RefreshTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000004 /* RefreshTimer.swift */; };
+		A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000005 /* BridgeCommandRunnerTests.swift */; };
+		A10000050000000000000006 /* bridge-status.active.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000006 /* bridge-status.active.json */; };
+		A10000050000000000000007 /* bridge-status.paused.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000007 /* bridge-status.paused.json */; };
+		A10000050000000000000008 /* bridge-status.needs-attention.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000008 /* bridge-status.needs-attention.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,6 +38,14 @@
 		A20000010000000000000005 /* OpenClawHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OpenClawHelper.entitlements; sourceTree = "<group>"; };
 		A20000010000000000000006 /* OpenClawHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenClawHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000010000000000000007 /* OpenClawHelperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenClawHelperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000050000000000000001 /* BridgeSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeSnapshot.swift; sourceTree = "<group>"; };
+		A20000050000000000000002 /* PermissionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatus.swift; sourceTree = "<group>"; };
+		A20000050000000000000003 /* BridgeCommandRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeCommandRunner.swift; sourceTree = "<group>"; };
+		A20000050000000000000004 /* RefreshTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshTimer.swift; sourceTree = "<group>"; };
+		A20000050000000000000005 /* BridgeCommandRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeCommandRunnerTests.swift; sourceTree = "<group>"; };
+		A20000050000000000000006 /* bridge-status.active.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.active.json"; sourceTree = "<group>"; };
+		A20000050000000000000007 /* bridge-status.paused.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.paused.json"; sourceTree = "<group>"; };
+		A20000050000000000000008 /* bridge-status.needs-attention.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.needs-attention.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +81,8 @@
 				A20000010000000000000001 /* OpenClawHelperApp.swift */,
 				A20000010000000000000002 /* AppModel.swift */,
 				A20000010000000000000005 /* OpenClawHelper.entitlements */,
+				A70000050000000000000001 /* Models */,
+				A70000050000000000000002 /* Services */,
 				A70000010000000000000005 /* Support */,
 			);
 			path = OpenClawHelper;
@@ -74,6 +92,8 @@
 			isa = PBXGroup;
 			children = (
 				A20000010000000000000003 /* OpenClawHelperTests.swift */,
+				A20000050000000000000005 /* BridgeCommandRunnerTests.swift */,
+				A70000050000000000000003 /* Fixtures */,
 			);
 			path = OpenClawHelperTests;
 			sourceTree = "<group>";
@@ -93,6 +113,34 @@
 				A20000010000000000000004 /* OpenClawHelper-Info.plist */,
 			);
 			path = Support;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000001 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000050000000000000001 /* BridgeSnapshot.swift */,
+				A20000050000000000000002 /* PermissionStatus.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000002 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20000050000000000000003 /* BridgeCommandRunner.swift */,
+				A20000050000000000000004 /* RefreshTimer.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000003 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				A20000050000000000000006 /* bridge-status.active.json */,
+				A20000050000000000000007 /* bridge-status.paused.json */,
+				A20000050000000000000008 /* bridge-status.needs-attention.json */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -120,6 +168,7 @@
 			buildPhases = (
 				A90000010000000000000002 /* Sources */,
 				A60000010000000000000002 /* Frameworks */,
+				A90000050000000000000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -169,6 +218,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A90000050000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000050000000000000006 /* bridge-status.active.json in Resources */,
+				A10000050000000000000007 /* bridge-status.paused.json in Resources */,
+				A10000050000000000000008 /* bridge-status.needs-attention.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		A90000010000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -176,6 +238,10 @@
 			files = (
 				A10000010000000000000001 /* OpenClawHelperApp.swift in Sources */,
 				A10000010000000000000002 /* AppModel.swift in Sources */,
+				A10000050000000000000001 /* BridgeSnapshot.swift in Sources */,
+				A10000050000000000000002 /* PermissionStatus.swift in Sources */,
+				A10000050000000000000003 /* BridgeCommandRunner.swift in Sources */,
+				A10000050000000000000004 /* RefreshTimer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -184,6 +250,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */,
+				A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

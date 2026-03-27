@@ -76,12 +76,70 @@ def extract_google_doc_urls(rows):
             val = row[field] or ''
             for prefix in google_prefixes:
                 if prefix in val:
-                    # Extract full URL
                     for part in val.split(';;;'):
                         url_part = part.split('|')[0] if '|' in part else part
                         if any(p in url_part for p in google_prefixes):
                             urls.add(url_part.strip())
     return urls
+
+
+def extract_doc_id(url):
+    """Extract Google Doc/Sheet/Slides ID from URL."""
+    # URLs look like: https://docs.google.com/document/d/DOC_ID/edit
+    import re
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+    return match.group(1) if match else None
+
+
+def read_google_doc_content(url):
+    """Read a Google Doc/Slides/Sheet content via gog CLI.
+    
+    This is JC's tool, NOT the daemon's. The daemon captures URLs,
+    this function reads the actual content during digest processing.
+    """
+    doc_id = extract_doc_id(url)
+    if not doc_id:
+        return None
+    
+    doc_type = None
+    if '/document/' in url:
+        doc_type = 'docs'
+    elif '/spreadsheets/' in url:
+        doc_type = 'sheets'
+    elif '/presentation/' in url:
+        doc_type = 'slides'
+    
+    if not doc_type:
+        return None
+    
+    try:
+        if doc_type == 'docs':
+            result = subprocess.run(
+                ['gog', 'docs', 'get', doc_id],
+                capture_output=True, text=True, timeout=30
+            )
+        elif doc_type == 'sheets':
+            result = subprocess.run(
+                ['gog', 'sheets', 'get', doc_id, 'A1:Z100'],
+                capture_output=True, text=True, timeout=30
+            )
+        elif doc_type == 'slides':
+            # gog may not have a slides get command - fall back to Drive metadata
+            result = subprocess.run(
+                ['gog', 'drive', 'info', doc_id],
+                capture_output=True, text=True, timeout=30
+            )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            # Truncate to avoid massive content in digest
+            content = result.stdout.strip()
+            if len(content) > 3000:
+                content = content[:3000] + "\n... (truncated)"
+            return content
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    
+    return None
 
 
 def get_recent_commits(since_ts):
@@ -264,14 +322,19 @@ def build_digest(hours_back=8):
                     lines.append("```")
                     lines.append("")
     
-    # Google docs found
+    # Google docs found - read content via gog
     if google_urls:
         lines.append("## Google Workspace Documents Accessed")
         for u in sorted(google_urls):
-            lines.append(f"- {u}")
-        lines.append("")
-        lines.append("*Digest processor should read these via `gog` for content context.*")
-        lines.append("")
+            lines.append(f"### {u}")
+            content = read_google_doc_content(u)
+            if content:
+                lines.append("```")
+                lines.append(content)
+                lines.append("```")
+            else:
+                lines.append("*(Could not read content - check gog auth)*")
+            lines.append("")
     
     # Unfinished / gaps
     all_known = set(PROJECTS.keys()) - {'other', 'legal', 'openclaw'}

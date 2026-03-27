@@ -46,6 +46,12 @@ def init_db():
             notification_app TEXT,
             notification_text TEXT,
             all_tabs TEXT,
+            clipboard TEXT,
+            clipboard_changed INTEGER DEFAULT 0,
+            file_changes TEXT,
+            codex_session TEXT,
+            codex_running INTEGER DEFAULT 0,
+            whatsapp_context TEXT,
             idle_state TEXT DEFAULT 'active',
             idle_seconds INTEGER DEFAULT 0,
             raw_payload TEXT,
@@ -117,8 +123,10 @@ def push_activity():
     db.execute("""
         INSERT INTO activity_stream 
         (ts, app, window_title, url, file_path, git_repo, git_branch, 
-         terminal_cmds, all_tabs, idle_state, idle_seconds, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         terminal_cmds, all_tabs, clipboard, clipboard_changed, file_changes,
+         codex_session, codex_running, whatsapp_context,
+         idle_state, idle_seconds, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('ts'),
         data.get('app'),
@@ -129,6 +137,12 @@ def push_activity():
         data.get('git_branch'),
         json.dumps(data.get('terminal_cmds', '')) if data.get('terminal_cmds') else None,
         data.get('all_tabs'),
+        data.get('clipboard'),
+        1 if data.get('clipboard_changed') else 0,
+        data.get('file_changes'),
+        data.get('codex_session'),
+        1 if data.get('codex_running') else 0,
+        data.get('whatsapp_context'),
         data.get('idle_state', 'active'),
         data.get('idle_seconds', 0),
         json.dumps(data)
@@ -164,6 +178,47 @@ def push_commit():
     db.close()
     
     return jsonify({'status': 'ok'}), 201
+
+@app.route('/context/handoff', methods=['POST'])
+def handoff():
+    """Receive explicit task handoff from Jonas.
+    
+    Jonas sends: /handoff prescrivia p0-6
+    Telegram bot (or direct POST) converts to API call.
+    JC reads handoffs and picks up the task.
+    """
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    try:
+        data = request.get_json(force=True)
+    except Exception:
+        return jsonify({'error': 'invalid json'}), 400
+    
+    db = get_db()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS handoffs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            task TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    db.execute("""
+        INSERT INTO handoffs (project, task, message)
+        VALUES (?, ?, ?)
+    """, (
+        data.get('project', ''),
+        data.get('task', ''),
+        data.get('message', '')
+    ))
+    db.commit()
+    db.close()
+    
+    return jsonify({'status': 'ok', 'message': f"Handoff received: {data.get('project')} - {data.get('task')}"}), 201
+
 
 @app.route('/context/health', methods=['GET'])
 def health():

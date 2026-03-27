@@ -61,12 +61,17 @@ if ! command -v fswatch &>/dev/null; then
   fi
 fi
 
-# 2. Install daemon scripts
+# 2. Install daemon scripts (user-owned, no sudo needed)
 echo "[2/8] Installing daemon scripts..."
-sudo cp "$SCRIPT_DIR/context-daemon.sh" /usr/local/bin/context-bridge-daemon.sh
-sudo cp "$SCRIPT_DIR/fswatch-projects.sh" /usr/local/bin/context-bridge-fswatch.sh
-sudo chmod +x /usr/local/bin/context-bridge-daemon.sh
-sudo chmod +x /usr/local/bin/context-bridge-fswatch.sh
+mkdir -p "$CB_DIR/bin"
+cp "$SCRIPT_DIR/context-daemon.sh"    "$CB_DIR/bin/context-bridge-daemon.sh"
+cp "$SCRIPT_DIR/fswatch-projects.sh"  "$CB_DIR/bin/context-bridge-fswatch.sh"
+cp "$SCRIPT_DIR/context-common.sh"    "$CB_DIR/bin/context-common.sh"
+cp "$SCRIPT_DIR/context-helperctl.sh" "$CB_DIR/bin/context-helperctl.sh"
+chmod 700 "$CB_DIR/bin/context-bridge-daemon.sh" \
+          "$CB_DIR/bin/context-bridge-fswatch.sh" \
+          "$CB_DIR/bin/context-helperctl.sh"
+chmod 600 "$CB_DIR/bin/context-common.sh"
 
 # 3. Store auth token in macOS Keychain
 echo "[3/8] Storing auth token in Keychain..."
@@ -116,14 +121,18 @@ fi
 # 7. Install launchd services
 echo "[7/8] Installing launchd services..."
 
-# Main daemon (every 2 minutes)
-cp "$SCRIPT_DIR/com.openclaw.context-bridge.plist" "$HOME/Library/LaunchAgents/"
+# Main daemon (every 2 minutes) – render template with actual bin path
+sed "s#__CONTEXT_BRIDGE_BIN_DIR__#$CB_DIR/bin#g" \
+  "$SCRIPT_DIR/com.openclaw.context-bridge.plist" \
+  > "$HOME/Library/LaunchAgents/com.openclaw.context-bridge.plist"
 launchctl unload "$HOME/Library/LaunchAgents/com.openclaw.context-bridge.plist" 2>/dev/null || true
 launchctl load "$HOME/Library/LaunchAgents/com.openclaw.context-bridge.plist"
 
 # File watcher (persistent)
 if command -v fswatch &>/dev/null; then
-  cp "$SCRIPT_DIR/com.openclaw.context-bridge-fswatch.plist" "$HOME/Library/LaunchAgents/"
+  sed "s#__CONTEXT_BRIDGE_BIN_DIR__#$CB_DIR/bin#g" \
+    "$SCRIPT_DIR/com.openclaw.context-bridge-fswatch.plist" \
+    > "$HOME/Library/LaunchAgents/com.openclaw.context-bridge-fswatch.plist"
   launchctl unload "$HOME/Library/LaunchAgents/com.openclaw.context-bridge-fswatch.plist" 2>/dev/null || true
   launchctl load "$HOME/Library/LaunchAgents/com.openclaw.context-bridge-fswatch.plist"
   echo "  File watcher installed"

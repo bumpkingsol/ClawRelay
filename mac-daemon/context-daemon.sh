@@ -1,7 +1,8 @@
 #!/bin/bash
 # OpenClaw Context Bridge - Mac Daemon
-# Captures active window, URLs, file paths, git state, idle status
-# Runs every 2-3 minutes via launchd
+# Captures active window, URLs, file paths, git state, idle status,
+# clipboard, file changes, Codex sessions, WhatsApp context
+# Runs every 2 minutes via launchd
 
 set -euo pipefail
 
@@ -10,9 +11,11 @@ SERVER_URL="${CONTEXT_BRIDGE_URL:-https://localhost:7890/context/push}"
 AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
 CMD_LOG="$HOME/.context-bridge-cmds.log"
 LOCAL_DB="$HOME/.context-bridge/local.db"
+CLIPBOARD_HASH_FILE="$HOME/.context-bridge/last-clipboard-hash"
+FSWATCH_LOG="$HOME/.context-bridge/fswatch-changes.log"
 IDLE_THRESHOLD=300  # 5 minutes in seconds
 
-# --- Ensure local queue DB exists ---
+# --- Ensure dirs + local queue DB ---
 mkdir -p "$HOME/.context-bridge"
 if [ ! -f "$LOCAL_DB" ]; then
   sqlite3 "$LOCAL_DB" "CREATE TABLE IF NOT EXISTS queue (
@@ -24,7 +27,6 @@ fi
 
 # --- Auth check ---
 if [ -z "$AUTH_TOKEN" ]; then
-  # Try macOS Keychain
   AUTH_TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
   if [ -z "$AUTH_TOKEN" ]; then
     echo "ERROR: No auth token found. Set CONTEXT_BRIDGE_TOKEN or add to Keychain." >&2
@@ -63,32 +65,34 @@ fi
 
 # --- If idle/away/locked, send minimal payload ---
 if [ "$IDLE_STATE" != "active" ]; then
-  PAYLOAD=$(cat <<ENDJSON
-{
-  "ts": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "idle_state": "$IDLE_STATE",
-  "idle_seconds": ${idle_seconds:-0}
-}
-ENDJSON
-)
-  # Try to send, queue if offline
+  PAYLOAD=$(python3 -c "
+import json
+print(json.dumps({
+    'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'idle_state': '$IDLE_STATE',
+    'idle_seconds': ${idle_seconds:-0}
+}))
+" 2>/dev/null)
   HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
     -X POST "$SERVER_URL" \
     -H "Authorization: Bearer $AUTH_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "$PAYLOAD" 2>/dev/null || echo "000")
-  
+    -d "$PAYLOAD" --connect-timeout 5 --max-time 10 2>/dev/null || echo "000")
   if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
-    sqlite3 "$LOCAL_DB" "INSERT INTO queue (payload) VALUES ('$(echo "$PAYLOAD" | sed "s/'/''/" )');"
+    sqlite3 "$LOCAL_DB" "INSERT INTO queue (payload) VALUES ($(echo "$PAYLOAD" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))"))" 2>/dev/null
   fi
   exit 0
 fi
+
+# ============================================================
+# ACTIVE STATE - Full Capture
+# ============================================================
 
 # --- Active App + Window Title ---
 ACTIVE_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
 WINDOW_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of first application process whose frontmost is true' 2>/dev/null || echo "")
 
-# --- Chrome URLs (all open tabs, not just active) ---
+# --- Chrome URLs (all open tabs) ---
 CHROME_URL=""
 CHROME_ALL_TABS=""
 if pgrep -x "Google Chrome" >/dev/null 2>&1; then
@@ -113,53 +117,132 @@ GIT_REPO=""
 GIT_BRANCH=""
 
 if [[ "$ACTIVE_APP" == "Cursor" || "$ACTIVE_APP" == "Code" || "$ACTIVE_APP" == "Visual Studio Code" ]]; then
-  # Electron editors show: filename - folder - AppName
-  # Extract the folder part to infer project
+  # Electron editors: try multiple separator patterns
   FILE_PATH=$(echo "$WINDOW_TITLE" | sed -n 's/.*— \(.*\) — .*/\1/p' 2>/dev/null || echo "")
   if [ -z "$FILE_PATH" ]; then
-    # Try dash separator variant
     FILE_PATH=$(echo "$WINDOW_TITLE" | sed -n 's/.* - \(.*\) - .*/\1/p' 2>/dev/null || echo "")
   fi
+  if [ -z "$FILE_PATH" ]; then
+    FILE_PATH=$(echo "$WINDOW_TITLE" | sed -n 's/.* | \(.*\) | .*/\1/p' 2>/dev/null || echo "")
+  fi
   
-  # Try to get git info from the project directory
+  # Git info from project directory
   if [ -n "$FILE_PATH" ] && [ -d "$HOME/$FILE_PATH" ]; then
     GIT_BRANCH=$(cd "$HOME/$FILE_PATH" && git branch --show-current 2>/dev/null || echo "")
     GIT_REPO=$(cd "$HOME/$FILE_PATH" && basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "")
   fi
 fi
 
-# --- Terminal: check for active git repo in pwd ---
+# --- Terminal context ---
+TERM_PWD=""
 if [[ "$ACTIVE_APP" == "Terminal" || "$ACTIVE_APP" == "iTerm2" || "$ACTIVE_APP" == "Warp" ]]; then
-  # Try to get the frontmost terminal's working directory
   if [[ "$ACTIVE_APP" == "Terminal" ]]; then
-    # macOS Terminal stores CWD in custom property
     TERM_PWD=$(osascript -e 'tell application "Terminal" to get custom title of front window' 2>/dev/null || echo "")
+  fi
+  # Also try to infer git info from terminal window title (often shows branch)
+  if echo "$WINDOW_TITLE" | grep -q "git:" 2>/dev/null; then
+    GIT_BRANCH=$(echo "$WINDOW_TITLE" | grep -oE 'git:[^ ]+' | cut -d: -f2 || echo "")
   fi
 fi
 
 # --- Terminal commands (from preexec hook log) ---
 TERMINAL_CMDS=""
-if [ -f "$CMD_LOG" ]; then
-  # Read last 10 commands, filter sensitive content
+if [ -f "$CMD_LOG" ] && [ -s "$CMD_LOG" ]; then
   TERMINAL_CMDS=$(tail -20 "$CMD_LOG" 2>/dev/null | \
-    sed -E 's/(export\s+\w*(KEY|TOKEN|SECRET|PASSWORD|PASS)\w*=).*/\1[REDACTED]/gi' | \
-    sed -E 's/(Bearer\s+)\S+/\1[REDACTED]/g' | \
-    sed -E 's/(password|secret|token)\s*=\s*\S+/\1=[REDACTED]/gi' | \
+    sed -E 's/(export[[:space:]]+[A-Za-z_]*(KEY|TOKEN|SECRET|PASSWORD|PASS)[A-Za-z_]*=).*/\1[REDACTED]/gi' | \
+    sed -E 's/(Bearer[[:space:]]+)[^ ]+/\1[REDACTED]/g' | \
+    sed -E 's/(password|secret|token)[[:space:]]*=[[:space:]]*[^ ]+/\1=[REDACTED]/gi' | \
     sed -E 's/sk-[a-zA-Z0-9]+/[REDACTED_KEY]/g' | \
     sed -E 's/sb_[a-zA-Z0-9_]+/[REDACTED_KEY]/g' | \
+    sed -E 's/am_[a-zA-Z0-9_]+/[REDACTED_KEY]/g' | \
     tail -10 | \
     python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
-  
-  # Flush the log after reading
   > "$CMD_LOG"
 fi
 
-# --- Notifications (recent, last 3 minutes) ---
+# --- Clipboard capture (with change detection + filtering) ---
+CLIPBOARD_CONTENT=""
+CLIPBOARD_CHANGED="false"
+CURRENT_CLIP=$(pbpaste 2>/dev/null | head -c 2000 || echo "")  # cap at 2KB
+if [ -n "$CURRENT_CLIP" ]; then
+  CURRENT_HASH=$(echo "$CURRENT_CLIP" | md5 -q 2>/dev/null || echo "$CURRENT_CLIP" | md5sum 2>/dev/null | cut -d' ' -f1)
+  LAST_HASH=""
+  if [ -f "$CLIPBOARD_HASH_FILE" ]; then
+    LAST_HASH=$(cat "$CLIPBOARD_HASH_FILE" 2>/dev/null || echo "")
+  fi
+  if [ "$CURRENT_HASH" != "$LAST_HASH" ]; then
+    CLIPBOARD_CHANGED="true"
+    echo "$CURRENT_HASH" > "$CLIPBOARD_HASH_FILE"
+    # Filter sensitive clipboard content
+    FILTERED_CLIP=$(echo "$CURRENT_CLIP" | \
+      sed -E 's/sk-[a-zA-Z0-9]{20,}/[REDACTED_KEY]/g' | \
+      sed -E 's/sb_[a-zA-Z0-9_]{20,}/[REDACTED_KEY]/g' | \
+      sed -E 's/Bearer [a-zA-Z0-9._-]+/Bearer [REDACTED]/g' | \
+      sed -E 's/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/[EMAIL]/g' | \
+      head -c 1000)
+    # Skip if it looks like a password (short, no spaces, mixed case+numbers+symbols)
+    if echo "$FILTERED_CLIP" | grep -qE '^[^ ]{8,64}$' && echo "$FILTERED_CLIP" | grep -qE '[A-Z]' && echo "$FILTERED_CLIP" | grep -qE '[0-9]' && echo "$FILTERED_CLIP" | grep -qE '[^a-zA-Z0-9]'; then
+      CLIPBOARD_CONTENT=""
+    else
+      CLIPBOARD_CONTENT="$FILTERED_CLIP"
+    fi
+  fi
+fi
+
+# --- File change events (from fswatch log) ---
+FILE_CHANGES=""
+if [ -f "$FSWATCH_LOG" ] && [ -s "$FSWATCH_LOG" ]; then
+  FILE_CHANGES=$(tail -30 "$FSWATCH_LOG" 2>/dev/null | \
+    sort -u | \
+    head -20 | \
+    python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
+  > "$FSWATCH_LOG"
+fi
+
+# --- Codex / Claude Code session detection ---
+CODEX_SESSION=""
+# Check for active Codex sessions (Codex stores sessions in ~/.codex/sessions/)
+CODEX_DIR="$HOME/.codex/sessions"
+if [ -d "$CODEX_DIR" ]; then
+  # Find sessions modified in last 5 minutes
+  RECENT_SESSIONS=$(find "$CODEX_DIR" -name "*.json" -mmin -5 2>/dev/null | head -3)
+  if [ -n "$RECENT_SESSIONS" ]; then
+    CODEX_SESSION=$(echo "$RECENT_SESSIONS" | while read -r sess; do
+      # Extract session metadata (task/prompt) without full conversation
+      python3 -c "
+import json, sys
+try:
+    with open('$sess') as f:
+        data = json.load(f)
+    # Get just the initial task/prompt, not full conversation
+    task = data.get('task', data.get('prompt', data.get('messages', [{}])[0].get('content', '')))[:200]
+    print(json.dumps({'file': '$sess', 'task': task}))
+except: pass
+" 2>/dev/null
+    done | python3 -c "import sys,json; lines=[l.strip() for l in sys.stdin if l.strip()]; print(json.dumps(lines))" 2>/dev/null || echo '[]')
+  fi
+fi
+# Also check if Claude Code / Codex is running as a process
+CODEX_RUNNING="false"
+if pgrep -f "codex" >/dev/null 2>&1 || pgrep -f "claude" >/dev/null 2>&1; then
+  CODEX_RUNNING="true"
+fi
+
+# --- WhatsApp Desktop context ---
+WHATSAPP_CONTEXT=""
+if pgrep -x "WhatsApp" >/dev/null 2>&1; then
+  # Get WhatsApp window title (shows active chat name)
+  WA_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of application process "WhatsApp"' 2>/dev/null || echo "")
+  if [ -n "$WA_TITLE" ]; then
+    WHATSAPP_CONTEXT="$WA_TITLE"
+  fi
+fi
+
+# --- Notifications (with Full Disk Access support) ---
 NOTIFICATIONS=""
-# macOS notification center access requires a helper - simplified approach:
-# Read from notification database if accessible
+# Primary: notification center DB (requires Full Disk Access)
 NOTIF_DB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
-if [ -f "$NOTIF_DB" ]; then
+if [ -f "$NOTIF_DB" ] && [ -r "$NOTIF_DB" ]; then
   NOTIFICATIONS=$(sqlite3 "$NOTIF_DB" "
     SELECT app_id, title, body 
     FROM record 
@@ -168,25 +251,93 @@ if [ -f "$NOTIF_DB" ]; then
     LIMIT 5
   " 2>/dev/null | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
 fi
+# Fallback: try alternative notification DB paths for different macOS versions
+if [ "$NOTIFICATIONS" = '""' ] || [ -z "$NOTIFICATIONS" ]; then
+  ALT_NOTIF_DB="$HOME/Library/Group Containers/group.com.apple.usernoted/db/db"
+  if [ -f "$ALT_NOTIF_DB" ] && [ -r "$ALT_NOTIF_DB" ]; then
+    NOTIFICATIONS=$(sqlite3 "$ALT_NOTIF_DB" "
+      SELECT app_id, title, body 
+      FROM record 
+      WHERE delivered_date > strftime('%s','now') - 180
+      ORDER BY delivered_date DESC
+      LIMIT 5
+    " 2>/dev/null | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
+  fi
+fi
 
-# --- Build payload ---
-PAYLOAD=$(python3 -c "
-import json, sys
-payload = {
-    'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
-    'app': '$(echo "$ACTIVE_APP" | sed "s/'/\\\\'/g")',
-    'window_title': $(echo "$WINDOW_TITLE" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""'),
-    'url': '$(echo "$CHROME_URL" | sed "s/'/\\\\'/g")',
-    'all_tabs': $(echo "$CHROME_ALL_TABS" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""'),
-    'file_path': '$(echo "$FILE_PATH" | sed "s/'/\\\\'/g")',
-    'git_repo': '$GIT_REPO',
-    'git_branch': '$GIT_BRANCH',
-    'terminal_cmds': $TERMINAL_CMDS,
-    'notifications': $NOTIFICATIONS,
-    'idle_state': '$IDLE_STATE',
-    'idle_seconds': ${idle_seconds:-0}
+# ============================================================
+# BUILD + SEND PAYLOAD
+# ============================================================
+
+PAYLOAD=$(python3 << 'PYEOF'
+import json, sys, os
+
+# Read environment variables passed from bash
+data = {
+    'ts': os.popen('date -u +%Y-%m-%dT%H:%M:%SZ').read().strip(),
+    'app': os.environ.get('CB_APP', ''),
+    'window_title': os.environ.get('CB_WINDOW_TITLE', ''),
+    'url': os.environ.get('CB_CHROME_URL', ''),
+    'all_tabs': os.environ.get('CB_ALL_TABS', ''),
+    'file_path': os.environ.get('CB_FILE_PATH', ''),
+    'git_repo': os.environ.get('CB_GIT_REPO', ''),
+    'git_branch': os.environ.get('CB_GIT_BRANCH', ''),
+    'terminal_cmds': os.environ.get('CB_TERMINAL_CMDS', ''),
+    'clipboard': os.environ.get('CB_CLIPBOARD', ''),
+    'clipboard_changed': os.environ.get('CB_CLIPBOARD_CHANGED', 'false') == 'true',
+    'file_changes': os.environ.get('CB_FILE_CHANGES', ''),
+    'codex_session': os.environ.get('CB_CODEX_SESSION', ''),
+    'codex_running': os.environ.get('CB_CODEX_RUNNING', 'false') == 'true',
+    'whatsapp_context': os.environ.get('CB_WHATSAPP', ''),
+    'notifications': os.environ.get('CB_NOTIFICATIONS', ''),
+    'idle_state': 'active',
+    'idle_seconds': int(os.environ.get('CB_IDLE_SECONDS', '0')),
 }
-print(json.dumps(payload))
+print(json.dumps(data))
+PYEOF
+)
+
+# Export for Python payload builder
+export CB_APP="$ACTIVE_APP"
+export CB_WINDOW_TITLE="$WINDOW_TITLE"
+export CB_CHROME_URL="$CHROME_URL"
+export CB_ALL_TABS="$CHROME_ALL_TABS"
+export CB_FILE_PATH="$FILE_PATH"
+export CB_GIT_REPO="$GIT_REPO"
+export CB_GIT_BRANCH="$GIT_BRANCH"
+export CB_TERMINAL_CMDS="${TERMINAL_CMDS:-""}"
+export CB_CLIPBOARD="$CLIPBOARD_CONTENT"
+export CB_CLIPBOARD_CHANGED="$CLIPBOARD_CHANGED"
+export CB_FILE_CHANGES="${FILE_CHANGES:-""}"
+export CB_CODEX_SESSION="${CODEX_SESSION:-""}"
+export CB_CODEX_RUNNING="$CODEX_RUNNING"
+export CB_WHATSAPP="$WHATSAPP_CONTEXT"
+export CB_NOTIFICATIONS="${NOTIFICATIONS:-""}"
+export CB_IDLE_SECONDS="${idle_seconds:-0}"
+
+PAYLOAD=$(python3 -c "
+import json, os
+data = {
+    'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'app': os.environ.get('CB_APP', ''),
+    'window_title': os.environ.get('CB_WINDOW_TITLE', ''),
+    'url': os.environ.get('CB_CHROME_URL', ''),
+    'all_tabs': os.environ.get('CB_ALL_TABS', ''),
+    'file_path': os.environ.get('CB_FILE_PATH', ''),
+    'git_repo': os.environ.get('CB_GIT_REPO', ''),
+    'git_branch': os.environ.get('CB_GIT_BRANCH', ''),
+    'terminal_cmds': os.environ.get('CB_TERMINAL_CMDS', ''),
+    'clipboard': os.environ.get('CB_CLIPBOARD', ''),
+    'clipboard_changed': os.environ.get('CB_CLIPBOARD_CHANGED', 'false') == 'true',
+    'file_changes': os.environ.get('CB_FILE_CHANGES', ''),
+    'codex_session': os.environ.get('CB_CODEX_SESSION', ''),
+    'codex_running': os.environ.get('CB_CODEX_RUNNING', 'false') == 'true',
+    'whatsapp_context': os.environ.get('CB_WHATSAPP', ''),
+    'notifications': os.environ.get('CB_NOTIFICATIONS', ''),
+    'idle_state': 'active',
+    'idle_seconds': int(os.environ.get('CB_IDLE_SECONDS', '0')),
+}
+print(json.dumps(data))
 " 2>/dev/null)
 
 if [ -z "$PAYLOAD" ]; then
@@ -205,7 +356,7 @@ HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
   2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-  # Success - also flush any queued items
+  # Flush queued items
   QUEUED=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM queue;" 2>/dev/null || echo "0")
   if [ "$QUEUED" -gt 0 ]; then
     sqlite3 "$LOCAL_DB" "SELECT payload FROM queue ORDER BY id ASC LIMIT 50;" 2>/dev/null | while read -r queued_payload; do
@@ -214,16 +365,12 @@ if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
         -H "Authorization: Bearer $AUTH_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$queued_payload" \
-        --connect-timeout 5 \
-        --max-time 10 \
-        2>/dev/null && \
+        --connect-timeout 5 --max-time 10 2>/dev/null && \
         sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE payload = '$(echo "$queued_payload" | sed "s/'/''/g")';" 2>/dev/null
     done
   fi
 else
-  # Offline or error - queue locally
-  sqlite3 "$LOCAL_DB" "INSERT INTO queue (payload) VALUES ($(echo "$PAYLOAD" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null));" 2>/dev/null
-  
-  # Enforce max queue size
+  # Queue locally
+  sqlite3 "$LOCAL_DB" "INSERT INTO queue (payload) VALUES ($(echo "$PAYLOAD" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))"))" 2>/dev/null
   sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE id NOT IN (SELECT id FROM queue ORDER BY id DESC LIMIT 10000);" 2>/dev/null
 fi

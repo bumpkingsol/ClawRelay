@@ -118,7 +118,17 @@ is_sensitive_app() {
 
 # --- Idle Detection ---
 get_idle_seconds() {
-  ioreg -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'
+  ioreg -c IOHIDSystem 2>/dev/null | awk '
+    /HIDIdleTime/ && !seen {
+      print int($NF/1000000000)
+      seen=1
+    }
+    END {
+      if (!seen) {
+        print 0
+      }
+    }
+  '
 }
 
 is_screen_locked() {
@@ -230,14 +240,13 @@ fi
 # --- Terminal commands (from preexec hook log) ---
 TERMINAL_CMDS=""
 if [ -f "$CMD_LOG" ] && [ -s "$CMD_LOG" ]; then
-  TERMINAL_CMDS=$(tail -20 "$CMD_LOG" 2>/dev/null | \
+  TERMINAL_CMDS=$(tail -10 "$CMD_LOG" 2>/dev/null | \
     sed -E 's/(export[[:space:]]+[A-Za-z_]*(KEY|TOKEN|SECRET|PASSWORD|PASS)[A-Za-z_]*=).*/\1[REDACTED]/gi' | \
     sed -E 's/(Bearer[[:space:]]+)[^ ]+/\1[REDACTED]/g' | \
     sed -E 's/(password|secret|token)[[:space:]]*=[[:space:]]*[^ ]+/\1=[REDACTED]/gi' | \
     sed -E 's/sk-[a-zA-Z0-9]+/[REDACTED_KEY]/g' | \
     sed -E 's/sb_[a-zA-Z0-9_]+/[REDACTED_KEY]/g' | \
     sed -E 's/am_[a-zA-Z0-9_]+/[REDACTED_KEY]/g' | \
-    tail -10 | \
     python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
   > "$CMD_LOG"
 fi
@@ -263,7 +272,7 @@ FILE_CHANGES=""
 if [ -f "$FSWATCH_LOG" ] && [ -s "$FSWATCH_LOG" ]; then
   FILE_CHANGES=$(tail -30 "$FSWATCH_LOG" 2>/dev/null | \
     sort -u | \
-    head -20 | \
+    awk 'NR <= 20 { print }' | \
     python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
   > "$FSWATCH_LOG"
 fi
@@ -274,7 +283,7 @@ CODEX_SESSION=""
 CODEX_DIR="$HOME/.codex/sessions"
 if [ -d "$CODEX_DIR" ]; then
   # Find sessions modified in last 5 minutes
-  RECENT_SESSIONS=$(find "$CODEX_DIR" -name "*.json" -mmin -5 2>/dev/null | head -3)
+  RECENT_SESSIONS=$(find "$CODEX_DIR" -name "*.json" -mmin -5 2>/dev/null | awk 'NR <= 3 { print }')
   if [ -n "$RECENT_SESSIONS" ]; then
     CODEX_SESSION=$(echo "$RECENT_SESSIONS" | while read -r sess; do
       # Extract session metadata (task/prompt) without full conversation

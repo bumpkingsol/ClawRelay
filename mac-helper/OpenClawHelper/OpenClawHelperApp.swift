@@ -1,15 +1,6 @@
 import SwiftUI
 
-// MARK: - Placeholder Views (replaced in Tasks 6 & 7)
-
-struct MenuBarPopoverView: View {
-    @ObservedObject var appModel: AppModel
-
-    var body: some View {
-        Text("Menu Bar Popover - coming in Task 6")
-            .padding()
-    }
-}
+// MARK: - Placeholder Views (replaced in Task 7)
 
 struct ControlCenterView: View {
     @ObservedObject var appModel: AppModel
@@ -28,7 +19,7 @@ struct OpenClawHelperApp: App {
 
     var body: some Scene {
         MenuBarExtra("OpenClaw Helper", systemImage: appModel.menuBarSymbol) {
-            MenuBarPopoverView(appModel: appModel)
+            MenuBarPopoverView(viewModel: appModel.menuBarViewModel)
         }
         .menuBarExtraStyle(.window)
 

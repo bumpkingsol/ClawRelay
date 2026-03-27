@@ -37,6 +37,14 @@ if [ ! -f "$LOCAL_DB" ]; then
 fi
 chmod 600 "$LOCAL_DB" 2>/dev/null || true
 
+# --- Source shared helpers and check pause state ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/context-common.sh"
+
+if cb_is_paused; then
+  exit 0
+fi
+
 # --- Auth check ---
 if [ -z "$AUTH_TOKEN" ]; then
   AUTH_TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
@@ -186,6 +194,13 @@ fi
 # --- If idle/away/locked, send minimal payload ---
 if [ "$IDLE_STATE" != "active" ]; then
   PAYLOAD=$(build_minimal_payload "$IDLE_STATE" "${idle_seconds:-0}")
+  send_payload "$PAYLOAD" || true
+  exit 0
+fi
+
+# --- If sensitive mode, send minimal active payload ---
+if cb_is_sensitive_mode; then
+  PAYLOAD=$(build_minimal_payload "active" "${idle_seconds:-0}")
   send_payload "$PAYLOAD" || true
   exit 0
 fi

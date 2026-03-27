@@ -37,6 +37,19 @@ __HOOK_START_MARKER__
 # OpenClaw Context Bridge - post-commit hook
 set -euo pipefail
 
+# Respect pause state
+PAUSE_FILE="$HOME/.context-bridge/pause-until"
+if [ -f "$PAUSE_FILE" ]; then
+  PAUSE_UNTIL=$(cat "$PAUSE_FILE" 2>/dev/null || echo "")
+  NOW=$(date +%s)
+  if [ "$PAUSE_UNTIL" = "indefinite" ] || { [ -n "$PAUSE_UNTIL" ] && [ "$PAUSE_UNTIL" -gt "$NOW" ]; }; then
+    exit 0
+  fi
+fi
+
+# Sensitive mode: git commit hooks still fire. Only pause suppresses hooks.
+# Canonical pause logic: mac-daemon/context-common.sh:cb_is_paused()
+
 normalize_commit_url() {
   case "$1" in
     */context/commit)
@@ -94,11 +107,18 @@ print(json.dumps({
 }))
 ')
 
-curl -sf -X POST "$COMMIT_URL" \
-  -H "Authorization: Bearer $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD" \
-  "${CURL_TLS_ARGS[@]}" &>/dev/null &
+if [ ${#CURL_TLS_ARGS[@]} -gt 0 ]; then
+  curl -sf -X POST "$COMMIT_URL" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" \
+    "${CURL_TLS_ARGS[@]}" &>/dev/null &
+else
+  curl -sf -X POST "$COMMIT_URL" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" &>/dev/null &
+fi
 __HOOK_END_MARKER__
 HOOKEOF
 HOOK_CONTENT=$(sed \

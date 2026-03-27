@@ -3,6 +3,7 @@
 # Run: bash install.sh <server-url> <auth-token>
 
 set -euo pipefail
+umask 077
 
 SERVER_URL="${1:-}"
 AUTH_TOKEN="${2:-}"
@@ -44,11 +45,11 @@ security add-generic-password -s "context-bridge" -a "token" -w "$AUTH_TOKEN"
 # 4. Configure server URL
 echo "[4/8] Configuring server URL..."
 mkdir -p "$HOME/.context-bridge"
+chmod 700 "$HOME/.context-bridge"
 echo "$SERVER_URL" > "$HOME/.context-bridge/server-url"
+touch "$HOME/.context-bridge-cmds.log" "$HOME/.context-bridge/fswatch-changes.log" "$HOME/.context-bridge/last-clipboard-hash"
 chmod 600 "$HOME/.context-bridge/server-url"
-
-# Patch daemon with server URL
-sudo sed -i '' "s|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-https://localhost:7890/context/push}\"|SERVER_URL=\"\${CONTEXT_BRIDGE_URL:-$SERVER_URL}\"|" /usr/local/bin/context-bridge-daemon.sh
+chmod 600 "$HOME/.context-bridge-cmds.log" "$HOME/.context-bridge/fswatch-changes.log" "$HOME/.context-bridge/last-clipboard-hash"
 
 # 5. Add shell hooks for terminal command capture
 echo "[5/8] Adding shell command hook..."
@@ -68,9 +69,7 @@ fi
 # 6. Install git post-commit hooks
 echo "[6/8] Installing git hooks..."
 if [ -f "$SCRIPT_DIR/../scripts/install-hooks.sh" ]; then
-  # Derive commit endpoint from push endpoint
-  COMMIT_URL=$(echo "$SERVER_URL" | sed 's|/context/push|/context/commit|')
-  bash "$SCRIPT_DIR/../scripts/install-hooks.sh" "$COMMIT_URL" "$AUTH_TOKEN" 2>/dev/null || echo "  Git hooks: some repos may not have been found"
+  bash "$SCRIPT_DIR/../scripts/install-hooks.sh" "$SERVER_URL" 2>/dev/null || echo "  Git hooks: some repos may not have been found"
 else
   echo "  Skipping git hooks (install-hooks.sh not found)"
 fi

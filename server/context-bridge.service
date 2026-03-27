@@ -7,7 +7,7 @@ Type=simple
 User=admin
 WorkingDirectory=/home/user/clawrelay/openclaw-computer-vision/server
 EnvironmentFile=/home/user/clawrelay/.env
-ExecStart=/usr/bin/python3 /home/user/clawrelay/openclaw-computer-vision/server/context-receiver.py
+ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 wsgi:app
 Restart=always
 RestartSec=5
 

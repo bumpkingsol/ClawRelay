@@ -4,9 +4,13 @@
 # Writes changes to a log file that the main daemon reads and flushes
 
 set -euo pipefail
+umask 077
 
 LOG="$HOME/.context-bridge/fswatch-changes.log"
 mkdir -p "$HOME/.context-bridge"
+chmod 700 "$HOME/.context-bridge" 2>/dev/null || true
+touch "$LOG"
+chmod 600 "$LOG" 2>/dev/null || true
 
 # Project directories to watch (add more as needed)
 WATCH_DIRS=()

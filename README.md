@@ -31,7 +31,7 @@ MacBook (daemon)  ──HTTPS──>  Server (receiver)  ──>  JC (agent)
 ### Server
 ```bash
 cd server && pip install -r requirements.txt
-python context-receiver.py  # starts on port 7890
+CONTEXT_BRIDGE_TOKEN=dev-token python context-receiver.py  # starts on port 7890
 ```
 
 ### Mac

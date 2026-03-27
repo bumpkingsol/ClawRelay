@@ -84,10 +84,10 @@ tail -f /tmp/context-bridge.log
 ### Manual Testing (Server)
 ```bash
 # Start receiver
-cd server && python3 context-receiver.py
+cd server && CONTEXT_BRIDGE_TOKEN=dev-token python3 context-receiver.py
 
 # Check health
-curl http://localhost:7890/context/health
+curl -H "Authorization: Bearer dev-token" http://localhost:7890/context/health
 
 # Query current state
 python3 server/context-query.py now

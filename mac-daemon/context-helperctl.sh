@@ -184,6 +184,7 @@ do_queue_handoff() {
   local project="${1:-}"
   local task="${2:-}"
   local message="${3:-}"
+  local priority="${4:-normal}"
   if [ -z "$project" ] || [ -z "$task" ]; then
     echo '{"error":"queue-handoff requires <project> <task> [message]"}' >&2
     exit 1
@@ -207,12 +208,53 @@ obj = {
     'project': sys.argv[1],
     'task':    sys.argv[2],
     'message': sys.argv[3],
-    'ts':      sys.argv[4],
+    'priority': sys.argv[4],
+    'ts':      sys.argv[5],
 }
 print(json.dumps(obj))
-" "$project" "$task" "$message" "$ts" > "$outbox/$filename"
+" "$project" "$task" "$message" "$priority" "$ts" > "$outbox/$filename"
 
   status_json
+}
+
+# ---------------------------------------------------------------------------
+# list-handoffs  – fetch recent handoffs from the server
+# ---------------------------------------------------------------------------
+do_list_handoffs() {
+  local server_url=""
+  if [ -f "$(cb_dir)/server-url" ]; then
+    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
+  fi
+  if [ -z "$server_url" ]; then
+    echo "[]"
+    exit 0
+  fi
+
+  # Replace /push with /handoffs in the URL
+  # Assumes server-url contains the full push endpoint (e.g. https://host:7890/context/push)
+  local handoffs_url="${server_url/\/context\/push/\/context\/handoffs}"
+
+  local auth_token=""
+  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  if [ -z "$auth_token" ]; then
+    echo "[]"
+    exit 0
+  fi
+
+  local curl_args=()
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  if [[ "$handoffs_url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+
+  local response
+  response=$(curl -sf \
+    -H "Authorization: Bearer $auth_token" \
+    --connect-timeout 5 --max-time 10 \
+    "${curl_args[@]}" \
+    "$handoffs_url" 2>/dev/null || echo "[]")
+
+  echo "$response"
 }
 
 # ---------------------------------------------------------------------------
@@ -230,9 +272,10 @@ case "$cmd" in
   restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
+  list-handoffs)   do_list_handoffs ;;
   privacy-rules)   do_privacy_rules "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|privacy-rules"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|privacy-rules"}' >&2
     exit 1
     ;;
 esac

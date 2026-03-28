@@ -338,9 +338,88 @@ fi
 # ACTIVE STATE - Full Capture
 # ============================================================
 
-# --- Active App + Window Title ---
-ACTIVE_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
-WINDOW_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of first application process whose frontmost is true' 2>/dev/null || echo "")
+# --- Active App + Window Title (switch log or snapshot) ---
+SWITCH_LOG="$CB_DIR/app-switches.jsonl"
+SWITCH_RESULT=""
+
+if [ -f "$SWITCH_LOG" ] && [ -s "$SWITCH_LOG" ]; then
+  SWITCH_RESULT=$(python3 -c "
+import json, sys
+from datetime import datetime, timezone
+
+log_path = sys.argv[1]
+lines = []
+try:
+    with open(log_path) as f:
+        lines = [json.loads(l) for l in f if l.strip()]
+except:
+    pass
+
+if not lines:
+    print(json.dumps({'fallback': True}))
+    sys.exit(0)
+
+app_times = {}
+all_titles = []
+for i, entry in enumerate(lines):
+    try:
+        ts = datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
+    except:
+        continue
+    if i + 1 < len(lines):
+        try:
+            next_ts = datetime.fromisoformat(lines[i+1]['ts'].replace('Z', '+00:00'))
+            duration = (next_ts - ts).total_seconds()
+        except:
+            duration = 0
+    else:
+        duration = (datetime.now(timezone.utc) - ts).total_seconds()
+    duration = min(max(duration, 0), 300)
+    app = entry.get('app', 'unknown')
+    app_times[app] = app_times.get(app, 0) + duration
+    title = entry.get('title', '')
+    if title:
+        all_titles.append(title)
+
+if not app_times:
+    print(json.dumps({'fallback': True}))
+    sys.exit(0)
+
+dominant = max(app_times, key=app_times.get)
+dominant_title = ''
+for entry in reversed(lines):
+    if entry.get('app') == dominant:
+        dominant_title = entry.get('title', '')
+        break
+
+unique_titles = list(set(all_titles))
+print(json.dumps({
+    'app': dominant,
+    'title': dominant_title,
+    'all_titles': unique_titles,
+}))
+" "$SWITCH_LOG" 2>/dev/null || echo '{"fallback": true}')
+
+  # Truncate the log after reading
+  > "$SWITCH_LOG"
+fi
+
+# Parse result or fall back to snapshot
+FALLBACK=$(echo "$SWITCH_RESULT" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('fallback',''))" 2>/dev/null || echo "true")
+
+if [ "$FALLBACK" = "True" ] || [ "$FALLBACK" = "true" ] || [ -z "$SWITCH_RESULT" ]; then
+  # Snapshot fallback
+  ACTIVE_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
+  WINDOW_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of first application process whose frontmost is true' 2>/dev/null || echo "")
+else
+  ACTIVE_APP=$(echo "$SWITCH_RESULT" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('app','unknown'))" 2>/dev/null || echo "unknown")
+  DOMINANT_TITLE=$(echo "$SWITCH_RESULT" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('title',''))" 2>/dev/null || echo "")
+  ALL_TITLES=$(echo "$SWITCH_RESULT" | python3 -c "import json,sys; print(' '.join(json.loads(sys.stdin.read()).get('all_titles',[])))" 2>/dev/null || echo "")
+  WINDOW_TITLE="$DOMINANT_TITLE"
+  if [ -n "$ALL_TITLES" ]; then
+    WINDOW_TITLE="$DOMINANT_TITLE [also: $ALL_TITLES]"
+  fi
+fi
 
 # --- Sensitive app or title: blank out entirely ---
 if is_sensitive_app "$ACTIVE_APP" || is_sensitive_title "$WINDOW_TITLE"; then
@@ -407,20 +486,6 @@ if [[ "$ACTIVE_APP" == "Cursor" || "$ACTIVE_APP" == "Code" || "$ACTIVE_APP" == "
     GIT_BRANCH=$(cd "$HOME/$FILE_PATH" && git branch --show-current 2>/dev/null || echo "")
     GIT_REPO=$(cd "$HOME/$FILE_PATH" && basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "")
   fi
-fi
-
-# --- Background editor context (capture even when not frontmost) ---
-EDITOR_PROJECTS=""
-if [[ "$ACTIVE_APP" != "Code" && "$ACTIVE_APP" != "Cursor" && "$ACTIVE_APP" != "Visual Studio Code" ]]; then
-  # Check if an editor is running in the background and grab its window title
-  for editor_proc in "Code" "Cursor" "Visual Studio Code"; do
-    if pgrep -x "$editor_proc" >/dev/null 2>&1; then
-      EDITOR_TITLE=$(osascript -e "tell application \"System Events\" to get name of front window of application process \"$editor_proc\"" 2>/dev/null || echo "")
-      if [ -n "$EDITOR_TITLE" ]; then
-        EDITOR_PROJECTS="${EDITOR_PROJECTS:+$EDITOR_PROJECTS;;;}$editor_proc|$EDITOR_TITLE"
-      fi
-    fi
-  done
 fi
 
 # --- Terminal context ---
@@ -658,10 +723,6 @@ export CB_CALL_APP="$CALL_APP"
 export CB_CALL_TYPE="$CALL_TYPE"
 export CB_FOCUS_MODE="$FOCUS_MODE"
 export CB_CALENDAR_EVENTS="$CALENDAR_EVENTS"
-# Append background editor context to window title for project matching
-if [ -n "$EDITOR_PROJECTS" ]; then
-  WINDOW_TITLE="${WINDOW_TITLE} [bg: ${EDITOR_PROJECTS}]"
-fi
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
 
 PAYLOAD=$(python3 -c "

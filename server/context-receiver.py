@@ -589,9 +589,43 @@ def dashboard():
         neglected = []
         try:
             last_seen_rows = db.execute("SELECT project, last_seen FROM project_last_seen").fetchall()
-            last_seen = {dict(r)['project']: dict(r)['last_seen'] for r in last_seen_rows}
+            last_seen = {}
+            for r in last_seen_rows:
+                ls_proj = r[0] if isinstance(r, (list, tuple)) else r['project']
+                ls_ts = r[1] if isinstance(r, (list, tuple)) else r['last_seen']
+                last_seen[ls_proj] = ls_ts
         except Exception:
             last_seen = {}
+
+        # Bootstrap: scan raw activity_stream (last 48h) for more recent data
+        try:
+            raw_since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+            raw_rows = db.execute(
+                "SELECT window_title, git_repo, url, file_path, MAX(ts) as latest FROM activity_stream WHERE ts >= ? AND idle_state = 'active' GROUP BY window_title, git_repo",
+                (raw_since,)
+            ).fetchall()
+            for r in raw_rows:
+                wt = r[0] if isinstance(r, (list, tuple)) else r['window_title']
+                gr = r[1] if isinstance(r, (list, tuple)) else r['git_repo']
+                u = r[2] if isinstance(r, (list, tuple)) else r['url']
+                fp = r[3] if isinstance(r, (list, tuple)) else r['file_path']
+                lt = r[4] if isinstance(r, (list, tuple)) else r['latest']
+                h = f"{wt} {gr} {u} {fp}".lower()
+                for p, kws in PORTFOLIO_PROJECTS.items():
+                    if any(kw in h for kw in kws):
+                        if p not in last_seen or lt > last_seen.get(p, ''):
+                            last_seen[p] = lt
+                            try:
+                                db.execute(
+                                    "INSERT INTO project_last_seen (project, last_seen, last_branch) VALUES (?, ?, '') ON CONFLICT(project) DO UPDATE SET last_seen = excluded.last_seen",
+                                    (p, lt)
+                                )
+                            except Exception:
+                                pass
+                        break
+            db.commit()
+        except Exception:
+            pass
 
         for p in PORTFOLIO_PROJECTS:
             if p in last_seen:

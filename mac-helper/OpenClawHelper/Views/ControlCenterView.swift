@@ -4,15 +4,32 @@ struct ControlCenterView: View {
     @ObservedObject var viewModel: ControlCenterViewModel
 
     var body: some View {
-        NavigationSplitView {
-            List(ControlCenterTab.allCases, selection: $viewModel.selectedTab) { tab in
-                Label(tab.rawValue.capitalized, systemImage: tabIcon(tab))
+        HSplitView {
+            // Sidebar
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(ControlCenterTab.allCases) { tab in
+                    Button(action: { viewModel.selectedTab = tab }) {
+                        Label(tab.rawValue.capitalized, systemImage: tabIcon(tab))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(
+                                viewModel.selectedTab == tab
+                                    ? Color.accentColor.opacity(0.2)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 6)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
             }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180)
-        } detail: {
-            if let tab = viewModel.selectedTab {
-                switch tab {
+            .padding(12)
+            .frame(width: 180)
+
+            // Detail
+            Group {
+                switch viewModel.selectedTab {
                 case .overview:
                     OverviewTabView(viewModel: viewModel)
                 case .diagnostics:
@@ -21,11 +38,13 @@ struct ControlCenterView: View {
                     PermissionsTabView(viewModel: viewModel)
                 case .privacy:
                     PrivacyTabView(viewModel: viewModel)
+                case .none:
+                    Text("Select a tab")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else {
-                Text("Select a tab")
-                    .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 860, minHeight: 560)
         .background(DarkUtilityGlass.background)

@@ -480,6 +480,184 @@ def jc_work_log():
         return jsonify({'error': 'internal error'}), 500
 
 
+@app.route('/context/dashboard', methods=['GET'])
+def dashboard():
+    """Combined dashboard data for ClawRelay app."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        db = get_db()
+        from config import PORTFOLIO_PROJECTS, ALL_PROJECTS, NOISE_APPS
+
+        # --- Status (latest row) ---
+        latest = db.execute(
+            "SELECT * FROM activity_stream ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+
+        status = {
+            'current_app': 'unknown',
+            'current_project': 'unknown',
+            'idle_state': 'unknown',
+            'idle_seconds': 0,
+            'in_call': False,
+            'focus_mode': None,
+            'focus_level': 'unknown',
+            'focus_switches_per_hour': 0.0,
+            'daemon_stale': False,
+            'last_activity': None,
+        }
+
+        if latest:
+            status['current_app'] = latest['app'] or 'unknown'
+            status['idle_state'] = latest['idle_state'] or 'unknown'
+            status['idle_seconds'] = latest['idle_seconds'] or 0
+            status['in_call'] = bool(latest.get('in_call', 0))
+            status['focus_mode'] = latest.get('focus_mode') or None
+            status['last_activity'] = latest['ts']
+
+            # Infer project
+            haystack = f"{latest['window_title']} {latest['git_repo']} {latest['url']} {latest['file_path']}".lower()
+            for proj, keywords in ALL_PROJECTS.items():
+                if any(kw in haystack for kw in keywords):
+                    status['current_project'] = proj
+                    break
+
+            # Staleness check
+            import os
+            status['daemon_stale'] = os.path.exists('/tmp/context-bridge-stale')
+
+            # Focus level (last 60 min)
+            since_1h = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            recent = db.execute(
+                "SELECT app, window_title, git_repo, url, file_path FROM activity_stream WHERE ts >= ? AND idle_state = 'active' ORDER BY ts",
+                (since_1h,)
+            ).fetchall()
+
+            switches = 0
+            prev_ctx = None
+            for r in recent:
+                h = f"{r['window_title']} {r['git_repo']} {r['url']} {r['file_path']}".lower()
+                proj = 'other'
+                for p, kws in ALL_PROJECTS.items():
+                    if any(kw in h for kw in kws):
+                        proj = p
+                        break
+                ctx = (r['app'], proj)
+                if prev_ctx and ctx != prev_ctx:
+                    switches += 1
+                prev_ctx = ctx
+
+            status['focus_switches_per_hour'] = round(switches, 1)
+            if switches <= 3:
+                status['focus_level'] = 'focused'
+            elif switches <= 7:
+                status['focus_level'] = 'multitasking'
+            else:
+                status['focus_level'] = 'scattered'
+
+        # --- Time allocation (today) ---
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0).isoformat()
+        today_rows = db.execute(
+            "SELECT window_title, git_repo, url, file_path FROM activity_stream WHERE ts >= ? AND idle_state = 'active'",
+            (today_start,)
+        ).fetchall()
+
+        project_counts = {}
+        for r in today_rows:
+            h = f"{r['window_title']} {r['git_repo']} {r['url']} {r['file_path']}".lower()
+            matched = 'other'
+            for p, kws in ALL_PROJECTS.items():
+                if any(kw in h for kw in kws):
+                    matched = p
+                    break
+            project_counts[matched] = project_counts.get(matched, 0) + 1
+
+        total_captures = sum(project_counts.values())
+        time_allocation = []
+        for proj, count in sorted(project_counts.items(), key=lambda x: -x[1]):
+            if proj == 'other':
+                continue
+            hours = round(count * 2 / 60, 1)
+            pct = round(count / total_captures * 100) if total_captures else 0
+            time_allocation.append({'project': proj, 'hours': hours, 'percentage': pct})
+
+        # --- Neglected projects ---
+        neglected = []
+        try:
+            last_seen_rows = db.execute("SELECT project, last_seen FROM project_last_seen").fetchall()
+            last_seen = {r['project']: r['last_seen'] for r in last_seen_rows}
+        except Exception:
+            last_seen = {}
+
+        for p in PORTFOLIO_PROJECTS:
+            if p in last_seen:
+                try:
+                    ls = datetime.fromisoformat(last_seen[p]).replace(tzinfo=timezone.utc)
+                    days = (datetime.now(timezone.utc) - ls).days
+                except Exception:
+                    days = 999
+            else:
+                days = 999
+            neglected.append({'project': p, 'days': days})
+        neglected.sort(key=lambda x: -x['days'])
+
+        # --- JC activity ---
+        jc_activity = []
+        try:
+            tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            if 'jc_work_log' in tables:
+                jc_since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+                jc_rows = db.execute(
+                    "SELECT * FROM jc_work_log WHERE started_at >= ? ORDER BY started_at DESC LIMIT 10",
+                    (jc_since,)
+                ).fetchall()
+                for r in jc_rows:
+                    jc_activity.append({
+                        'id': r[0],
+                        'project': r[1],
+                        'description': r[2],
+                        'status': r[3],
+                        'started_at': r[5],
+                        'completed_at': r[6],
+                        'duration_minutes': r[7],
+                    })
+        except Exception:
+            pass
+
+        # --- Handoffs ---
+        handoffs = []
+        try:
+            h_rows = db.execute(
+                "SELECT id, project, task, message, priority, status, created_at FROM handoffs ORDER BY created_at DESC LIMIT 10"
+            ).fetchall()
+            for r in h_rows:
+                handoffs.append({
+                    'id': r['id'],
+                    'project': r['project'],
+                    'task': r['task'],
+                    'message': r['message'] or '',
+                    'priority': r['priority'] or 'normal',
+                    'status': r['status'] or 'pending',
+                    'created_at': r['created_at'],
+                })
+        except Exception:
+            pass
+
+        db.close()
+
+        return jsonify({
+            'status': status,
+            'time_allocation': time_allocation,
+            'neglected': neglected,
+            'jc_activity': jc_activity,
+            'handoffs': handoffs,
+        })
+    except Exception:
+        logger.exception("Dashboard query failed")
+        return jsonify({'error': 'internal error'}), 500
+
+
 @app.errorhandler(413)
 def payload_too_large(_error):
     return jsonify({'error': 'payload too large'}), 413

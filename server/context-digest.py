@@ -354,6 +354,26 @@ def build_digest(hours_back=8):
     # Update project_last_seen
     update_project_last_seen(DB_PATH, project_details)
 
+    # Write daily_summary rows for each project this period
+    try:
+        today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        summary_db = get_db()
+        summary_db.execute("""CREATE TABLE IF NOT EXISTS daily_summary (
+            date TEXT NOT NULL, project TEXT NOT NULL, hours REAL NOT NULL,
+            captures INTEGER NOT NULL, PRIMARY KEY (date, project))""")
+        for proj, count in project_captures.items():
+            if proj == 'other' or count == 0:
+                continue
+            hours = round(count * interval_min / 60, 1)
+            summary_db.execute(
+                "INSERT OR REPLACE INTO daily_summary (date, project, hours, captures) VALUES (?, ?, ?, ?)",
+                (today_str, proj, hours, count)
+            )
+        summary_db.commit()
+        summary_db.close()
+    except Exception:
+        pass
+
     # Get neglect data
     last_seen_data = get_project_last_seen(DB_PATH)
 

@@ -43,6 +43,7 @@
 		A10000140000000000000001 /* DashboardTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000140000000000000001 /* DashboardTabView.swift */; };
 		A10000150000000000000001 /* JCQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000001 /* JCQuestion.swift */; };
 		A10000150000000000000002 /* DailyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000002 /* DailyEntry.swift */; };
+		A10000150000000000000003 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000003 /* NotificationService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -96,6 +97,7 @@
 		A20000140000000000000001 /* DashboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTabView.swift; sourceTree = "<group>"; };
 		A20000150000000000000001 /* JCQuestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JCQuestion.swift; sourceTree = "<group>"; };
 		A20000150000000000000002 /* DailyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyEntry.swift; sourceTree = "<group>"; };
+		A20000150000000000000003 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -188,6 +190,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000050000000000000003 /* BridgeCommandRunner.swift */,
+				A20000150000000000000003 /* NotificationService.swift */,
 				A20000080000000000000001 /* PermissionService.swift */,
 				A20000050000000000000004 /* RefreshTimer.swift */,
 				A20000080000000000000002 /* SettingsDeepLinkService.swift */,
@@ -372,6 +375,7 @@
 				A10000140000000000000001 /* DashboardTabView.swift in Sources */,
 				A10000150000000000000001 /* JCQuestion.swift in Sources */,
 				A10000150000000000000002 /* DailyEntry.swift in Sources */,
+				A10000150000000000000003 /* NotificationService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

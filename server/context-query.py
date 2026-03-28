@@ -11,6 +11,8 @@ import sqlite3
 import argparse
 from datetime import datetime, timedelta, timezone
 
+from config import PORTFOLIO_PROJECTS, ALL_PROJECTS
+
 DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-bridge.db')
 
 def get_db():
@@ -75,21 +77,13 @@ def cmd_today(args):
         app = r['app'] or 'unknown'
         apps[app] = apps.get(app, 0) + 1
         
-        # Infer project from git_repo, url, or file_path
-        project = r['git_repo'] or ''
-        if not project and r['url']:
-            if 'prescrivia' in r['url'].lower():
-                project = 'prescrivia'
-            elif 'leverwork' in r['url'].lower():
-                project = 'leverwork'
-            elif 'sonopeace' in r['url'].lower():
-                project = 'sonopeace'
-        if not project and r['window_title']:
-            title_lower = r['window_title'].lower()
-            for p in ['prescrivia', 'leverwork', 'sonopeace', 'jsvhq', 'aeoa']:
-                if p in title_lower:
-                    project = p
-                    break
+        # Infer project from git_repo, url, window_title, or file_path
+        project = ''
+        haystack = f"{r['git_repo']} {r['url']} {r['window_title']} {r['file_path']}".lower()
+        for p, keywords in ALL_PROJECTS.items():
+            if any(kw in haystack for kw in keywords):
+                project = p
+                break
         if project:
             projects[project] = projects.get(project, 0) + 1
     
@@ -176,8 +170,7 @@ def cmd_gaps(args):
     days = args.days or 3
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
-    # Known projects
-    known = ['prescrivia', 'leverwork', 'sonopeace', 'jsvhq', 'aeoa']
+    known = list(PORTFOLIO_PROJECTS.keys())
     
     rows = db.execute(
         "SELECT * FROM activity_stream WHERE ts >= ? AND idle_state = 'active'",

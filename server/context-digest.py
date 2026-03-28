@@ -21,20 +21,7 @@ DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-br
 DIGEST_DIR = Path('/home/admin/clawd/memory/activity-digest')
 REPOS_DIR = Path('/home/admin/clawd')
 
-# Known projects and their identifiers
-PROJECTS = {
-    'prescrivia': ['prescrivia'],
-    'leverwork': ['leverwork'],
-    'sonopeace': ['sonopeace'],
-    'jsvhq': ['jsvhq', 'jsvcapital'],
-    'aeoa': ['aeoa', 'aeoa-studio'],
-    'openclaw': ['openclaw', 'clawd'],
-    'nilsy': ['nilsy'],
-    'legal': ['mcol', 'sehaj', 'azika', 'sorna', 'rohu'],
-}
-
-# Apps to ignore in time tracking
-NOISE_APPS = {'Finder', 'SystemUIServer', 'loginwindow', 'Dock', 'Spotlight'}
+from config import ALL_PROJECTS as PROJECTS, PORTFOLIO_PROJECTS, NOISE_APPS
 
 
 def get_db():

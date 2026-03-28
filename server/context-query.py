@@ -12,16 +12,13 @@ import argparse
 from datetime import datetime, timedelta, timezone
 
 from config import PORTFOLIO_PROJECTS, ALL_PROJECTS
-
-DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-bridge.db')
+from db_utils import get_db as _shared_get_db, DB_PATH
 
 def get_db():
     if not os.path.exists(DB_PATH):
         print("No context bridge database found. Is the receiver running?")
         sys.exit(1)
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = sqlite3.Row
-    return db
+    return _shared_get_db()
 
 def cmd_now(args):
     """What is Jonas doing right now?"""

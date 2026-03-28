@@ -43,6 +43,14 @@ struct StatusHeaderView: View {
         switch snapshot.trackingState {
         case .paused:
             if let until = snapshot.pauseUntil, until != "indefinite" {
+                if let epoch = TimeInterval(until) {
+                    let date = Date(timeIntervalSince1970: epoch)
+                    let fmt = DateFormatter()
+                    fmt.doesRelativeDateFormatting = true
+                    fmt.dateStyle = .short
+                    fmt.timeStyle = .short
+                    return "Until \(fmt.string(from: date))"
+                }
                 return "Until \(until)"
             }
             return "Indefinitely"

@@ -232,7 +232,8 @@ do_list_handoffs() {
 
   # Replace /push with /handoffs in the URL
   # Assumes server-url contains the full push endpoint (e.g. https://host:7890/context/push)
-  local handoffs_url="${server_url/\/context\/push/\/context\/handoffs}"
+  local handoffs_url
+  handoffs_url=$(echo "$server_url" | sed 's|/context/push|/context/handoffs|')
 
   local auth_token=""
   auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")

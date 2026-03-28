@@ -683,3 +683,39 @@ if [ -z "$PAYLOAD" ]; then
 fi
 
 send_payload "$PAYLOAD" || true
+
+# --- Flush handoff outbox ---
+HANDOFF_OUTBOX="$CB_DIR/handoff-outbox"
+if [ -d "$HANDOFF_OUTBOX" ]; then
+  HANDOFF_URL="${SERVER_URL/\/context\/push/\/context\/handoff}"
+  for hf in "$HANDOFF_OUTBOX"/*.json; do
+    [ -f "$hf" ] || continue
+    local_curl_args=()
+    while IFS= read -r arg; do
+      local_curl_args+=("$arg")
+    done < <(curl_tls_args)
+
+    if [ ${#local_curl_args[@]} -gt 0 ]; then
+      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        -X POST "$HANDOFF_URL" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d @"$hf" \
+        --connect-timeout 5 --max-time 10 \
+        "${local_curl_args[@]}" \
+        2>/dev/null || echo "000")
+    else
+      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        -X POST "$HANDOFF_URL" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d @"$hf" \
+        --connect-timeout 5 --max-time 10 \
+        2>/dev/null || echo "000")
+    fi
+
+    if [ "$hf_code" = "201" ]; then
+      rm -f "$hf"
+    fi
+  done
+fi

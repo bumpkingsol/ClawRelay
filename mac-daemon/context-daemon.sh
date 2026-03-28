@@ -567,6 +567,65 @@ FOCUS_MODE=$(osascript -e '
   return ""
 ' 2>/dev/null || echo "")
 
+# --- Calendar Awareness (opt-in) ---
+CALENDAR_EVENTS="[]"
+CALENDAR_ENABLED=$(python3 -c "
+import json
+try:
+    with open('$PRIVACY_RULES_FILE') as f:
+        print('true' if json.load(f).get('calendar_enabled') else 'false')
+except:
+    print('false')
+" 2>/dev/null || echo "false")
+
+if [ "$CALENDAR_ENABLED" = "true" ]; then
+  CALENDAR_EVENTS=$(osascript -l JavaScript -e '
+    const app = Application("Calendar");
+    app.includeStandardAdditions = true;
+    const now = new Date();
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const results = [];
+    try {
+      const calendars = app.calendars();
+      for (const cal of calendars) {
+        const events = cal.events.whose({
+          _and: [
+            { startDate: { _lessThanEquals: twoHoursLater } },
+            { endDate: { _greaterThanEquals: now } }
+          ]
+        })();
+        for (const evt of events) {
+          const title = evt.summary();
+          const start = evt.startDate().toISOString();
+          const end = evt.endDate().toISOString();
+          const isNow = evt.startDate() <= now && evt.endDate() >= now;
+          results.push({ title: title, start: start, end: end, is_now: isNow });
+        }
+      }
+    } catch(e) {}
+    JSON.stringify(results.slice(0, 10));
+  ' 2>/dev/null || echo "[]")
+
+  # Redact sensitive event titles (pass via env vars to avoid shell quoting issues)
+  if [ "$CALENDAR_EVENTS" != "[]" ] && [ -n "$SENSITIVE_TITLE_KEYWORDS" ]; then
+    export _CB_CAL_EVENTS="$CALENDAR_EVENTS"
+    export _CB_SENSITIVE_KW="$SENSITIVE_TITLE_KEYWORDS"
+    CALENDAR_EVENTS=$(python3 -c "
+import json, os
+events = json.loads(os.environ.get('_CB_CAL_EVENTS', '[]'))
+sensitive = [kw.strip().lower() for kw in os.environ.get('_CB_SENSITIVE_KW', '').split('\n') if kw.strip()]
+for evt in events:
+    title_lower = evt.get('title', '').lower()
+    for kw in sensitive:
+        if kw in title_lower:
+            evt['title'] = '[private event]'
+            break
+print(json.dumps(events))
+" 2>/dev/null || echo "$CALENDAR_EVENTS")
+    unset _CB_CAL_EVENTS _CB_SENSITIVE_KW
+  fi
+fi
+
 # Export for Python payload builder
 export CB_APP="$ACTIVE_APP"
 export CB_WINDOW_TITLE="$WINDOW_TITLE"
@@ -586,6 +645,7 @@ export CB_IN_CALL="$IN_CALL"
 export CB_CALL_APP="$CALL_APP"
 export CB_CALL_TYPE="$CALL_TYPE"
 export CB_FOCUS_MODE="$FOCUS_MODE"
+export CB_CALENDAR_EVENTS="$CALENDAR_EVENTS"
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
 
 PAYLOAD=$(python3 -c "
@@ -610,6 +670,7 @@ data = {
     'call_app': os.environ.get('CB_CALL_APP', ''),
     'call_type': os.environ.get('CB_CALL_TYPE', 'unknown'),
     'focus_mode': os.environ.get('CB_FOCUS_MODE', '') or None,
+    'calendar_events': os.environ.get('CB_CALENDAR_EVENTS', '[]'),
     'idle_state': 'active',
     'idle_seconds': int(os.environ.get('CB_IDLE_SECONDS', '0')),
 }

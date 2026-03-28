@@ -47,8 +47,7 @@ def init_db():
             git_repo TEXT,
             git_branch TEXT,
             terminal_cmds TEXT,
-            notification_app TEXT,
-            notification_text TEXT,
+            notifications TEXT,
             all_tabs TEXT,
             clipboard TEXT,
             clipboard_changed INTEGER DEFAULT 0,
@@ -58,6 +57,11 @@ def init_db():
             whatsapp_context TEXT,
             idle_state TEXT DEFAULT 'active',
             idle_seconds INTEGER DEFAULT 0,
+            in_call BOOLEAN DEFAULT 0,
+            call_app TEXT,
+            call_type TEXT,
+            focus_mode TEXT,
+            calendar_events TEXT,
             raw_payload TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         )
@@ -79,6 +83,13 @@ def init_db():
             diff_stat TEXT,
             ts TEXT NOT NULL,
             created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS project_last_seen (
+            project TEXT PRIMARY KEY,
+            last_seen TEXT NOT NULL,
+            last_branch TEXT
         )
     """)
     db.commit()
@@ -162,7 +173,6 @@ def sanitize_activity_payload(data):
         'codex_session': data.get('codex_session'),
         'codex_running': bool(data.get('codex_running')),
         'whatsapp_context': data.get('whatsapp_context'),
-        'notifications': data.get('notifications'),
         'idle_state': data.get('idle_state', 'active'),
     }
 
@@ -170,6 +180,13 @@ def sanitize_activity_payload(data):
         sanitized['idle_seconds'] = int(data.get('idle_seconds', 0) or 0)
     except (TypeError, ValueError):
         sanitized['idle_seconds'] = 0
+
+    sanitized['notifications'] = data.get('notifications', '')
+    sanitized['in_call'] = bool(data.get('in_call', False))
+    sanitized['call_app'] = str(data.get('call_app', ''))[:100]
+    sanitized['call_type'] = str(data.get('call_type', ''))[:20]
+    sanitized['focus_mode'] = data.get('focus_mode') or None
+    sanitized['calendar_events'] = data.get('calendar_events', '')
 
     return sanitized
 
@@ -190,12 +207,13 @@ def push_activity():
 
     db = get_db()
     db.execute("""
-        INSERT INTO activity_stream 
-        (ts, app, window_title, url, file_path, git_repo, git_branch, 
-         terminal_cmds, all_tabs, clipboard, clipboard_changed, file_changes,
+        INSERT INTO activity_stream
+        (ts, app, window_title, url, file_path, git_repo, git_branch,
+         terminal_cmds, notifications, all_tabs, clipboard, clipboard_changed, file_changes,
          codex_session, codex_running, whatsapp_context,
-         idle_state, idle_seconds, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         idle_state, idle_seconds, in_call, call_app, call_type, focus_mode, calendar_events,
+         raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         sanitized['ts'],
         sanitized['app'],
@@ -205,6 +223,7 @@ def push_activity():
         sanitized['git_repo'],
         sanitized['git_branch'],
         json.dumps(sanitized['terminal_cmds']) if sanitized['terminal_cmds'] else None,
+        sanitized.get('notifications', ''),
         sanitized['all_tabs'],
         None,
         1 if sanitized['clipboard_changed'] else 0,
@@ -214,6 +233,11 @@ def push_activity():
         sanitized['whatsapp_context'],
         sanitized['idle_state'],
         sanitized['idle_seconds'],
+        1 if sanitized.get('in_call') else 0,
+        sanitized.get('call_app', ''),
+        sanitized.get('call_type', ''),
+        sanitized.get('focus_mode'),
+        sanitized.get('calendar_events', ''),
         json.dumps(sanitized)
     ))
     db.commit()

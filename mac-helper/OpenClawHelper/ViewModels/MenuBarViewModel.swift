@@ -52,6 +52,27 @@ final class MenuBarViewModel: ObservableObject {
         refreshTimer?.stop()
         refreshTimer = nil
     }
+
+    @Published var handoffProject: String = UserDefaults.standard.string(forKey: "lastHandoffProject") ?? ""
+    @Published var handoffTask: String = ""
+    @Published var handoffSent: Bool = false
+
+    static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
+
+    func sendQuickHandoff() {
+        let project = handoffProject.isEmpty ? "general" : handoffProject
+        do {
+            try runner.runAction("queue-handoff", project, handoffTask, "", "normal")
+            UserDefaults.standard.set(handoffProject, forKey: "lastHandoffProject")
+            handoffTask = ""
+            handoffSent = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.handoffSent = false
+            }
+        } catch {
+            // Silently fail for menu bar quick actions
+        }
+    }
 }
 
 // MARK: - Preview / Test Support

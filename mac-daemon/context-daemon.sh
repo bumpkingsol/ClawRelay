@@ -54,6 +54,46 @@ if [ -z "$AUTH_TOKEN" ]; then
   fi
 fi
 
+# Flush handoff outbox on every exit (including early exits for idle/paused/sensitive)
+trap 'flush_handoff_outbox' EXIT
+
+flush_handoff_outbox() {
+  local outbox="$CB_DIR/handoff-outbox"
+  [ -d "$outbox" ] || return 0
+  local handoff_url="$(echo "$SERVER_URL" | sed 's|/context/push|/context/handoff|')"
+  for hf in "$outbox"/*.json; do
+    [ -f "$hf" ] || continue
+    local hf_curl_args=()
+    while IFS= read -r arg; do
+      hf_curl_args+=("$arg")
+    done < <(curl_tls_args)
+
+    local hf_code
+    if [ ${#hf_curl_args[@]} -gt 0 ]; then
+      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        -X POST "$handoff_url" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d @"$hf" \
+        --connect-timeout 5 --max-time 10 \
+        "${hf_curl_args[@]}" \
+        2>/dev/null || echo "000")
+    else
+      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        -X POST "$handoff_url" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d @"$hf" \
+        --connect-timeout 5 --max-time 10 \
+        2>/dev/null || echo "000")
+    fi
+
+    if [ "$hf_code" = "201" ]; then
+      rm -f "$hf"
+    fi
+  done
+}
+
 curl_tls_args() {
   if [[ "$SERVER_URL" == https://* ]] && [ -f "$SERVER_CA_CERT_FILE" ]; then
     printf '%s\n' "--cacert" "$SERVER_CA_CERT_FILE"
@@ -685,37 +725,4 @@ fi
 send_payload "$PAYLOAD" || true
 
 # --- Flush handoff outbox ---
-HANDOFF_OUTBOX="$CB_DIR/handoff-outbox"
-if [ -d "$HANDOFF_OUTBOX" ]; then
-  HANDOFF_URL="${SERVER_URL/\/context\/push/\/context\/handoff}"
-  for hf in "$HANDOFF_OUTBOX"/*.json; do
-    [ -f "$hf" ] || continue
-    local_curl_args=()
-    while IFS= read -r arg; do
-      local_curl_args+=("$arg")
-    done < <(curl_tls_args)
-
-    if [ ${#local_curl_args[@]} -gt 0 ]; then
-      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
-        -X POST "$HANDOFF_URL" \
-        -H "Authorization: Bearer $AUTH_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d @"$hf" \
-        --connect-timeout 5 --max-time 10 \
-        "${local_curl_args[@]}" \
-        2>/dev/null || echo "000")
-    else
-      hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
-        -X POST "$HANDOFF_URL" \
-        -H "Authorization: Bearer $AUTH_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d @"$hf" \
-        --connect-timeout 5 --max-time 10 \
-        2>/dev/null || echo "000")
-    fi
-
-    if [ "$hf_code" = "201" ]; then
-      rm -f "$hf"
-    fi
-  done
-fi
+flush_handoff_outbox

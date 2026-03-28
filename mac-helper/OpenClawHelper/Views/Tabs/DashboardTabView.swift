@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct DashboardTabView: View {
-    @ObservedObject var viewModel: DashboardViewModel
+    @StateObject var viewModel: DashboardViewModel
 
     var body: some View {
         Group {
-            if let error = viewModel.lastError {
-                errorState(error)
-            } else if let data = viewModel.data {
+            if let data = viewModel.data {
                 dashboardContent(data)
+            } else if let error = viewModel.lastError {
+                errorState(error)
             } else {
                 loadingState
             }

@@ -24,7 +24,10 @@ final class DashboardViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run { [weak self] in
-                    self?.lastError = "Dashboard unavailable"
+                    // Only show error if we have no data at all
+                    if self?.data == nil {
+                        self?.lastError = "Dashboard unavailable"
+                    }
                 }
             }
         }

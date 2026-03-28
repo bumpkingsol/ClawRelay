@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
         self.controlCenterViewModel = ControlCenterViewModel(runner: runner)
 
         NotificationService.shared.requestPermission()
+        AppSwitchTracker.shared.start()
 
         // Forward changes from both view models so SwiftUI re-evaluates menuBarSymbol
         menuBarViewModel.objectWillChange.sink { [weak self] _ in

@@ -285,6 +285,10 @@ def handoff():
     if error:
         return error
 
+    priority = data.get('priority', 'normal')
+    if priority not in ('normal', 'high', 'urgent'):
+        priority = 'normal'
+
     db = get_db()
     db.execute("""
         CREATE TABLE IF NOT EXISTS handoffs (
@@ -292,22 +296,97 @@ def handoff():
             project TEXT NOT NULL,
             task TEXT,
             message TEXT,
+            priority TEXT DEFAULT 'normal',
             status TEXT DEFAULT 'pending',
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
     db.execute("""
-        INSERT INTO handoffs (project, task, message)
-        VALUES (?, ?, ?)
+        INSERT INTO handoffs (project, task, message, priority)
+        VALUES (?, ?, ?, ?)
     """, (
         data.get('project', ''),
         data.get('task', ''),
-        data.get('message', '')
+        data.get('message', ''),
+        priority,
     ))
     db.commit()
     db.close()
 
     return jsonify({'status': 'ok', 'message': f"Handoff received: {data.get('project')} - {data.get('task')}"}), 201
+
+
+@app.route('/context/handoffs', methods=['GET'])
+def list_handoffs():
+    """List recent handoffs with status."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    db = get_db()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS handoffs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            task TEXT,
+            message TEXT,
+            priority TEXT DEFAULT 'normal',
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    rows = db.execute(
+        "SELECT id, project, task, message, priority, status, created_at FROM handoffs ORDER BY created_at DESC LIMIT 50"
+    ).fetchall()
+    db.close()
+
+    return jsonify([
+        {
+            'id': r['id'],
+            'project': r['project'],
+            'task': r['task'],
+            'message': r['message'] or '',
+            'priority': r['priority'] or 'normal',
+            'status': r['status'] or 'pending',
+            'created_at': r['created_at'],
+        }
+        for r in rows
+    ])
+
+
+@app.route('/context/handoffs/<int:handoff_id>', methods=['PATCH'])
+def update_handoff(handoff_id):
+    """JC updates handoff status."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    data, error = parse_json_request()
+    if error:
+        return error
+
+    new_status = data.get('status', '')
+    if new_status not in ('in-progress', 'done'):
+        return jsonify({'error': 'invalid status, must be in-progress or done'}), 400
+
+    db = get_db()
+    row = db.execute("SELECT status FROM handoffs WHERE id = ?", (handoff_id,)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'handoff not found'}), 404
+
+    current = row['status']
+    valid_transitions = {
+        'pending': ('in-progress', 'done'),
+        'in-progress': ('done',),
+    }
+    if new_status not in valid_transitions.get(current, ()):
+        db.close()
+        return jsonify({'error': f'invalid status transition from {current} to {new_status}'}), 400
+
+    db.execute("UPDATE handoffs SET status = ? WHERE id = ?", (new_status, handoff_id))
+    db.commit()
+    db.close()
+
+    return jsonify({'status': 'ok', 'handoff_id': handoff_id, 'new_status': new_status})
 
 
 @app.route('/context/health', methods=['GET'])

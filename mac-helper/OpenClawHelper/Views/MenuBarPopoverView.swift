@@ -86,6 +86,7 @@ struct MenuBarPopoverView: View {
             }
             Button("Open Control Center") {
                 openWindow(id: "control-center")
+                NSApp.activate(ignoringOtherApps: true)
             }
         }
         .padding(18)

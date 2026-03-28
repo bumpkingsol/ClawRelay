@@ -11,15 +11,20 @@ struct ControlCenterView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
-            switch viewModel.selectedTab {
-            case .overview:
-                OverviewTabView(viewModel: viewModel)
-            case .diagnostics:
-                DiagnosticsTabView(viewModel: viewModel)
-            case .permissions:
-                PermissionsTabView(viewModel: viewModel)
-            case .privacy:
-                PrivacyTabView(viewModel: viewModel)
+            if let tab = viewModel.selectedTab {
+                switch tab {
+                case .overview:
+                    OverviewTabView(viewModel: viewModel)
+                case .diagnostics:
+                    DiagnosticsTabView(viewModel: viewModel)
+                case .permissions:
+                    PermissionsTabView(viewModel: viewModel)
+                case .privacy:
+                    PrivacyTabView(viewModel: viewModel)
+                }
+            } else {
+                Text("Select a tab")
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(minWidth: 860, minHeight: 560)

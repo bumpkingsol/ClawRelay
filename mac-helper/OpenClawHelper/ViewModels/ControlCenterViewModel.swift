@@ -1,13 +1,13 @@
 import SwiftUI
 
-enum ControlCenterTab: String, CaseIterable, Identifiable {
+enum ControlCenterTab: String, CaseIterable, Identifiable, Hashable {
     case overview, permissions, privacy, diagnostics
     var id: String { rawValue }
 }
 
 @MainActor
 final class ControlCenterViewModel: ObservableObject {
-    @Published var selectedTab: ControlCenterTab = .overview
+    @Published var selectedTab: ControlCenterTab? = .overview
     @Published private(set) var snapshot: BridgeSnapshot = .placeholder
     @Published private(set) var recentErrors: [String] = []
     @Published private(set) var recentFswatchErrors: [String] = []

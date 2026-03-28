@@ -5,39 +5,69 @@ Real-time activity monitoring from Jonas's Mac → JC's server. Gives JC operati
 ## Architecture
 
 ```
-MacBook (daemon)  ──HTTPS──>  Server (receiver)  ──>  JC (agent)
-  captures every              stores in SQLite         reads before
-  2-3 minutes                 purges after 48h         any autonomous
-                              digests persist           action
+┌─────────────────┐           ┌──────────────────┐       ┌──────────┐
+│  macOS Helper    │ controls  │  Mac Daemon       │ HTTPS │  Server  │
+│  (menu bar app)  │─────────>│  (every 2 min)    │──────>│  (Flask) │
+│  observe/repair  │          │  captures context  │       │  SQLite  │
+└─────────────────┘           └──────────────────┘       └────┬─────┘
+                                                              │ reads
+                                                         ┌────┴─────┐
+                                                         │  JC (AI) │
+                                                         │  agent   │
+                                                         └──────────┘
 ```
 
 ## Components
 
 ### Mac Side (`mac-daemon/`)
-- `context-daemon.sh` - Main capture script (launchd)
-- `context-helperctl.sh` - Control contract for the helper app (JSON over Process)
-- `install.sh` - One-command installer
-- `com.openclaw.context-bridge.plist` - launchd config
+- `context-daemon.sh` - Main capture script (runs every 2 min via launchd)
+- `context-helperctl.sh` - Control CLI for the helper app (10 JSON commands: status, pause, resume, sensitive, restart-daemon, restart-watcher, purge-local, queue-handoff, privacy-rules)
+- `context-common.sh` - Shared path helpers and pause/sensitive state readers
+- `context-shell-hook.zsh` - Shell command logger (respects pause state)
+- `fswatch-projects.sh` - File change watcher (respects pause state)
+- `install.sh` - One-command installer (user-owned scripts at `~/.context-bridge/bin/`)
 
 ### macOS Helper App (`mac-helper/`)
 
-Native SwiftUI menu bar app that observes, controls, and repairs the local capture pipeline. Lives in the system tray and provides:
+Native SwiftUI menu bar app (macOS 14+) that observes, controls, and repairs the local capture pipeline. Sits in the menu bar - no Dock icon.
 
-- **Menu bar popover**: live status, health strip, quick actions (pause/resume/sensitive)
-- **Control Center window**: Overview, Permissions, Privacy, Diagnostics tabs
+**Menu Bar Popover:**
+- Live tracking state (Active / Paused / Sensitive / Needs Attention)
+- Health strip: queue depth, daemon status, watcher status
+- Quick actions: Pause 15m, Pause 1h, Until Tomorrow, Resume, Sensitive Mode toggle
+
+**Control Center Window (4 tabs):**
+- **Overview** - State cards, service health, restart buttons
+- **Permissions** - Accessibility, Automation, Full Disk Access detection with "Open Settings" repair links
+- **Privacy** - Pause presets, Sensitive Mode, handoff composer, local data purge
+- **Diagnostics** - Error logs, config paths, repair actions
+
+**How it works:**
+- Communicates with the daemon via `context-helperctl.sh` (JSON over `Process`)
 - Reads `~/.context-bridge/` for queue state, logs, and pause files
-- Communicates with the daemon via `context-helperctl.sh` (JSON over Process)
-- Never captures data itself - it only observes and controls the bash-based pipeline
+- Never captures data itself - it only observes and controls the bash pipeline
+- Polls every 5 seconds when the popover or Control Center is open
+
+#### Requirements
+- macOS 14.0+ (Sonoma or later)
+- Xcode 15+ to build from source
 
 #### Build and Run
 ```bash
 # Command line
-xcodebuild -project mac-helper/OpenClawHelper.xcodeproj -scheme OpenClawHelper -destination 'platform=macOS' build
+xcodebuild -project mac-helper/OpenClawHelper.xcodeproj \
+  -scheme OpenClawHelper -destination 'platform=macOS' build
 open mac-helper/build/Build/Products/Debug/OpenClawHelper.app
 
 # Or open in Xcode
 open mac-helper/OpenClawHelper.xcodeproj  # then Cmd+R
 ```
+
+#### Privacy Controls
+| Mode | Effect | Use case |
+|------|--------|----------|
+| **Pause** | Stops all local context generation entirely | Personal time, sensitive meetings |
+| **Sensitive** | Reduces capture to heartbeat payloads; shell/git still flow | Confidential work where you want JC to know you're active |
 
 ### Server Side (`server/`)
 - `context-receiver.py` - HTTP endpoint accepting pushes

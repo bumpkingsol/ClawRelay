@@ -409,6 +409,20 @@ if [[ "$ACTIVE_APP" == "Cursor" || "$ACTIVE_APP" == "Code" || "$ACTIVE_APP" == "
   fi
 fi
 
+# --- Background editor context (capture even when not frontmost) ---
+EDITOR_PROJECTS=""
+if [[ "$ACTIVE_APP" != "Code" && "$ACTIVE_APP" != "Cursor" && "$ACTIVE_APP" != "Visual Studio Code" ]]; then
+  # Check if an editor is running in the background and grab its window title
+  for editor_proc in "Code" "Cursor" "Visual Studio Code"; do
+    if pgrep -x "$editor_proc" >/dev/null 2>&1; then
+      EDITOR_TITLE=$(osascript -e "tell application \"System Events\" to get name of front window of application process \"$editor_proc\"" 2>/dev/null || echo "")
+      if [ -n "$EDITOR_TITLE" ]; then
+        EDITOR_PROJECTS="${EDITOR_PROJECTS:+$EDITOR_PROJECTS;;;}$editor_proc|$EDITOR_TITLE"
+      fi
+    fi
+  done
+fi
+
 # --- Terminal context ---
 TERM_PWD=""
 if [[ "$ACTIVE_APP" == "Terminal" || "$ACTIVE_APP" == "iTerm2" || "$ACTIVE_APP" == "Warp" ]]; then
@@ -644,6 +658,10 @@ export CB_CALL_APP="$CALL_APP"
 export CB_CALL_TYPE="$CALL_TYPE"
 export CB_FOCUS_MODE="$FOCUS_MODE"
 export CB_CALENDAR_EVENTS="$CALENDAR_EVENTS"
+# Append background editor context to window title for project matching
+if [ -n "$EDITOR_PROJECTS" ]; then
+  WINDOW_TITLE="${WINDOW_TITLE} [bg: ${EDITOR_PROJECTS}]"
+fi
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
 
 PAYLOAD=$(python3 -c "

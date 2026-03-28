@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/openclaw-icon.svg" width="80" height="80" alt="OpenClaw">
+</p>
+
 # OpenClaw Context Bridge
 
 Real-time activity monitoring from Jonas's Mac → JC's server. Gives JC operational visibility into what Jonas is working on so autonomous actions don't duplicate or conflict.

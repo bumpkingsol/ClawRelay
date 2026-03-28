@@ -387,8 +387,9 @@ print(f'Purged {deleted} rows')
 | `ROADMAP.md` | Repo root | Build phases |
 | `CLAUDE.md` | Repo root | Agent onboarding (Claude) |
 | `AGENTS.md` | Repo root | Agent onboarding (other) |
-| `mac-daemon/context-daemon.sh` | Mac: `/usr/local/bin/context-bridge-daemon.sh` | Main capture script |
-| `mac-daemon/fswatch-projects.sh` | Mac: `/usr/local/bin/context-bridge-fswatch.sh` | File change watcher |
+| `mac-daemon/context-daemon.sh` | Mac: `~/.context-bridge/bin/context-bridge-daemon.sh` | Main capture script |
+| `mac-daemon/context-helperctl.sh` | Mac: `~/.context-bridge/bin/context-helperctl.sh` | Control CLI for helper app |
+| `mac-daemon/fswatch-projects.sh` | Mac: `~/.context-bridge/bin/context-bridge-fswatch.sh` | File change watcher |
 | `mac-daemon/install.sh` | Run from repo | Mac installer |
 | `mac-daemon/com.openclaw.context-bridge.plist` | Mac: `~/Library/LaunchAgents/` | Daemon launchd config |
 | `mac-daemon/com.openclaw.context-bridge-fswatch.plist` | Mac: `~/Library/LaunchAgents/` | fswatch launchd config |

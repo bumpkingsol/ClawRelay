@@ -4,7 +4,7 @@ struct ControlCenterView: View {
     @ObservedObject var viewModel: ControlCenterViewModel
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             // Sidebar
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(ControlCenterTab.allCases) { tab in
@@ -27,6 +27,8 @@ struct ControlCenterView: View {
             .padding(12)
             .frame(width: 180)
 
+            Divider()
+
             // Detail
             Group {
                 switch viewModel.selectedTab {
@@ -48,6 +50,7 @@ struct ControlCenterView: View {
         }
         .frame(minWidth: 860, minHeight: 560)
         .background(DarkUtilityGlass.background)
+        .environment(\.colorScheme, .dark)
         .onAppear { viewModel.startPolling() }
         .onDisappear { viewModel.stopPolling() }
     }

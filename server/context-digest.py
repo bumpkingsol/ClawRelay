@@ -16,8 +16,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections import defaultdict
-
-DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/user/clawrelay/data/context-bridge.db')
+from db_utils import get_db as _shared_get_db, DB_PATH
 DIGEST_DIR = Path('/home/user/clawrelay/memory/activity-digest')
 REPOS_DIR = Path('/home/user/clawrelay')
 
@@ -56,9 +55,7 @@ def get_project_last_seen(db_path):
 
 
 def get_db():
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = sqlite3.Row
-    return db
+    return _shared_get_db()
 
 
 def infer_project(row):

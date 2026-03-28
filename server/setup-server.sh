@@ -10,6 +10,20 @@ DATA_DIR="/home/user/clawrelay/data"
 DIGEST_DIR="/home/user/clawrelay/memory/activity-digest"
 ENV_FILE="/home/user/clawrelay/.env"
 
+# --- Token rotation subcommand ---
+if [ "${1:-}" = "rotate-token" ]; then
+  NEW_TOKEN=$(openssl rand -hex 32)
+  sed -i "s/^CONTEXT_BRIDGE_TOKEN=.*/CONTEXT_BRIDGE_TOKEN=$NEW_TOKEN/" "$ENV_FILE"
+  echo "Token rotated. New token: $NEW_TOKEN"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Restart the service: sudo systemctl restart context-bridge"
+  echo "  2. On Jonas's Mac, update the Keychain:"
+  echo "     security delete-generic-password -s context-bridge -a token 2>/dev/null"
+  echo "     security add-generic-password -s context-bridge -a token -w \"$NEW_TOKEN\""
+  exit 0
+fi
+
 echo "=== Context Bridge Server Setup ==="
 
 touch "$ENV_FILE"

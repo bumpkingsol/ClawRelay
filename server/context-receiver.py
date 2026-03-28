@@ -12,13 +12,13 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from flask import Flask, request, jsonify
+from db_utils import get_db as _get_db, DB_PATH, is_encrypted
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- Config ---
-DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/user/clawrelay/data/context-bridge.db')
 AUTH_TOKEN = os.environ.get('CONTEXT_BRIDGE_TOKEN', '').strip()
 MAX_CONTENT_LENGTH = int(os.environ.get('CONTEXT_BRIDGE_MAX_CONTENT_LENGTH', '262144'))
 PURGE_HOURS = 48
@@ -26,10 +26,9 @@ PURGE_HOURS = 48
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 def get_db():
-    """Get SQLite connection with WAL mode for concurrent reads."""
-    db = sqlite3.connect(DB_PATH)
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA busy_timeout=5000")
+    """Get SQLite connection with WAL mode and optional encryption."""
+    db = _get_db()
+    db.row_factory = sqlite3.Row
     return db
 
 def init_db():
@@ -350,7 +349,8 @@ def health():
             'total_rows': count,
             'recent_captures_10min': recent,
             'latest_activity': latest[0] if latest else None,
-            'latest_idle_state': last_active[1] if last_active else None
+            'latest_idle_state': last_active[1] if last_active else None,
+            'db_encrypted': is_encrypted(),
         })
     except Exception:
         logger.exception("Health check failed")

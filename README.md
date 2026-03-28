@@ -4,104 +4,140 @@
 
 # OpenClaw Context Bridge
 
-Real-time activity monitoring from Jonas's Mac → JC's server. Gives JC operational visibility into what Jonas is working on so autonomous actions don't duplicate or conflict.
+Real-time activity monitoring bridge between a Mac and an autonomous AI agent. Captures what you're working on and pushes it to your agent's server, so the agent can coordinate autonomously without duplicating your work.
 
 ## Architecture
 
 ```
-┌─────────────────┐           ┌──────────────────┐       ┌──────────┐
-│  macOS Helper    │ controls  │  Mac Daemon       │ HTTPS │  Server  │
-│  (menu bar app)  │─────────>│  (every 2 min)    │──────>│  (Flask) │
-│  observe/repair  │          │  captures context  │       │  SQLite  │
-└─────────────────┘           └──────────────────┘       └────┬─────┘
-                                                              │ reads
-                                                         ┌────┴─────┐
-                                                         │  JC (AI) │
-                                                         │  agent   │
-                                                         └──────────┘
+┌──────────────┐           ┌──────────────────┐       ┌──────────────┐
+│  ClawRelay   │ controls  │  Mac Daemon       │ HTTPS │  Server      │
+│  (menu bar)  │─────────>│  (every 2 min)    │──────>│  (Flask)     │
+│  + handoffs  │          │  captures context  │       │  SQLite      │
+└──────────────┘           └──────────────────┘       └──────┬───────┘
+                                                             │ reads
+                                                        ┌────┴───────┐
+                                                        │  AI Agent  │
+                                                        │  (JC)      │
+                                                        └────────────┘
 ```
+
+## What It Captures
+
+| Signal | Detail |
+|--------|--------|
+| Active app + window title | Which app is frontmost, what's in the title bar |
+| Chrome tabs | Active URL + all open tab URLs and titles |
+| Git state | Current repo, branch, recent commits |
+| Terminal commands | Last 10 commands (secrets redacted) |
+| File changes | Real-time fswatch events per project |
+| AI agent sessions | Active Claude/Codex sessions and tasks |
+| Meeting/call detection | Camera + mic state, call app identification |
+| Focus/DND mode | macOS Focus mode detection |
+| Calendar events | Upcoming events from Calendar.app (opt-in) |
+| Idle state | Active, idle, away, or locked |
+| Notifications | Recent macOS notifications (requires Full Disk Access) |
+| WhatsApp context | Active chat name (not message content) |
+
+**Privacy filtering:** Banks, password managers, crypto wallets, login pages, and sensitive window titles are automatically blanked out. Configurable via `~/.context-bridge/privacy-rules.json`.
 
 ## Components
 
-### Mac Side (`mac-daemon/`)
-- `context-daemon.sh` - Main capture script (runs every 2 min via launchd)
-- `context-helperctl.sh` - Control CLI for the helper app (10 JSON commands: status, pause, resume, sensitive, restart-daemon, restart-watcher, purge-local, queue-handoff, privacy-rules)
-- `context-common.sh` - Shared path helpers and pause/sensitive state readers
-- `context-shell-hook.zsh` - Shell command logger (respects pause state)
-- `fswatch-projects.sh` - File change watcher (respects pause state)
-- `install.sh` - One-command installer (user-owned scripts at `~/.context-bridge/bin/`)
+### ClawRelay (`mac-helper/`)
 
-### macOS Helper App (`mac-helper/`)
-
-Native SwiftUI menu bar app (macOS 14+) that observes, controls, and repairs the local capture pipeline. Sits in the menu bar - no Dock icon.
+Native SwiftUI menu bar app (macOS 14+). Controls the daemon, manages privacy, and handles task handoffs.
 
 **Menu Bar Popover:**
 - Live tracking state (Active / Paused / Sensitive / Needs Attention)
 - Health strip: queue depth, daemon status, watcher status
-- Quick actions: Pause 15m, Pause 1h, Until Tomorrow, Resume, Sensitive Mode toggle
+- Quick actions: Pause 15m, Pause 1h, Until Tomorrow, Sensitive Mode
+- Quick handoff: project dropdown + task field for fast delegation to AI agent
 
-**Control Center Window (4 tabs):**
+**Control Center (5 tabs):**
 - **Overview** - State cards, service health, restart buttons
-- **Permissions** - Accessibility, Automation, Full Disk Access detection with "Open Settings" repair links
-- **Privacy** - Pause presets, Sensitive Mode, handoff composer, local data purge
+- **Permissions** - Accessibility, Automation, Full Disk Access with repair links
+- **Privacy** - Pause presets, Sensitive Mode, local data purge
+- **Handoffs** - Full compose form (project, task, details, priority) + bidirectional status history (pending / in-progress / done)
 - **Diagnostics** - Error logs, config paths, repair actions
 
-**How it works:**
-- Communicates with the daemon via `context-helperctl.sh` (JSON over `Process`)
-- Reads `~/.context-bridge/` for queue state, logs, and pause files
-- Never captures data itself - it only observes and controls the bash pipeline
-- Polls every 5 seconds when the popover or Control Center is open
-
-#### Requirements
-- macOS 14.0+ (Sonoma or later)
-
-#### Install (pre-built)
-1. Download `OpenClawHelper-v0.1.0.zip` from [Releases](https://github.com/bumpkingsol/openclaw-computer-vision/releases)
-2. Unzip and move `OpenClawHelper.app` to `/Applications`
-3. First launch: right-click the app > **Open** (required for unsigned apps)
-
-#### Build from source
+#### Install
 ```bash
-# Command line
-bash scripts/build-release.sh
-open mac-helper/build/Build/Products/Release/OpenClawHelper.app
-
-# Or open in Xcode (requires Xcode 15+)
-open mac-helper/OpenClawHelper.xcodeproj  # then Cmd+R
+# Build from source
+cd mac-helper && xcodebuild -scheme OpenClawHelper -configuration Release build
+cp -R ~/Library/Developer/Xcode/DerivedData/OpenClawHelper-*/Build/Products/Release/OpenClawHelper.app /Applications/
 ```
 
-#### Privacy Controls
-| Mode | Effect | Use case |
-|------|--------|----------|
-| **Pause** | Stops all local context generation entirely | Personal time, sensitive meetings |
-| **Sensitive** | Reduces capture to heartbeat payloads; shell/git still flow | Confidential work where you want JC to know you're active |
+### Mac Daemon (`mac-daemon/`)
+- `context-daemon.sh` - Main capture script (runs every 2 min via launchd)
+- `context-helperctl.sh` - Control CLI (status, pause, resume, sensitive, restart, queue-handoff, list-handoffs, privacy-rules)
+- `context-common.sh` - Shared path helpers and state readers
+- `context-shell-hook.zsh` - Shell command logger
+- `fswatch-projects.sh` - File change watcher
+- `install.sh` - One-command installer
 
-### Server Side (`server/`)
-- `context-receiver.py` - HTTP endpoint accepting pushes
-- `context-digest.py` - Processes raw stream into daily summaries
-- `context-query.py` - CLI for querying current state
-
-### Shared
-- `scripts/install-hooks.sh` - Git post-commit hook installer
-
-## Setup
-
-### Server
 ```bash
-cd server && pip install -r requirements.txt
-CONTEXT_BRIDGE_TOKEN=dev-token python context-receiver.py  # starts on port 7890
+bash mac-daemon/install.sh https://YOUR_SERVER:7890/context/push /path/to/server-ca.pem
 ```
 
-### Mac
+### Server (`server/`)
+- `context-receiver.py` - Flask endpoint accepting pushes, handoffs, and status updates
+- `context-digest.py` - Processes raw stream into structured summaries (3x daily)
+- `context-query.py` - CLI for querying state (`status`, `today`, `project`, `gaps`, `since`, `neglected`)
+- `config.py` - Shared project list and constants
+- `db_utils.py` - Encrypted DB connections (SQLCipher when available, fallback to sqlite3)
+- `staleness-watchdog.sh` - Cron script to detect daemon disconnection
+
 ```bash
-bash mac-daemon/install.sh https://YOUR_SERVER:7890/context/push /path/to/context-bridge.pem
+bash server/setup-server.sh  # generates TLS certs, installs systemd service
 ```
+
+### Digest Output
+
+The digest processor runs 3x daily and produces structured markdown summaries:
+
+- Time allocation per project (hours + percentages)
+- Cross-digest comparison (new / continued / dropped work)
+- Project neglect tracker (days since last activity)
+- Focus level per hour (focused / multitasking / scattered)
+- Terminal commands, file changes, Chrome tabs
+- Communication context (WhatsApp), AI agent sessions, notifications
+- Calendar events
+
+The AI agent reads these digests to decide what to work on autonomously.
+
+### API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/context/push` | Receive activity capture from daemon |
+| POST | `/context/commit` | Receive git commit data |
+| POST | `/context/handoff` | Receive task handoff |
+| GET | `/context/handoffs` | List recent handoffs with status |
+| PATCH | `/context/handoffs/<id>` | Update handoff status (agent marks done) |
+| GET | `/context/health` | Health check with capture status |
+
+All endpoints require Bearer token auth.
 
 ## Security
-- Transport: HTTPS with Bearer token auth
-- Storage: SQLite, 600 permissions, purged after 48h
-- No third-party services, no cloud storage
-- Raw data ephemeral, only digests persist
 
-## Design Doc
-See [design document](https://github.com/bumpkingsol/openclaw-computer-vision/blob/main/DESIGN.md)
+- **Transport:** HTTPS with self-signed cert pinning (over Tailscale WireGuard tunnel)
+- **Auth:** Bearer token (macOS Keychain on client, `.env` on server), HMAC-constant comparison
+- **Data at rest:** SQLCipher AES-256 encryption (when installed), 600 file permissions
+- **Retention:** Raw data purged after 48h, only digest summaries persist
+- **Privacy:** 40+ sensitive apps, 48 URL patterns, and 8 title keywords auto-filtered
+- **Systemd hardening:** NoNewPrivileges, ProtectSystem=strict, PrivateTmp, UMask=0077
+- **No third-party services** - data flows Mac to server only
+
+#### Privacy Controls
+
+| Mode | Effect | Use case |
+|------|--------|----------|
+| **Pause** | Stops all local context generation | Personal time, sensitive meetings |
+| **Sensitive** | Reduces to heartbeat payloads; shell/git still flow | Confidential work |
+| **Auto-filter** | Banks, password managers, login pages blanked automatically | Always active |
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md) - Full system design
+- [Design](DESIGN.md) - Technical decisions from the original brainstorm
+- [JC Integration Guide](docs/jc-integration-guide.md) - Pre-action check pattern for the AI agent
+- [Server Deployment Checklist](docs/server-deployment-checklist.md) - VPS setup steps

@@ -259,6 +259,45 @@ do_list_handoffs() {
 }
 
 # ---------------------------------------------------------------------------
+# fetch-dashboard  – fetch combined dashboard data from the server
+# ---------------------------------------------------------------------------
+do_fetch_dashboard() {
+  local server_url=""
+  if [ -f "$(cb_dir)/server-url" ]; then
+    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
+  fi
+  if [ -z "$server_url" ]; then
+    echo "{}"
+    exit 0
+  fi
+
+  local dashboard_url
+  dashboard_url=$(echo "$server_url" | sed 's|/context/push|/context/dashboard|')
+
+  local auth_token=""
+  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  if [ -z "$auth_token" ]; then
+    echo "{}"
+    exit 0
+  fi
+
+  local curl_args=()
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  if [[ "$dashboard_url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+
+  local response
+  response=$(curl -sf \
+    -H "Authorization: Bearer $auth_token" \
+    --connect-timeout 5 --max-time 10 \
+    "${curl_args[@]}" \
+    "$dashboard_url" 2>/dev/null || echo "{}")
+
+  echo "$response"
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 cmd="${1:-}"
@@ -274,9 +313,10 @@ case "$cmd" in
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
   list-handoffs)   do_list_handoffs ;;
+  dashboard)       do_fetch_dashboard ;;
   privacy-rules)   do_privacy_rules "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|privacy-rules"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|privacy-rules"}' >&2
     exit 1
     ;;
 esac

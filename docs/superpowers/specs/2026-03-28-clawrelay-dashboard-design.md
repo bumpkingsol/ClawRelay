@@ -207,7 +207,7 @@ Fetches dashboard data via `BridgeCommandRunner.runActionWithOutput("dashboard")
 
 Add a single compact line at the top of the menu bar popover showing the current project and JC status. This is NOT a full dashboard — just a glanceable summary.
 
-Format: `prescrivia 2.3h | JC: leverwork`
+Placed after the StatusHeaderView and before HealthStripView. Format: `prescrivia 2.3h | JC: leverwork`
 
 Data source: same `dashboard` helperctl command. `MenuBarViewModel` decodes the full `DashboardData` model but the popover only renders `data.status.currentProject`, `data.timeAllocation` (to find hours for current project), and `data.jcActivity.first` (latest JC entry). Fetched once on `onAppear`, no timer. Independent from `DashboardViewModel` — two separate fetches is acceptable since they don't overlap (popover opens when Control Center is closed and vice versa).
 

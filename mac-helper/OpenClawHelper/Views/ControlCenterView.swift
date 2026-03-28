@@ -19,8 +19,7 @@ struct ControlCenterView: View {
             case .permissions:
                 PermissionsTabView(viewModel: viewModel)
             case .privacy:
-                Text("Privacy - coming in Task 9")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                PrivacyTabView(viewModel: viewModel)
             }
         }
         .frame(minWidth: 860, minHeight: 560)

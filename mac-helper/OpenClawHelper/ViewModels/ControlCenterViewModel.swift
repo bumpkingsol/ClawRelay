@@ -15,12 +15,15 @@ final class ControlCenterViewModel: ObservableObject {
     @Published private(set) var permissions: [PermissionStatus] = []
     @Published var lastActionError: String?
 
-    private let runner: BridgeCommandRunner
+    private let _runner: BridgeCommandRunner
     private let permissionService = PermissionService()
     private var refreshTimer: RefreshTimer?
 
+    /// Public access for child view models (e.g. HandoffViewModel)
+    var runner: BridgeCommandRunner { _runner }
+
     init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
-        self.runner = runner
+        self._runner = runner
         loadConfigPaths()
         recheckPermissions()
     }
@@ -67,6 +70,38 @@ final class ControlCenterViewModel: ObservableObject {
         } catch {
             lastActionError = "Watcher restart failed: \(error.localizedDescription)"
         }
+        refresh()
+    }
+
+    // MARK: - Privacy Controls
+
+    func pause(seconds: Int) {
+        try? runner.runAction("pause", "\(seconds)")
+        refresh()
+    }
+
+    func pauseUntilTomorrow() {
+        try? runner.runAction("pause", "until-tomorrow")
+        refresh()
+    }
+
+    func pauseIndefinite() {
+        try? runner.runAction("pause", "indefinite")
+        refresh()
+    }
+
+    func resume() {
+        try? runner.runAction("resume")
+        refresh()
+    }
+
+    func setSensitiveMode(_ enabled: Bool) {
+        try? runner.runAction("sensitive", enabled ? "on" : "off")
+        refresh()
+    }
+
+    func purgeLocal() {
+        try? runner.runAction("purge-local")
         refresh()
     }
 

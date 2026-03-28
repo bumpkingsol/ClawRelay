@@ -32,6 +32,10 @@
 		A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000002 /* SettingsDeepLinkService.swift */; };
 		A10000080000000000000003 /* PermissionsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000003 /* PermissionsTabView.swift */; };
 		A10000080000000000000004 /* PermissionStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000004 /* PermissionStatusTests.swift */; };
+		A10000090000000000000001 /* HandoffDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000001 /* HandoffDraft.swift */; };
+		A10000090000000000000002 /* HandoffViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000002 /* HandoffViewModel.swift */; };
+		A10000090000000000000003 /* PrivacyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000003 /* PrivacyTabView.swift */; };
+		A10000090000000000000004 /* HandoffSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000004 /* HandoffSheetView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +78,10 @@
 		A20000080000000000000002 /* SettingsDeepLinkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDeepLinkService.swift; sourceTree = "<group>"; };
 		A20000080000000000000003 /* PermissionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsTabView.swift; sourceTree = "<group>"; };
 		A20000080000000000000004 /* PermissionStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatusTests.swift; sourceTree = "<group>"; };
+		A20000090000000000000001 /* HandoffDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffDraft.swift; sourceTree = "<group>"; };
+		A20000090000000000000002 /* HandoffViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffViewModel.swift; sourceTree = "<group>"; };
+		A20000090000000000000003 /* PrivacyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyTabView.swift; sourceTree = "<group>"; };
+		A20000090000000000000004 /* HandoffSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffSheetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000050000000000000001 /* BridgeSnapshot.swift */,
+				A20000090000000000000001 /* HandoffDraft.swift */,
 				A20000050000000000000002 /* PermissionStatus.swift */,
 			);
 			path = Models;
@@ -180,8 +189,9 @@
 		A70000060000000000000001 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
-				A20000060000000000000001 /* MenuBarViewModel.swift */,
 				A20000070000000000000001 /* ControlCenterViewModel.swift */,
+				A20000090000000000000002 /* HandoffViewModel.swift */,
+				A20000060000000000000001 /* MenuBarViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -194,17 +204,27 @@
 				A20000060000000000000004 /* QuickActionsGrid.swift */,
 				A20000060000000000000005 /* HealthStripView.swift */,
 				A20000070000000000000002 /* ControlCenterView.swift */,
+				A70000090000000000000001 /* Sheets */,
 				A70000070000000000000001 /* Tabs */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
+		A70000090000000000000001 /* Sheets */ = {
+			isa = PBXGroup;
+			children = (
+				A20000090000000000000004 /* HandoffSheetView.swift */,
+			);
+			path = Sheets;
+			sourceTree = "<group>";
+		};
 		A70000070000000000000001 /* Tabs */ = {
 			isa = PBXGroup;
 			children = (
-				A20000070000000000000003 /* OverviewTabView.swift */,
 				A20000070000000000000004 /* DiagnosticsTabView.swift */,
+				A20000070000000000000003 /* OverviewTabView.swift */,
 				A20000080000000000000003 /* PermissionsTabView.swift */,
+				A20000090000000000000003 /* PrivacyTabView.swift */,
 			);
 			path = Tabs;
 			sourceTree = "<group>";
@@ -320,6 +340,10 @@
 				A10000080000000000000001 /* PermissionService.swift in Sources */,
 				A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */,
 				A10000080000000000000003 /* PermissionsTabView.swift in Sources */,
+				A10000090000000000000001 /* HandoffDraft.swift in Sources */,
+				A10000090000000000000002 /* HandoffViewModel.swift in Sources */,
+				A10000090000000000000003 /* PrivacyTabView.swift in Sources */,
+				A10000090000000000000004 /* HandoffSheetView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

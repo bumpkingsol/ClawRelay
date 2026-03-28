@@ -32,6 +32,8 @@ struct ControlCenterView: View {
             // Detail
             Group {
                 switch viewModel.selectedTab {
+                case .dashboard:
+                    DashboardTabView(viewModel: DashboardViewModel(runner: viewModel.runner))
                 case .overview:
                     OverviewTabView(viewModel: viewModel)
                 case .diagnostics:
@@ -59,6 +61,7 @@ struct ControlCenterView: View {
 
     private func tabIcon(_ tab: ControlCenterTab) -> String {
         switch tab {
+        case .dashboard: return "chart.bar.xaxis"
         case .overview: return "gauge.with.dots.needle.33percent"
         case .permissions: return "lock.shield"
         case .privacy: return "hand.raised"

@@ -21,20 +21,7 @@ DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/user/clawrelay/data/context
 DIGEST_DIR = Path('/home/user/clawrelay/memory/activity-digest')
 REPOS_DIR = Path('/home/user/clawrelay')
 
-# Known projects and their identifiers
-PROJECTS = {
-    'project-gamma': ['project-gamma'],
-    'project-alpha': ['project-alpha'],
-    'project-delta': ['project-delta'],
-    'project-beta': ['project-beta', 'jsvcapital'],
-    'aeoa': ['aeoa', 'aeoa-studio'],
-    'openclaw': ['openclaw', 'clawd'],
-    'nilsy': ['nilsy'],
-    'legal': ['mcol', 'sehaj', 'azika', 'sorna', 'rohu'],
-}
-
-# Apps to ignore in time tracking
-NOISE_APPS = {'Finder', 'SystemUIServer', 'loginwindow', 'Dock', 'Spotlight'}
+from config import ALL_PROJECTS as PROJECTS, PORTFOLIO_PROJECTS, NOISE_APPS
 
 
 def get_db():

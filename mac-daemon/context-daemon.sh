@@ -619,51 +619,9 @@ except:
 " 2>/dev/null || echo "false")
 
 if [ "$CALENDAR_ENABLED" = "true" ]; then
-  CALENDAR_EVENTS=$(osascript -l JavaScript -e '
-    const app = Application("Calendar");
-    app.includeStandardAdditions = true;
-    const now = new Date();
-    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    const results = [];
-    try {
-      const calendars = app.calendars();
-      for (const cal of calendars) {
-        const events = cal.events.whose({
-          _and: [
-            { startDate: { _lessThanEquals: twoHoursLater } },
-            { endDate: { _greaterThanEquals: now } }
-          ]
-        })();
-        for (const evt of events) {
-          const title = evt.summary();
-          const start = evt.startDate().toISOString();
-          const end = evt.endDate().toISOString();
-          const isNow = evt.startDate() <= now && evt.endDate() >= now;
-          results.push({ title: title, start: start, end: end, is_now: isNow });
-        }
-      }
-    } catch(e) {}
-    JSON.stringify(results.slice(0, 10));
-  ' 2>/dev/null || echo "[]")
-
-  # Redact sensitive event titles (pass via env vars to avoid shell quoting issues)
-  if [ "$CALENDAR_EVENTS" != "[]" ] && [ -n "$SENSITIVE_TITLE_KEYWORDS" ]; then
-    export _CB_CAL_EVENTS="$CALENDAR_EVENTS"
-    export _CB_SENSITIVE_KW="$SENSITIVE_TITLE_KEYWORDS"
-    CALENDAR_EVENTS=$(python3 -c "
-import json, os
-events = json.loads(os.environ.get('_CB_CAL_EVENTS', '[]'))
-sensitive = [kw.strip().lower() for kw in os.environ.get('_CB_SENSITIVE_KW', '').split('\n') if kw.strip()]
-for evt in events:
-    title_lower = evt.get('title', '').lower()
-    for kw in sensitive:
-        if kw in title_lower:
-            evt['title'] = '[private event]'
-            break
-print(json.dumps(events))
-" 2>/dev/null || echo "$CALENDAR_EVENTS")
-    unset _CB_CAL_EVENTS _CB_SENSITIVE_KW
-  fi
+  # Use native Swift CLI (EventKit) — never launches Calendar.app
+  export SENSITIVE_TITLE_KEYWORDS
+  CALENDAR_EVENTS=$("$CB_DIR/bin/claw-calendar" 2>/dev/null || echo "[]")
 fi
 
 # Export for Python payload builder

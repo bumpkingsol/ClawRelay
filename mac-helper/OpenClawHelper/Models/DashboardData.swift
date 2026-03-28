@@ -7,6 +7,8 @@ struct DashboardData: Decodable {
     let neglected: [ProjectNeglect]
     let jcActivity: [JCWorkEntry]
     let handoffs: [Handoff]  // uses existing Handoff model from Handoff.swift
+    let jcQuestions: [JCQuestion]?
+    let history: [DailyEntry]?
 
     enum CodingKeys: String, CodingKey {
         case status
@@ -14,6 +16,8 @@ struct DashboardData: Decodable {
         case neglected
         case jcActivity = "jc_activity"
         case handoffs
+        case jcQuestions = "jc_questions"
+        case history
     }
 }
 

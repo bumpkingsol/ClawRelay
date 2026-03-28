@@ -41,6 +41,8 @@
 		A10000120000000000000001 /* DashboardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000120000000000000001 /* DashboardData.swift */; };
 		A10000130000000000000001 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000130000000000000001 /* DashboardViewModel.swift */; };
 		A10000140000000000000001 /* DashboardTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000140000000000000001 /* DashboardTabView.swift */; };
+		A10000150000000000000001 /* JCQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000001 /* JCQuestion.swift */; };
+		A10000150000000000000002 /* DailyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000002 /* DailyEntry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,6 +94,8 @@
 		A20000120000000000000001 /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
 		A20000130000000000000001 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		A20000140000000000000001 /* DashboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTabView.swift; sourceTree = "<group>"; };
+		A20000150000000000000001 /* JCQuestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JCQuestion.swift; sourceTree = "<group>"; };
+		A20000150000000000000002 /* DailyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyEntry.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -170,9 +174,11 @@
 			isa = PBXGroup;
 			children = (
 				A20000050000000000000001 /* BridgeSnapshot.swift */,
+				A20000150000000000000002 /* DailyEntry.swift */,
 				A20000120000000000000001 /* DashboardData.swift */,
 				A20000110000000000000001 /* Handoff.swift */,
 				A20000090000000000000001 /* HandoffDraft.swift */,
+				A20000150000000000000001 /* JCQuestion.swift */,
 				A20000050000000000000002 /* PermissionStatus.swift */,
 			);
 			path = Models;
@@ -364,6 +370,8 @@
 				A10000120000000000000001 /* DashboardData.swift in Sources */,
 				A10000130000000000000001 /* DashboardViewModel.swift in Sources */,
 				A10000140000000000000001 /* DashboardTabView.swift in Sources */,
+				A10000150000000000000001 /* JCQuestion.swift in Sources */,
+				A10000150000000000000002 /* DailyEntry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

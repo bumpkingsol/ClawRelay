@@ -74,6 +74,8 @@ struct DashboardTabView: View {
                     needsAttentionPanel(data)
                     recentHandoffsPanel(data)
                 }
+
+                historySection(data)
             }
             .padding(20)
         }
@@ -342,6 +344,76 @@ struct DashboardTabView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .glassCard()
+    }
+
+    // MARK: - History Section
+
+    private func historySection(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("This Week")
+                    .font(.headline)
+                Spacer()
+                Picker("", selection: $viewModel.historyDays) {
+                    Text("7 days").tag(7)
+                    Text("30 days").tag(30)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+                .onChange(of: viewModel.historyDays) { _ in
+                    viewModel.refreshDashboard()
+                }
+            }
+
+            let entries = data.history ?? []
+            if entries.isEmpty {
+                Text("No historical data yet")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            } else {
+                let grouped = Dictionary(grouping: entries, by: { $0.date })
+                let sortedDates = grouped.keys.sorted(by: >)
+
+                ForEach(Array(sortedDates.prefix(viewModel.historyDays)), id: \.self) { date in
+                    let dayEntries = grouped[date] ?? []
+                    let totalHours = dayEntries.reduce(0) { $0 + $1.hours }
+
+                    HStack(spacing: 8) {
+                        Text(formatDayLabel(date))
+                            .font(DarkUtilityGlass.monoCaption)
+                            .frame(width: 36, alignment: .leading)
+
+                        GeometryReader { geo in
+                            HStack(spacing: 1) {
+                                ForEach(dayEntries.sorted(by: { $0.hours > $1.hours })) { entry in
+                                    let fraction = totalHours > 0 ? entry.hours / totalHours : 0
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(projectColor(entry.project))
+                                        .frame(width: max(geo.size.width * fraction, 2))
+                                }
+                            }
+                        }
+                        .frame(height: 12)
+
+                        Text("\(totalHours, specifier: "%.1f")h")
+                            .font(DarkUtilityGlass.monoCaption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
+            }
+        }
+        .padding()
+        .glassCard()
+    }
+
+    private func formatDayLabel(_ dateStr: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dateStr) else { return dateStr }
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEE"
+        return dayFormatter.string(from: date)
     }
 
     // MARK: - Color Helpers

@@ -269,6 +269,7 @@ do_list_handoffs() {
 # fetch-dashboard  – fetch combined dashboard data from the server
 # ---------------------------------------------------------------------------
 do_fetch_dashboard() {
+  local history_days="${1:-7}"
   local server_url=""
   if [ -f "$(cb_dir)/server-url" ]; then
     server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
@@ -279,7 +280,7 @@ do_fetch_dashboard() {
   fi
 
   local dashboard_url
-  dashboard_url=$(echo "$server_url" | sed 's|/context/push|/context/dashboard|')
+  dashboard_url="$(echo "$server_url" | sed 's|/context/push|/context/dashboard|')?history_days=$history_days"
 
   local auth_token=""
   auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
@@ -312,6 +313,59 @@ do_fetch_dashboard() {
 }
 
 # ---------------------------------------------------------------------------
+# mark-question-seen <id>  – PATCH jc-question seen=true on the server
+# ---------------------------------------------------------------------------
+do_mark_question_seen() {
+  local qid="${1:-}"
+  if [ -z "$qid" ]; then
+    echo '{"error":"mark-question-seen requires <id>"}'
+    exit 1
+  fi
+
+  local server_url=""
+  if [ -f "$(cb_dir)/server-url" ]; then
+    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
+  fi
+  if [ -z "$server_url" ]; then
+    echo "{}"
+    exit 0
+  fi
+
+  local question_url
+  question_url="$(echo "$server_url" | sed "s|/context/push|/context/jc-question/$qid|")"
+
+  local auth_token=""
+  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  if [ -z "$auth_token" ]; then
+    echo "{}"
+    exit 0
+  fi
+
+  local curl_args=()
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  if [[ "$question_url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    curl -sf -X PATCH \
+      -H "Authorization: Bearer $auth_token" \
+      -H "Content-Type: application/json" \
+      -d '{"seen": true}' \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      "$question_url" 2>/dev/null || echo "{}"
+  else
+    curl -sf -X PATCH \
+      -H "Authorization: Bearer $auth_token" \
+      -H "Content-Type: application/json" \
+      -d '{"seen": true}' \
+      --connect-timeout 5 --max-time 10 \
+      "$question_url" 2>/dev/null || echo "{}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 cmd="${1:-}"
@@ -327,10 +381,11 @@ case "$cmd" in
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
   list-handoffs)   do_list_handoffs ;;
-  dashboard)       do_fetch_dashboard ;;
-  privacy-rules)   do_privacy_rules "$@" ;;
+  dashboard)            do_fetch_dashboard "$@" ;;
+  mark-question-seen)   do_mark_question_seen "$@" ;;
+  privacy-rules)        do_privacy_rules "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|privacy-rules"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|mark-question-seen|privacy-rules"}' >&2
     exit 1
     ;;
 esac

@@ -2,10 +2,17 @@
 
 ## Overview
 
-The Context Bridge has three layers:
+The Context Bridge has four layers:
 
 ```
 ┌─────────────────────────────────────────────────────┐
+│                    LAYER 4                           │
+│              macOS Helper (Local Operator)           │
+│    SwiftUI menu bar app: observe, control, repair   │
+│    Talks to daemon via context-helperctl.sh          │
+└─────────────────────────┬───────────────────────────┘
+                          │ controls
+┌─────────────────────────┴───────────────────────────┐
 │                    LAYER 3                           │
 │              Mutual Visibility                       │
 │    Jonas sees JC's work via Telegram                 │
@@ -28,6 +35,25 @@ The Context Bridge has three layers:
 │    Every 2 minutes, 48-hour retention               │
 └─────────────────────────────────────────────────────┘
 ```
+
+## Layer 4: macOS Helper (Local Operator)
+
+Native SwiftUI menu bar app that observes, controls, and repairs the local capture pipeline.
+
+- **MenuBarExtra with popover**: status, quick actions (pause/resume/sensitive), health strip
+- **Control Center window**: Overview, Permissions, Privacy, Diagnostics tabs
+- Communicates with the daemon via `context-helperctl.sh` (JSON over Process)
+- Reads logs, queue state, and permission status directly from the filesystem
+- Never captures data itself - it observes and controls the bash-based pipeline
+
+### Pause vs Sensitive
+
+| Mode | What happens | Use when |
+|------|-------------|----------|
+| **Pause** | Stops all local context generation. No shell commands, file changes, or window info is captured. The daemon does nothing until resumed. | You want complete privacy. Personal calls, sensitive meetings, off-the-clock hours. |
+| **Sensitive** | Keeps the system operational but reduces capture to minimal heartbeat payloads. Shell commands and git commits still flow; window titles and URLs are suppressed. | You're working on something confidential but still want JC to know you're active on a project. |
+
+Both modes can be activated from the menu bar popover or the Privacy tab in the Control Center.
 
 ## Layer 1: Raw Activity Stream
 
@@ -256,8 +282,18 @@ openclaw-computer-vision/
 ├── DESIGN.md               ← Detailed design decisions
 ├── mac-daemon/
 │   ├── context-daemon.sh   ← Main capture script
+│   ├── context-helperctl.sh ← Control contract for helper app
+│   ├── context-common.sh   ← Shared functions
 │   ├── install.sh          ← Mac installer
 │   └── com.openclaw.context-bridge.plist  ← launchd config
+├── mac-helper/
+│   └── OpenClawHelper.xcodeproj  ← Layer 4 SwiftUI app
+│       └── OpenClawHelper/
+│           ├── Models/      ← BridgeSnapshot, PermissionStatus, HandoffDraft
+│           ├── ViewModels/  ← MenuBarViewModel, ControlCenterViewModel
+│           ├── Views/       ← MenuBarPopover, ControlCenter, tab views
+│           ├── Services/    ← BridgeCommandRunner, PermissionService
+│           └── Theme/       ← DarkUtilityGlass visual system
 ├── server/
 │   ├── context-receiver.py ← HTTP endpoint + SQLite
 │   ├── context-digest.py   ← Layer 2 intelligence

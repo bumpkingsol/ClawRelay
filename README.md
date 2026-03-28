@@ -15,8 +15,29 @@ MacBook (daemon)  ──HTTPS──>  Server (receiver)  ──>  JC (agent)
 
 ### Mac Side (`mac-daemon/`)
 - `context-daemon.sh` - Main capture script (launchd)
+- `context-helperctl.sh` - Control contract for the helper app (JSON over Process)
 - `install.sh` - One-command installer
 - `com.openclaw.context-bridge.plist` - launchd config
+
+### macOS Helper App (`mac-helper/`)
+
+Native SwiftUI menu bar app that observes, controls, and repairs the local capture pipeline. Lives in the system tray and provides:
+
+- **Menu bar popover**: live status, health strip, quick actions (pause/resume/sensitive)
+- **Control Center window**: Overview, Permissions, Privacy, Diagnostics tabs
+- Reads `~/.context-bridge/` for queue state, logs, and pause files
+- Communicates with the daemon via `context-helperctl.sh` (JSON over Process)
+- Never captures data itself - it only observes and controls the bash-based pipeline
+
+#### Build and Run
+```bash
+# Command line
+xcodebuild -project mac-helper/OpenClawHelper.xcodeproj -scheme OpenClawHelper -destination 'platform=macOS' build
+open mac-helper/build/Build/Products/Debug/OpenClawHelper.app
+
+# Or open in Xcode
+open mac-helper/OpenClawHelper.xcodeproj  # then Cmd+R
+```
 
 ### Server Side (`server/`)
 - `context-receiver.py` - HTTP endpoint accepting pushes

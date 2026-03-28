@@ -15,6 +15,7 @@ struct MenuBarPopoverView: View {
         }
         .padding(18)
         .frame(width: 340)
+        .background(DarkUtilityGlass.background)
         .onAppear { viewModel.startPolling() }
         .onDisappear { viewModel.stopPolling() }
     }

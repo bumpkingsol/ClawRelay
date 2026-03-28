@@ -23,6 +23,7 @@ struct OverviewTabView: View {
                         )
                     }
                 }
+                .groupBoxStyle(.automatic)
 
                 // Services section
                 GroupBox("Services") {
@@ -65,7 +66,7 @@ struct OverviewTabView: View {
                 .font(.title2)
                 .foregroundStyle(warn ? .orange : .green)
             Text(title)
-                .font(.caption)
+                .font(DarkUtilityGlass.compactBody)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.headline)
@@ -73,7 +74,7 @@ struct OverviewTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+        .glassCard()
     }
 
     private func serviceRow(_ name: String, state: String, restart: @escaping () -> Void) -> some View {
@@ -82,7 +83,7 @@ struct OverviewTabView: View {
                 Text(name)
                     .font(.headline)
                 Text(state)
-                    .font(.caption)
+                    .font(DarkUtilityGlass.monoCaption)
                     .foregroundStyle(state == "loaded" ? .green : .orange)
             }
             Spacer()
@@ -93,6 +94,6 @@ struct OverviewTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+        .glassCard()
     }
 }

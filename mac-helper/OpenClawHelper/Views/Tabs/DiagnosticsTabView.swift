@@ -8,64 +8,80 @@ struct DiagnosticsTabView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Error banner
                 if let error = viewModel.lastActionError {
-                    GroupBox {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    }
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .padding()
+                        .glassCard()
                 }
 
                 // Recent errors
-                GroupBox("Recent Daemon Errors") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent Daemon Errors")
+                        .font(.headline)
                     if viewModel.recentErrors.isEmpty {
                         Text("No recent errors").foregroundStyle(.secondary)
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(viewModel.recentErrors.enumerated()), id: \.offset) { _, line in
                                 Text(line)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(DarkUtilityGlass.monoCaption)
                             }
                         }
                     }
                 }
+                .padding()
+                .glassCard()
 
-                GroupBox("Recent Watcher Errors") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent Watcher Errors")
+                        .font(.headline)
                     if viewModel.recentFswatchErrors.isEmpty {
                         Text("No recent errors").foregroundStyle(.secondary)
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(viewModel.recentFswatchErrors.enumerated()), id: \.offset) { _, line in
                                 Text(line)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(DarkUtilityGlass.monoCaption)
                             }
                         }
                     }
                 }
+                .padding()
+                .glassCard()
 
                 // Config paths
-                GroupBox("Configuration Paths") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Configuration Paths")
+                        .font(.headline)
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(viewModel.configPaths, id: \.label) { item in
                             HStack {
                                 Text(item.label)
-                                    .font(.caption)
+                                    .font(DarkUtilityGlass.compactBody)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 120, alignment: .trailing)
                                 Text(item.path)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(DarkUtilityGlass.monoCaption)
                                     .textSelection(.enabled)
                                 Spacer()
                             }
                         }
                     }
                 }
+                .padding()
+                .glassCard()
 
                 // Repair actions
-                GroupBox("Repair Actions") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Repair Actions")
+                        .font(.headline)
                     HStack(spacing: 12) {
                         Button("Restart Daemon") { viewModel.restartDaemon() }
                         Button("Restart Watcher") { viewModel.restartWatcher() }
                     }
                 }
+                .padding()
+                .glassCard()
             }
             .padding()
         }

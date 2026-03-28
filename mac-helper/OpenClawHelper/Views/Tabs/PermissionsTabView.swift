@@ -11,7 +11,7 @@ struct PermissionsTabView: View {
                     .padding(.bottom, 4)
 
                 Text("The Context Bridge daemon needs these permissions to capture your activity. Grant them to the terminal app that runs the daemon (usually Terminal).")
-                    .font(.callout)
+                    .font(DarkUtilityGlass.compactBody)
                     .foregroundStyle(.secondary)
 
                 ForEach(viewModel.permissions, id: \.kind) { status in
@@ -23,30 +23,30 @@ struct PermissionsTabView: View {
     }
 
     private func permissionRow(_ status: PermissionStatus) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: stateIcon(status.state))
-                        .foregroundStyle(stateColor(status.state))
-                    Text(kindLabel(status.kind))
-                        .font(.headline)
-                    Spacer()
-                    stateLabel(status.state)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: stateIcon(status.state))
+                    .foregroundStyle(stateColor(status.state))
+                Text(kindLabel(status.kind))
+                    .font(.headline)
+                Spacer()
+                stateLabel(status.state)
+            }
+            Text(status.detail)
+                .font(DarkUtilityGlass.monoCaption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Open Settings") {
+                    SettingsDeepLinkService.open(for: status.kind)
                 }
-                Text(status.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button("Open Settings") {
-                        SettingsDeepLinkService.open(for: status.kind)
-                    }
-                    Button("Check Again") {
-                        viewModel.recheckPermissions()
-                    }
-                    .buttonStyle(.bordered)
+                Button("Check Again") {
+                    viewModel.recheckPermissions()
                 }
+                .buttonStyle(.bordered)
             }
         }
+        .padding()
+        .glassCard()
     }
 
     // MARK: - Helpers
@@ -80,15 +80,15 @@ struct PermissionsTabView: View {
         switch state {
         case .granted:
             Text("Granted")
-                .font(.caption)
+                .font(DarkUtilityGlass.monoCaption)
                 .foregroundStyle(.green)
         case .missing:
             Text("Missing")
-                .font(.caption)
+                .font(DarkUtilityGlass.monoCaption)
                 .foregroundStyle(.red)
         case .needsReview:
             Text("Needs Review")
-                .font(.caption)
+                .font(DarkUtilityGlass.monoCaption)
                 .foregroundStyle(.orange)
         }
     }

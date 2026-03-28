@@ -36,6 +36,7 @@
 		A10000090000000000000002 /* HandoffViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000002 /* HandoffViewModel.swift */; };
 		A10000090000000000000003 /* PrivacyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000003 /* PrivacyTabView.swift */; };
 		A10000090000000000000004 /* HandoffSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000004 /* HandoffSheetView.swift */; };
+		A10000100000000000000001 /* DarkUtilityGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000100000000000000001 /* DarkUtilityGlass.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		A20000090000000000000002 /* HandoffViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffViewModel.swift; sourceTree = "<group>"; };
 		A20000090000000000000003 /* PrivacyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyTabView.swift; sourceTree = "<group>"; };
 		A20000090000000000000004 /* HandoffSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffSheetView.swift; sourceTree = "<group>"; };
+		A20000100000000000000001 /* DarkUtilityGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkUtilityGlass.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +123,7 @@
 				A70000060000000000000001 /* ViewModels */,
 				A70000060000000000000002 /* Views */,
 				A70000050000000000000002 /* Services */,
+				A70000100000000000000001 /* Theme */,
 				A70000010000000000000005 /* Support */,
 			);
 			path = OpenClawHelper;
@@ -227,6 +230,14 @@
 				A20000090000000000000003 /* PrivacyTabView.swift */,
 			);
 			path = Tabs;
+			sourceTree = "<group>";
+		};
+		A70000100000000000000001 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A20000100000000000000001 /* DarkUtilityGlass.swift */,
+			);
+			path = Theme;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -344,6 +355,7 @@
 				A10000090000000000000002 /* HandoffViewModel.swift in Sources */,
 				A10000090000000000000003 /* PrivacyTabView.swift in Sources */,
 				A10000090000000000000004 /* HandoffSheetView.swift in Sources */,
+				A10000100000000000000001 /* DarkUtilityGlass.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

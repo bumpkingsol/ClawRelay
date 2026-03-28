@@ -39,6 +39,7 @@
 		A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000002 /* HandoffsTabViewModel.swift */; };
 		A10000110000000000000003 /* HandoffsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000003 /* HandoffsTabView.swift */; };
 		A10000120000000000000001 /* DashboardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000120000000000000001 /* DashboardData.swift */; };
+		A10000130000000000000001 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000130000000000000001 /* DashboardViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,6 +89,7 @@
 		A20000110000000000000002 /* HandoffsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabViewModel.swift; sourceTree = "<group>"; };
 		A20000110000000000000003 /* HandoffsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabView.swift; sourceTree = "<group>"; };
 		A20000120000000000000001 /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
+		A20000130000000000000001 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -199,6 +201,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000070000000000000001 /* ControlCenterViewModel.swift */,
+				A20000130000000000000001 /* DashboardViewModel.swift */,
 				A20000110000000000000002 /* HandoffsTabViewModel.swift */,
 				A20000060000000000000001 /* MenuBarViewModel.swift */,
 			);
@@ -356,6 +359,7 @@
 				A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */,
 				A10000110000000000000003 /* HandoffsTabView.swift in Sources */,
 				A10000120000000000000001 /* DashboardData.swift in Sources */,
+				A10000130000000000000001 /* DashboardViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

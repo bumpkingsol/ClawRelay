@@ -504,6 +504,51 @@ except:
   fi
 fi
 
+# --- Meeting / Call Detection ---
+IN_CALL="false"
+CALL_APP=""
+CALL_TYPE="unknown"
+
+# Check camera (VDCAssistant = camera in use)
+CAMERA_ACTIVE="false"
+if pgrep -x "VDCAssistant" >/dev/null 2>&1; then
+  CAMERA_ACTIVE="true"
+fi
+
+# Check mic via ioreg (audio input active)
+MIC_ACTIVE="false"
+if ioreg -c AppleHDAEngineInput 2>/dev/null | grep -q "IOAudioEngineState = 1" 2>/dev/null; then
+  MIC_ACTIVE="true"
+fi
+
+# If mic or camera is active, we're in a call
+if [ "$CAMERA_ACTIVE" = "true" ] || [ "$MIC_ACTIVE" = "true" ]; then
+  IN_CALL="true"
+
+  if [ "$CAMERA_ACTIVE" = "true" ]; then
+    CALL_TYPE="video"
+  else
+    CALL_TYPE="audio"
+  fi
+
+  # Identify the call app
+  if pgrep -x "zoom.us" >/dev/null 2>&1; then
+    CALL_APP="Zoom"
+  elif pgrep -x "FaceTime" >/dev/null 2>&1; then
+    CALL_APP="FaceTime"
+  elif pgrep -x "Microsoft Teams" >/dev/null 2>&1 || pgrep -f "MSTeams" >/dev/null 2>&1; then
+    CALL_APP="Teams"
+  elif pgrep -x "Discord" >/dev/null 2>&1; then
+    CALL_APP="Discord"
+  elif pgrep -x "Slack" >/dev/null 2>&1; then
+    CALL_APP="Slack"
+  elif [ -n "$CHROME_ALL_TABS" ] && echo "$CHROME_ALL_TABS" | grep -qi "meet.google.com" 2>/dev/null; then
+    CALL_APP="Google Meet"
+  else
+    CALL_APP="unknown"
+  fi
+fi
+
 # Export for Python payload builder
 export CB_APP="$ACTIVE_APP"
 export CB_WINDOW_TITLE="$WINDOW_TITLE"
@@ -519,6 +564,9 @@ export CB_CODEX_SESSION="${CODEX_SESSION:-""}"
 export CB_CODEX_RUNNING="$CODEX_RUNNING"
 export CB_WHATSAPP="$WHATSAPP_CONTEXT"
 export CB_NOTIFICATIONS="${NOTIFICATIONS:-""}"
+export CB_IN_CALL="$IN_CALL"
+export CB_CALL_APP="$CALL_APP"
+export CB_CALL_TYPE="$CALL_TYPE"
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
 
 PAYLOAD=$(python3 -c "
@@ -539,6 +587,9 @@ data = {
     'codex_running': os.environ.get('CB_CODEX_RUNNING', 'false') == 'true',
     'whatsapp_context': os.environ.get('CB_WHATSAPP', ''),
     'notifications': os.environ.get('CB_NOTIFICATIONS', ''),
+    'in_call': os.environ.get('CB_IN_CALL', 'false') == 'true',
+    'call_app': os.environ.get('CB_CALL_APP', ''),
+    'call_type': os.environ.get('CB_CALL_TYPE', 'unknown'),
     'idle_state': 'active',
     'idle_seconds': int(os.environ.get('CB_IDLE_SECONDS', '0')),
 }

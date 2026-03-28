@@ -79,14 +79,24 @@ flush_queue() {
       curl_args+=("$arg")
     done < <(curl_tls_args)
 
-    curl -sf -o /dev/null \
-      -X POST "$SERVER_URL" \
-      -H "Authorization: Bearer $AUTH_TOKEN" \
-      -H "Content-Type: application/json" \
-      -d "$queued_payload" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      2>/dev/null && \
+    if [ ${#curl_args[@]} -gt 0 ]; then
+      curl -sf -o /dev/null \
+        -X POST "$SERVER_URL" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$queued_payload" \
+        --connect-timeout 5 --max-time 10 \
+        "${curl_args[@]}" \
+        2>/dev/null
+    else
+      curl -sf -o /dev/null \
+        -X POST "$SERVER_URL" \
+        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$queued_payload" \
+        --connect-timeout 5 --max-time 10 \
+        2>/dev/null
+    fi && \
       sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE payload = '$(echo "$queued_payload" | sed "s/'/''/g")';" 2>/dev/null
   done || true
 }
@@ -100,15 +110,26 @@ send_payload() {
     curl_args+=("$arg")
   done < <(curl_tls_args)
 
-  http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
-    -X POST "$SERVER_URL" \
-    -H "Authorization: Bearer $AUTH_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "$payload" \
-    --connect-timeout 5 \
-    --max-time 10 \
-    "${curl_args[@]}" \
-    2>/dev/null || echo "000")
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+      -X POST "$SERVER_URL" \
+      -H "Authorization: Bearer $AUTH_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      --connect-timeout 5 \
+      --max-time 10 \
+      "${curl_args[@]}" \
+      2>/dev/null || echo "000")
+  else
+    http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+      -X POST "$SERVER_URL" \
+      -H "Authorization: Bearer $AUTH_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      --connect-timeout 5 \
+      --max-time 10 \
+      2>/dev/null || echo "000")
+  fi
 
   if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
     flush_queue

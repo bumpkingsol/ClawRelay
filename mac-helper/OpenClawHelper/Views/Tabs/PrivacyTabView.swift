@@ -2,7 +2,6 @@ import SwiftUI
 
 struct PrivacyTabView: View {
     @ObservedObject var viewModel: ControlCenterViewModel
-    @State private var showHandoffSheet = false
     @State private var showPurgeConfirmation = false
 
     var body: some View {
@@ -66,19 +65,6 @@ struct PrivacyTabView: View {
                 .padding()
                 .glassCard()
 
-                // Handoff
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Quick Handoff")
-                        .font(.headline)
-                    Text("Send a task handoff to JC")
-                        .font(DarkUtilityGlass.compactBody).foregroundStyle(.secondary)
-                    Button("Compose Handoff...") {
-                        showHandoffSheet = true
-                    }
-                }
-                .padding()
-                .glassCard()
-
                 // Local purge
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Danger Zone")
@@ -93,9 +79,6 @@ struct PrivacyTabView: View {
                 .glassCard()
             }
             .padding()
-        }
-        .sheet(isPresented: $showHandoffSheet) {
-            HandoffSheetView(viewModel: HandoffViewModel(runner: viewModel.runner))
         }
         .confirmationDialog("Purge Local Data?", isPresented: $showPurgeConfirmation) {
             Button("Purge", role: .destructive) { viewModel.purgeLocal() }

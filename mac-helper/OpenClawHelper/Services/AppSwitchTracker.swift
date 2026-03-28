@@ -7,6 +7,8 @@ final class AppSwitchTracker {
     private let logPath: String
     private let pausePath: String
     private let dateFormatter: ISO8601DateFormatter
+    private let queue = DispatchQueue(label: "com.clawrelay.appswitch", qos: .utility)
+    private var writeCount = 0
 
     private init() {
         let home = NSHomeDirectory()
@@ -26,23 +28,28 @@ final class AppSwitchTracker {
     }
 
     @objc private func appDidActivate(_ notification: Notification) {
-        guard !isPaused() else { return }
-
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let appName = app.localizedName else { return }
 
-        let title = captureWindowTitle(appName)
+        let ts = dateFormatter.string(from: Date())
 
-        let entry: [String: Any] = [
-            "ts": dateFormatter.string(from: Date()),
-            "app": appName,
-            "title": title,
-        ]
+        // All blocking work off the main thread
+        queue.async { [weak self] in
+            guard let self = self, !self.isPaused() else { return }
 
-        guard let data = try? JSONSerialization.data(withJSONObject: entry),
-              let line = String(data: data, encoding: .utf8) else { return }
+            let title = self.captureWindowTitle(appName)
 
-        appendLine(line)
+            let entry: [String: Any] = [
+                "ts": ts,
+                "app": appName,
+                "title": title,
+            ]
+
+            guard let data = try? JSONSerialization.data(withJSONObject: entry),
+                  let line = String(data: data, encoding: .utf8) else { return }
+
+            self.appendLine(line)
+        }
     }
 
     private func captureWindowTitle(_ appName: String) -> String {
@@ -76,7 +83,12 @@ final class AppSwitchTracker {
         handle.write((line + "\n").data(using: .utf8)!)
         handle.closeFile()
 
-        pruneOldEntries()
+        // Prune every 20 writes instead of every write
+        writeCount += 1
+        if writeCount >= 20 {
+            writeCount = 0
+            pruneOldEntries()
+        }
     }
 
     private func pruneOldEntries() {

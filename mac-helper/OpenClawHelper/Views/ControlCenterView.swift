@@ -17,8 +17,7 @@ struct ControlCenterView: View {
             case .diagnostics:
                 DiagnosticsTabView(viewModel: viewModel)
             case .permissions:
-                Text("Permissions - coming in Task 8")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                PermissionsTabView(viewModel: viewModel)
             case .privacy:
                 Text("Privacy - coming in Task 9")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

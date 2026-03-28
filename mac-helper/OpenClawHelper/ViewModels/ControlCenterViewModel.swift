@@ -12,19 +12,27 @@ final class ControlCenterViewModel: ObservableObject {
     @Published private(set) var recentErrors: [String] = []
     @Published private(set) var recentFswatchErrors: [String] = []
     @Published private(set) var configPaths: [(label: String, path: String)] = []
+    @Published private(set) var permissions: [PermissionStatus] = []
     @Published var lastActionError: String?
 
     private let runner: BridgeCommandRunner
+    private let permissionService = PermissionService()
     private var refreshTimer: RefreshTimer?
 
     init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
         self.runner = runner
         loadConfigPaths()
+        recheckPermissions()
     }
 
     func refresh() {
         snapshot = runner.fetchStatus()
         loadErrors()
+        recheckPermissions()
+    }
+
+    func recheckPermissions() {
+        permissions = permissionService.checkAll()
     }
 
     func startPolling() {

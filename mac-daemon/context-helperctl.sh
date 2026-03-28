@@ -132,15 +132,49 @@ restart_launchd() {
 }
 
 # ---------------------------------------------------------------------------
-# purge-local  – wipe the local SQLite queue
+# purge-local  – wipe all local context data (queue, logs, pause, handoffs)
 # ---------------------------------------------------------------------------
 do_purge_local() {
-  local db_path
-  db_path="$(cb_dir)/local.db"
-  if [ -f "$db_path" ]; then
-    sqlite3 "$db_path" "DELETE FROM queue;" 2>/dev/null || true
-  fi
+  local cb
+  cb="$(cb_dir)"
+  local outbox
+  outbox="$(cb_handoff_outbox_dir)"
+  rm -f "$cb/local.db" "$cb/pause-until" "$cb/sensitive-mode" "$HOME/.context-bridge-cmds.log" "$cb/fswatch-changes.log"
+  [ -n "$outbox" ] && [ "$outbox" != "/" ] && rm -rf "$outbox"
+  mkdir -p "$cb" "$outbox"
   status_json
+}
+
+# ---------------------------------------------------------------------------
+# privacy-rules get | set <path-to-json>
+# ---------------------------------------------------------------------------
+do_privacy_rules() {
+  local subcmd="${1:-}"
+  local rules_file
+  rules_file="$(cb_privacy_rules_file)"
+  case "$subcmd" in
+    get)
+      if [ -f "$rules_file" ]; then
+        cat "$rules_file"
+      else
+        echo '{"rules":[]}'
+      fi
+      ;;
+    set)
+      local path="${2:-}"
+      if [ -z "$path" ] || [ ! -f "$path" ]; then
+        echo '{"error":"privacy-rules set requires a valid JSON file path"}' >&2
+        exit 1
+      fi
+      cp "$path" "$rules_file"
+      chmod 600 "$rules_file"
+      status_json
+      ;;
+    *)
+      echo '{"error":"privacy-rules requires get or set subcommand"}' >&2
+      exit 1
+      ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------
@@ -196,8 +230,9 @@ case "$cmd" in
   restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
+  privacy-rules)   do_privacy_rules "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|privacy-rules"}' >&2
     exit 1
     ;;
 esac

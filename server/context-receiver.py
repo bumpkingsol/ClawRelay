@@ -414,7 +414,7 @@ def health():
         
         capture_status = 'healthy'
         if recent == 0 and count > 0:
-            if last_active and last_active[1] in ('locked', 'away'):
+            if last_active and dict(last_active).get('idle_state') in ('locked', 'away'):
                 capture_status = 'mac_idle'
             else:
                 capture_status = 'stale'  # daemon may have stopped
@@ -427,8 +427,8 @@ def health():
             'capture_status': capture_status,
             'total_rows': count,
             'recent_captures_10min': recent,
-            'latest_activity': latest[0] if latest else None,
-            'latest_idle_state': last_active[1] if last_active else None,
+            'latest_activity': dict(latest).get('ts') if latest else None,
+            'latest_idle_state': dict(last_active).get('idle_state') if last_active else None,
             'db_encrypted': is_encrypted(),
         })
     except Exception:
@@ -445,7 +445,7 @@ def jc_work_log():
     try:
         db = get_db()
         # Check if table exists
-        tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        tables = [list(r.values())[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         if 'jc_work_log' not in tables:
             db.close()
             return jsonify({'entries': [], 'total': 0})
@@ -464,7 +464,7 @@ def jc_work_log():
         entries = []
         for r in rows:
             entries.append({
-                'id': r[0],
+                'id': dict(r).get('id'),
                 'project': r[1],
                 'description': r[2],
                 'status': r[3],
@@ -509,12 +509,13 @@ def dashboard():
         }
 
         if latest:
-            status['current_app'] = latest['app'] or 'unknown'
-            status['idle_state'] = latest['idle_state'] or 'unknown'
-            status['idle_seconds'] = latest['idle_seconds'] or 0
+            latest = dict(latest)  # convert Row to dict for .get() access
+            status['current_app'] = latest.get('app') or 'unknown'
+            status['idle_state'] = latest.get('idle_state') or 'unknown'
+            status['idle_seconds'] = latest.get('idle_seconds') or 0
             status['in_call'] = bool(latest.get('in_call', 0))
             status['focus_mode'] = latest.get('focus_mode') or None
-            status['last_activity'] = latest['ts']
+            status['last_activity'] = latest.get('ts')
 
             # Infer project
             haystack = f"{latest['window_title']} {latest['git_repo']} {latest['url']} {latest['file_path']}".lower()
@@ -537,7 +538,8 @@ def dashboard():
             switches = 0
             prev_ctx = None
             for r in recent:
-                h = f"{r['window_title']} {r['git_repo']} {r['url']} {r['file_path']}".lower()
+                r = dict(r)  # convert Row to dict
+                h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')}".lower()
                 proj = 'other'
                 for p, kws in ALL_PROJECTS.items():
                     if any(kw in h for kw in kws):
@@ -565,7 +567,8 @@ def dashboard():
 
         project_counts = {}
         for r in today_rows:
-            h = f"{r['window_title']} {r['git_repo']} {r['url']} {r['file_path']}".lower()
+            r = dict(r)
+            h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')}".lower()
             matched = 'other'
             for p, kws in ALL_PROJECTS.items():
                 if any(kw in h for kw in kws):
@@ -586,7 +589,7 @@ def dashboard():
         neglected = []
         try:
             last_seen_rows = db.execute("SELECT project, last_seen FROM project_last_seen").fetchall()
-            last_seen = {r['project']: r['last_seen'] for r in last_seen_rows}
+            last_seen = {dict(r)['project']: dict(r)['last_seen'] for r in last_seen_rows}
         except Exception:
             last_seen = {}
 
@@ -605,7 +608,7 @@ def dashboard():
         # --- JC activity ---
         jc_activity = []
         try:
-            tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            tables = [list(r.values())[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
             if 'jc_work_log' in tables:
                 jc_since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
                 jc_rows = db.execute(
@@ -613,14 +616,15 @@ def dashboard():
                     (jc_since,)
                 ).fetchall()
                 for r in jc_rows:
+                    r = dict(r)
                     jc_activity.append({
-                        'id': r[0],
-                        'project': r[1],
-                        'description': r[2],
-                        'status': r[3],
-                        'started_at': r[5],
-                        'completed_at': r[6],
-                        'duration_minutes': r[7],
+                        'id': r.get('id'),
+                        'project': r.get('project'),
+                        'description': r.get('description'),
+                        'status': r.get('status'),
+                        'started_at': r.get('started_at'),
+                        'completed_at': r.get('completed_at'),
+                        'duration_minutes': r.get('duration_minutes'),
                     })
         except Exception:
             pass
@@ -632,14 +636,15 @@ def dashboard():
                 "SELECT id, project, task, message, priority, status, created_at FROM handoffs ORDER BY created_at DESC LIMIT 10"
             ).fetchall()
             for r in h_rows:
+                r = dict(r)
                 handoffs.append({
-                    'id': r['id'],
-                    'project': r['project'],
-                    'task': r['task'],
-                    'message': r['message'] or '',
-                    'priority': r['priority'] or 'normal',
-                    'status': r['status'] or 'pending',
-                    'created_at': r['created_at'],
+                    'id': r.get('id'),
+                    'project': r.get('project'),
+                    'task': r.get('task'),
+                    'message': r.get('message') or '',
+                    'priority': r.get('priority') or 'normal',
+                    'status': r.get('status') or 'pending',
+                    'created_at': r.get('created_at'),
                 })
         except Exception:
             pass

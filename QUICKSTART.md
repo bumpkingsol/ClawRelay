@@ -262,6 +262,27 @@ CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-query
 
 ---
 
+## macOS Helper App
+
+The menu bar helper gives you quick controls for the Context Bridge. It does not capture data - it observes and controls the daemon.
+
+### Build
+```bash
+xcodebuild -project mac-helper/OpenClawHelper.xcodeproj -scheme OpenClawHelper -destination 'platform=macOS' build
+```
+
+### Run
+```bash
+open mac-helper/build/Build/Products/Debug/OpenClawHelper.app
+```
+
+### Or from Xcode
+Open `mac-helper/OpenClawHelper.xcodeproj` and hit Cmd+R.
+
+The helper reads from `~/.context-bridge/` (queue database, logs, pause state) and invokes `context-helperctl.sh` for actions like pause, resume, sensitive mode, restart, and local data purge.
+
+---
+
 ## Part 3: Verify End-to-End
 
 ### 3.1 On the server, check current state

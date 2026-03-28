@@ -23,6 +23,7 @@ struct ControlCenterView: View {
             }
         }
         .frame(minWidth: 860, minHeight: 560)
+        .background(DarkUtilityGlass.background)
         .onAppear { viewModel.startPolling() }
         .onDisappear { viewModel.stopPolling() }
     }

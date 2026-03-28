@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 final class MenuBarViewModel: ObservableObject {
     @Published private(set) var snapshot: BridgeSnapshot = .placeholder
+    @Published var dashboard: DashboardData?
     private let runner: BridgeCommandRunner
     private var refreshTimer: RefreshTimer?
 
@@ -16,6 +17,22 @@ final class MenuBarViewModel: ObservableObject {
 
     func refresh() {
         snapshot = runner.fetchStatus()
+        fetchDashboard()
+    }
+
+    func fetchDashboard() {
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                let raw = try capturedRunner.runActionWithOutput("dashboard")
+                let decoded = try JSONDecoder().decode(DashboardData.self, from: raw)
+                await MainActor.run { [weak self] in
+                    self?.dashboard = decoded
+                }
+            } catch {
+                // Silently fail — popover summary is best-effort
+            }
+        }
     }
 
     func pause(seconds: Int) {

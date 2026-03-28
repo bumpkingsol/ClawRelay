@@ -24,6 +24,37 @@ REPOS_DIR = Path('/home/user/clawrelay')
 from config import ALL_PROJECTS as PROJECTS, PORTFOLIO_PROJECTS, NOISE_APPS
 
 
+def update_project_last_seen(db_path, project_activity):
+    """Update the project_last_seen table with latest activity timestamps."""
+    conn = sqlite3.connect(db_path)
+    for project, details in project_activity.items():
+        if project == 'other':
+            continue
+        last_seen = details.get('last_seen')
+        last_branch = ''
+        if details.get('branches'):
+            last_branch = list(details['branches'])[-1]
+        if last_seen:
+            conn.execute(
+                """INSERT INTO project_last_seen (project, last_seen, last_branch)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(project) DO UPDATE SET
+                   last_seen = excluded.last_seen,
+                   last_branch = excluded.last_branch""",
+                (project, last_seen, last_branch)
+            )
+    conn.commit()
+    conn.close()
+
+
+def get_project_last_seen(db_path):
+    """Read all project_last_seen records."""
+    conn = sqlite3.connect(db_path)
+    rows = conn.execute("SELECT project, last_seen, last_branch FROM project_last_seen").fetchall()
+    conn.close()
+    return {row[0]: {'last_seen': row[1], 'last_branch': row[2]} for row in rows}
+
+
 def get_db():
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
@@ -300,10 +331,69 @@ def build_digest(hours_back=8):
     # --- Google Doc URLs ---
     google_urls = extract_google_doc_urls(rows)
     
+    # --- Cross-digest comparison ---
+    prev_since = (datetime.fromisoformat(since) - timedelta(hours=hours_back)).isoformat()
+    prev_until = since
+
+    prev_rows = db.execute(
+        "SELECT app, window_title, url, git_repo, git_branch, file_path FROM activity_stream WHERE ts >= ? AND ts < ? AND idle_state = 'active'",
+        (prev_since, prev_until)
+    ).fetchall()
+
+    prev_projects = set()
+    for prow in prev_rows:
+        haystack = f"{prow['window_title']} {prow['git_repo']} {prow['url']} {prow['file_path']}".lower()
+        for project, keywords in PROJECTS.items():
+            if any(kw in haystack for kw in keywords):
+                prev_projects.add(project)
+                break
+
+    current_projects = set(p for p, c in project_captures.items() if c > 0 and p != 'other')
+
+    new_work = current_projects - prev_projects
+    continued_work = current_projects & prev_projects
+    dropped_work = prev_projects - current_projects
+
+    # Update project_last_seen
+    update_project_last_seen(DB_PATH, project_details)
+
+    # Get neglect data
+    last_seen_data = get_project_last_seen(DB_PATH)
+
+    # --- Context switching / focus metric ---
+    focus_periods = []
+    if rows:
+        from collections import defaultdict as _dd
+        hourly_switches = _dd(int)
+        prev_context = None
+        for row in rows:
+            if row['idle_state'] != 'active' or row['app'] in NOISE_APPS:
+                continue
+            ts_str = row['ts'][:13]  # YYYY-MM-DDTHH
+            haystack = f"{row['window_title']} {row['git_repo']} {row['url']} {row['file_path']}".lower()
+            current_project = 'other'
+            for project, keywords in PROJECTS.items():
+                if any(kw in haystack for kw in keywords):
+                    current_project = project
+                    break
+            ctx = (row['app'], current_project)
+            if prev_context and ctx != prev_context:
+                hourly_switches[ts_str] += 1
+            prev_context = ctx
+
+        for hour, switches in sorted(hourly_switches.items()):
+            if switches <= 3:
+                level = 'focused'
+            elif switches <= 7:
+                level = 'multitasking'
+            else:
+                level = 'scattered'
+            focus_periods.append(f"- {hour}:00: {level} ({switches} switches/hr)")
+
     # --- Build output ---
     today = datetime.now().strftime('%Y-%m-%d')
     now = datetime.now().strftime('%H:%M')
-    
+
     lines = [
         f"# Activity Digest - {today} ({now})",
         "",
@@ -312,7 +402,66 @@ def build_digest(hours_back=8):
         f"~{total_active * interval_min} min tracked*",
         "",
     ]
-    
+
+    # Changes since last digest
+    lines.append("## Changes Since Last Digest")
+    lines.append("")
+
+    if new_work:
+        lines.append("### New work this period")
+        for p in sorted(new_work):
+            days_info = ""
+            if p in last_seen_data:
+                try:
+                    last = datetime.fromisoformat(last_seen_data[p]['last_seen']).replace(tzinfo=timezone.utc)
+                    days_ago = (datetime.now(timezone.utc) - last).days
+                    if days_ago > 0:
+                        days_info = f" (first activity in {days_ago} days)"
+                except:
+                    pass
+            lines.append(f"- {p}{days_info}")
+        lines.append("")
+
+    if continued_work:
+        lines.append("### Continued from last period")
+        for p in sorted(continued_work):
+            branch_info = ""
+            if project_details[p]['branches']:
+                branches = list(project_details[p]['branches'])
+                branch_info = f" (branch: {branches[0]})"
+            lines.append(f"- {p}{branch_info}")
+        lines.append("")
+
+    if dropped_work:
+        lines.append("### Dropped since last period")
+        for p in sorted(dropped_work):
+            lines.append(f"- {p}")
+        lines.append("")
+
+    # Neglect tracker
+    lines.append("### Project neglect")
+    for p in sorted(PORTFOLIO_PROJECTS.keys()):
+        if p in current_projects:
+            lines.append(f"- {p}: 0 days (active now)")
+        elif p in last_seen_data:
+            try:
+                last = datetime.fromisoformat(last_seen_data[p]['last_seen']).replace(tzinfo=timezone.utc)
+                days_ago = (datetime.now(timezone.utc) - last).days
+                lines.append(f"- {p}: {days_ago} days since last activity")
+            except:
+                lines.append(f"- {p}: unknown")
+        else:
+            lines.append(f"- {p}: never tracked")
+    lines.append("")
+
+    # Focus level
+    if focus_periods:
+        lines.append("## Focus Level")
+        lines.append("")
+        for fp in focus_periods:
+            lines.append(fp)
+        lines.append("")
+
     # Time allocation summary
     if project_captures:
         lines.append("## Time Allocation")

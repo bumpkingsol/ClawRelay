@@ -567,7 +567,7 @@ def dashboard():
             status['last_activity'] = latest.get('ts')
 
             # Infer project
-            haystack = f"{latest['window_title']} {latest['git_repo']} {latest['url']} {latest['file_path']}".lower()
+            haystack = f"{latest.get('window_title', '')} {latest.get('git_repo', '')} {latest.get('url', '')} {latest.get('file_path', '')} {latest.get('all_tabs', '')}".lower()
             for proj, keywords in ALL_PROJECTS.items():
                 if any(kw in haystack for kw in keywords):
                     status['current_project'] = proj
@@ -580,7 +580,7 @@ def dashboard():
             # Focus level (last 60 min)
             since_1h = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
             recent = db.execute(
-                "SELECT app, window_title, git_repo, url, file_path FROM activity_stream WHERE ts >= ? AND idle_state = 'active' ORDER BY ts",
+                "SELECT app, window_title, git_repo, url, file_path, all_tabs FROM activity_stream WHERE ts >= ? AND idle_state = 'active' ORDER BY ts",
                 (since_1h,)
             ).fetchall()
 
@@ -588,7 +588,7 @@ def dashboard():
             prev_ctx = None
             for r in recent:
                 r = dict(r)  # convert Row to dict
-                h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')}".lower()
+                h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')} {r.get('all_tabs', '')}".lower()
                 proj = 'other'
                 for p, kws in ALL_PROJECTS.items():
                     if any(kw in h for kw in kws):
@@ -610,14 +610,14 @@ def dashboard():
         # --- Time allocation (today) ---
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0).isoformat()
         today_rows = db.execute(
-            "SELECT window_title, git_repo, url, file_path FROM activity_stream WHERE ts >= ? AND idle_state = 'active'",
+            "SELECT window_title, git_repo, url, file_path, all_tabs FROM activity_stream WHERE ts >= ? AND idle_state = 'active'",
             (today_start,)
         ).fetchall()
 
         project_counts = {}
         for r in today_rows:
             r = dict(r)
-            h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')}".lower()
+            h = f"{r.get('window_title', '')} {r.get('git_repo', '')} {r.get('url', '')} {r.get('file_path', '')} {r.get('all_tabs', '')}".lower()
             matched = 'other'
             for p, kws in ALL_PROJECTS.items():
                 if any(kw in h for kw in kws):

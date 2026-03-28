@@ -13,3 +13,7 @@ xcuserdata/
 
 # Superpowers
 .superpowers/
+
+# Build artifacts
+OpenClawHelper-*.zip
+mac-helper/build/

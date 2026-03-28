@@ -50,16 +50,19 @@ Native SwiftUI menu bar app (macOS 14+) that observes, controls, and repairs the
 
 #### Requirements
 - macOS 14.0+ (Sonoma or later)
-- Xcode 15+ to build from source
 
-#### Build and Run
+#### Install (pre-built)
+1. Download `OpenClawHelper-v0.1.0.zip` from [Releases](https://github.com/bumpkingsol/openclaw-computer-vision/releases)
+2. Unzip and move `OpenClawHelper.app` to `/Applications`
+3. First launch: right-click the app > **Open** (required for unsigned apps)
+
+#### Build from source
 ```bash
 # Command line
-xcodebuild -project mac-helper/OpenClawHelper.xcodeproj \
-  -scheme OpenClawHelper -destination 'platform=macOS' build
-open mac-helper/build/Build/Products/Debug/OpenClawHelper.app
+bash scripts/build-release.sh
+open mac-helper/build/Build/Products/Release/OpenClawHelper.app
 
-# Or open in Xcode
+# Or open in Xcode (requires Xcode 15+)
 open mac-helper/OpenClawHelper.xcodeproj  # then Cmd+R
 ```
 

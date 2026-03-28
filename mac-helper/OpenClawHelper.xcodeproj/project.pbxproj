@@ -38,6 +38,7 @@
 		A10000110000000000000001 /* Handoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000001 /* Handoff.swift */; };
 		A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000002 /* HandoffsTabViewModel.swift */; };
 		A10000110000000000000003 /* HandoffsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000003 /* HandoffsTabView.swift */; };
+		A10000120000000000000001 /* DashboardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000120000000000000001 /* DashboardData.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +87,7 @@
 		A20000110000000000000001 /* Handoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Handoff.swift; sourceTree = "<group>"; };
 		A20000110000000000000002 /* HandoffsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabViewModel.swift; sourceTree = "<group>"; };
 		A20000110000000000000003 /* HandoffsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabView.swift; sourceTree = "<group>"; };
+		A20000120000000000000001 /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +166,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000050000000000000001 /* BridgeSnapshot.swift */,
+				A20000120000000000000001 /* DashboardData.swift */,
 				A20000110000000000000001 /* Handoff.swift */,
 				A20000090000000000000001 /* HandoffDraft.swift */,
 				A20000050000000000000002 /* PermissionStatus.swift */,
@@ -352,6 +355,7 @@
 				A10000110000000000000001 /* Handoff.swift in Sources */,
 				A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */,
 				A10000110000000000000003 /* HandoffsTabView.swift in Sources */,
+				A10000120000000000000001 /* DashboardData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

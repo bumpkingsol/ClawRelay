@@ -159,15 +159,19 @@ Commits: [2] Fixed doctor approval notification, Started RPC refactor
 - ⚠️ project-beta
 ```
 
+### Synthesis Approach
+
+The digest processor generates rich, structured markdown directly from mechanical extraction — no LLM synthesis step is used during digest generation. JC reads the digest directly and applies its own reasoning to interpret context, detect patterns, and make decisions. This reduces cost, latency, and failure surface while giving JC full interpretive control over the raw evidence. The `context-query.py` CLI provides pre-computed views (status, neglected, since) that JC can call before any autonomous action without reading the full digest.
+
 ### Model Budget
 
 | Phase | Model | Cost/run |
 |-------|-------|----------|
-| Mechanical extraction | MiniMax M2.7 | ~$0.02 |
+| Mechanical extraction | Rule-based Python | $0 |
 | Google Doc reading | `gog` CLI (no model) | $0 |
-| Synthesis | Sonnet 4.6 | ~$0.10-0.25 |
-| **Total per digest** | | **~$0.15-0.30** |
-| **Daily (3 runs)** | | **~$0.50-1.00** |
+| Synthesis | JC interprets digest directly | $0 |
+| **Total per digest** | | **~$0** |
+| **Daily (3 runs)** | | **~$0** |
 
 ### Project Classification
 

@@ -28,6 +28,10 @@
 		A10000070000000000000002 /* ControlCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000002 /* ControlCenterView.swift */; };
 		A10000070000000000000003 /* OverviewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000003 /* OverviewTabView.swift */; };
 		A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000004 /* DiagnosticsTabView.swift */; };
+		A10000080000000000000001 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000001 /* PermissionService.swift */; };
+		A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000002 /* SettingsDeepLinkService.swift */; };
+		A10000080000000000000003 /* PermissionsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000003 /* PermissionsTabView.swift */; };
+		A10000080000000000000004 /* PermissionStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000004 /* PermissionStatusTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,6 +70,10 @@
 		A20000070000000000000002 /* ControlCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterView.swift; sourceTree = "<group>"; };
 		A20000070000000000000003 /* OverviewTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTabView.swift; sourceTree = "<group>"; };
 		A20000070000000000000004 /* DiagnosticsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTabView.swift; sourceTree = "<group>"; };
+		A20000080000000000000001 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		A20000080000000000000002 /* SettingsDeepLinkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDeepLinkService.swift; sourceTree = "<group>"; };
+		A20000080000000000000003 /* PermissionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsTabView.swift; sourceTree = "<group>"; };
+		A20000080000000000000004 /* PermissionStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatusTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +124,7 @@
 				A20000010000000000000003 /* OpenClawHelperTests.swift */,
 				A20000050000000000000005 /* BridgeCommandRunnerTests.swift */,
 				A20000060000000000000006 /* MenuBarViewModelTests.swift */,
+				A20000080000000000000004 /* PermissionStatusTests.swift */,
 				A70000050000000000000003 /* Fixtures */,
 			);
 			path = OpenClawHelperTests;
@@ -151,7 +160,9 @@
 			isa = PBXGroup;
 			children = (
 				A20000050000000000000003 /* BridgeCommandRunner.swift */,
+				A20000080000000000000001 /* PermissionService.swift */,
 				A20000050000000000000004 /* RefreshTimer.swift */,
+				A20000080000000000000002 /* SettingsDeepLinkService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -193,6 +204,7 @@
 			children = (
 				A20000070000000000000003 /* OverviewTabView.swift */,
 				A20000070000000000000004 /* DiagnosticsTabView.swift */,
+				A20000080000000000000003 /* PermissionsTabView.swift */,
 			);
 			path = Tabs;
 			sourceTree = "<group>";
@@ -305,6 +317,9 @@
 				A10000070000000000000002 /* ControlCenterView.swift in Sources */,
 				A10000070000000000000003 /* OverviewTabView.swift in Sources */,
 				A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */,
+				A10000080000000000000001 /* PermissionService.swift in Sources */,
+				A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */,
+				A10000080000000000000003 /* PermissionsTabView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +330,7 @@
 				A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */,
 				A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */,
 				A10000060000000000000006 /* MenuBarViewModelTests.swift in Sources */,
+				A10000080000000000000004 /* PermissionStatusTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

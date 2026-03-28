@@ -462,28 +462,45 @@ fi
 
 # --- Notifications (with Full Disk Access support) ---
 NOTIFICATIONS=""
-# Primary: notification center DB (requires Full Disk Access)
 NOTIF_DB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
 if [ -f "$NOTIF_DB" ] && [ -r "$NOTIF_DB" ]; then
-  NOTIFICATIONS=$(sqlite3 "$NOTIF_DB" "
-    SELECT app_id, title, body 
-    FROM record 
-    WHERE delivered_date > strftime('%s','now') - 180
-    ORDER BY delivered_date DESC
-    LIMIT 5
-  " 2>/dev/null | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
+  NOTIFICATIONS=$(python3 -c "
+import sqlite3, json, sys
+try:
+    conn = sqlite3.connect('$NOTIF_DB')
+    rows = conn.execute('''
+        SELECT app_id, title, body
+        FROM record
+        WHERE delivered_date > strftime('%s','now') - 180
+        ORDER BY delivered_date DESC
+        LIMIT 5
+    ''').fetchall()
+    conn.close()
+    print(json.dumps([{'app': r[0] or '', 'title': r[1] or '', 'body': r[2] or ''} for r in rows]))
+except:
+    print('[]')
+" 2>/dev/null || echo "[]")
 fi
-# Fallback: try alternative notification DB paths for different macOS versions
-if [ "$NOTIFICATIONS" = '""' ] || [ -z "$NOTIFICATIONS" ]; then
+# Fallback: alternative DB path for different macOS versions
+if [ "$NOTIFICATIONS" = "[]" ] || [ -z "$NOTIFICATIONS" ]; then
   ALT_NOTIF_DB="$HOME/Library/Group Containers/group.com.apple.usernoted/db/db"
   if [ -f "$ALT_NOTIF_DB" ] && [ -r "$ALT_NOTIF_DB" ]; then
-    NOTIFICATIONS=$(sqlite3 "$ALT_NOTIF_DB" "
-      SELECT app_id, title, body 
-      FROM record 
-      WHERE delivered_date > strftime('%s','now') - 180
-      ORDER BY delivered_date DESC
-      LIMIT 5
-    " 2>/dev/null | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
+    NOTIFICATIONS=$(python3 -c "
+import sqlite3, json
+try:
+    conn = sqlite3.connect('$ALT_NOTIF_DB')
+    rows = conn.execute('''
+        SELECT app_id, title, body
+        FROM record
+        WHERE delivered_date > strftime('%s','now') - 180
+        ORDER BY delivered_date DESC
+        LIMIT 5
+    ''').fetchall()
+    conn.close()
+    print(json.dumps([{'app': r[0] or '', 'title': r[1] or '', 'body': r[2] or ''} for r in rows]))
+except:
+    print('[]')
+" 2>/dev/null || echo "[]")
   fi
 fi
 

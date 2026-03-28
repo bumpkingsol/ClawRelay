@@ -45,4 +45,20 @@ final class BridgeCommandRunner {
             throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
         }
     }
+
+    func runActionWithOutput(_ action: String, _ args: String...) throws -> Data {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [executablePath, action] + args
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
+        }
+        return data
+    }
 }

@@ -154,15 +154,83 @@ print(json.dumps({
 " 2>/dev/null
 }
 
+PRIVACY_RULES_FILE="$CB_DIR/privacy-rules.json"
+
+# Load privacy rules into shell-friendly formats (once at startup)
+SENSITIVE_APPS_LIST=""
+SENSITIVE_URL_PATTERNS=""
+SENSITIVE_TITLE_KEYWORDS=""
+if [ -f "$PRIVACY_RULES_FILE" ]; then
+  SENSITIVE_APPS_LIST=$(python3 -c "
+import json
+with open('$PRIVACY_RULES_FILE') as f:
+    rules = json.load(f)
+for app in rules.get('sensitive_apps', []):
+    print(app.lower())
+" 2>/dev/null || echo "")
+  SENSITIVE_URL_PATTERNS=$(python3 -c "
+import json
+with open('$PRIVACY_RULES_FILE') as f:
+    rules = json.load(f)
+for p in rules.get('sensitive_url_patterns', []):
+    print(p.lower())
+" 2>/dev/null || echo "")
+  SENSITIVE_TITLE_KEYWORDS=$(python3 -c "
+import json
+with open('$PRIVACY_RULES_FILE') as f:
+    rules = json.load(f)
+for k in rules.get('sensitive_title_keywords', []):
+    print(k.lower())
+" 2>/dev/null || echo "")
+fi
+
 is_sensitive_app() {
+  local app_lower
+  app_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  if [ -n "$SENSITIVE_APPS_LIST" ]; then
+    while IFS= read -r pattern; do
+      [ -z "$pattern" ] && continue
+      if [[ "$app_lower" == *"$pattern"* ]]; then
+        return 0
+      fi
+    done <<< "$SENSITIVE_APPS_LIST"
+    return 1
+  fi
+  # Fallback hardcoded list if no rules file
   case "$1" in
-    "1Password"*|"Wise"|"Revolut"|"Vaultwarden")
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
+    "1Password"*|"Wise"|"Revolut"|"Vaultwarden") return 0 ;;
+    *) return 1 ;;
   esac
+}
+
+is_sensitive_url() {
+  local url_lower
+  url_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  [ -z "$url_lower" ] && return 1
+  if [ -n "$SENSITIVE_URL_PATTERNS" ]; then
+    while IFS= read -r pattern; do
+      [ -z "$pattern" ] && continue
+      if [[ "$url_lower" == *"$pattern"* ]]; then
+        return 0
+      fi
+    done <<< "$SENSITIVE_URL_PATTERNS"
+  fi
+  return 1
+}
+
+is_sensitive_title() {
+  local title_lower
+  title_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  [ -z "$title_lower" ] && return 1
+  if [ -n "$SENSITIVE_TITLE_KEYWORDS" ]; then
+    while IFS= read -r keyword; do
+      [ -z "$keyword" ] && continue
+      if [[ "$title_lower" == *"$keyword"* ]]; then
+        return 0
+      fi
+    done <<< "$SENSITIVE_TITLE_KEYWORDS"
+  fi
+  return 1
 }
 
 # --- Idle Detection ---
@@ -234,18 +302,28 @@ fi
 ACTIVE_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
 WINDOW_TITLE=$(osascript -e 'tell application "System Events" to get name of front window of first application process whose frontmost is true' 2>/dev/null || echo "")
 
-if is_sensitive_app "$ACTIVE_APP"; then
+# --- Sensitive app or title: blank out entirely ---
+if is_sensitive_app "$ACTIVE_APP" || is_sensitive_title "$WINDOW_TITLE"; then
   PAYLOAD=$(build_minimal_payload "active" "${idle_seconds:-0}")
   send_payload "$PAYLOAD" || true
   exit 0
 fi
 
-# --- Chrome URLs (all open tabs) ---
+# --- Chrome URLs (all open tabs, with sensitive URL filtering) ---
 CHROME_URL=""
 CHROME_ALL_TABS=""
 if pgrep -x "Google Chrome" >/dev/null 2>&1; then
   CHROME_URL=$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window' 2>/dev/null || echo "")
-  CHROME_ALL_TABS=$(osascript -e '
+
+  # If the active tab is a sensitive URL, blank out entirely
+  if is_sensitive_url "$CHROME_URL"; then
+    PAYLOAD=$(build_minimal_payload "active" "${idle_seconds:-0}")
+    send_payload "$PAYLOAD" || true
+    exit 0
+  fi
+
+  # Collect all tabs, then filter out sensitive ones
+  CHROME_ALL_TABS_RAW=$(osascript -e '
     set tabList to {}
     tell application "Google Chrome"
       repeat with w in windows
@@ -257,6 +335,16 @@ if pgrep -x "Google Chrome" >/dev/null 2>&1; then
     set AppleScript'\''s text item delimiters to ";;;"
     return tabList as text
   ' 2>/dev/null || echo "")
+
+  # Strip sensitive tabs from the list
+  if [ -n "$CHROME_ALL_TABS_RAW" ]; then
+    CHROME_ALL_TABS=$(echo "$CHROME_ALL_TABS_RAW" | tr ';;;' '\n' | while IFS= read -r tab_entry; do
+      tab_url=$(echo "$tab_entry" | cut -d'|' -f1)
+      if ! is_sensitive_url "$tab_url"; then
+        echo "$tab_entry"
+      fi
+    done | paste -sd ';;;' - 2>/dev/null || echo "")
+  fi
 fi
 
 # --- File path from editor window title ---

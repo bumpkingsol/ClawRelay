@@ -91,6 +91,24 @@ def init_db():
             last_branch TEXT
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS daily_summary (
+            date TEXT NOT NULL,
+            project TEXT NOT NULL,
+            hours REAL NOT NULL,
+            captures INTEGER NOT NULL,
+            PRIMARY KEY (date, project)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS jc_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT NOT NULL,
+            project TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            seen INTEGER DEFAULT 0
+        )
+    """)
     db.commit()
     db.execute("UPDATE activity_stream SET clipboard = NULL WHERE clipboard IS NOT NULL")
     scrub_raw_payloads(db)
@@ -480,6 +498,37 @@ def jc_work_log():
         return jsonify({'error': 'internal error'}), 500
 
 
+@app.route('/context/jc-question', methods=['POST'])
+def post_jc_question():
+    """JC posts a question for Jonas."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+    data, error = parse_json_request()
+    if error:
+        return error
+    db = get_db()
+    db.execute("""CREATE TABLE IF NOT EXISTS jc_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL,
+        project TEXT, created_at TEXT DEFAULT (datetime('now')), seen INTEGER DEFAULT 0)""")
+    db.execute("INSERT INTO jc_questions (question, project) VALUES (?, ?)",
+               (data.get('question', ''), data.get('project', '')))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'}), 201
+
+
+@app.route('/context/jc-question/<int:qid>', methods=['PATCH'])
+def mark_jc_question(qid):
+    """ClawRelay marks a question as seen."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+    db = get_db()
+    db.execute("UPDATE jc_questions SET seen = 1 WHERE id = ?", (qid,))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/context/dashboard', methods=['GET'])
 def dashboard():
     """Combined dashboard data for ClawRelay app."""
@@ -683,6 +732,59 @@ def dashboard():
         except Exception:
             pass
 
+        # --- JC Questions (unseen) ---
+        jc_questions = []
+        try:
+            tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            if 'jc_questions' in tables:
+                q_rows = db.execute(
+                    "SELECT id, question, project, created_at FROM jc_questions WHERE seen = 0 ORDER BY created_at DESC LIMIT 10"
+                ).fetchall()
+                for r in q_rows:
+                    jc_questions.append({
+                        'id': r[0] if isinstance(r, (list, tuple)) else r['id'],
+                        'question': r[1] if isinstance(r, (list, tuple)) else r['question'],
+                        'project': r[2] if isinstance(r, (list, tuple)) else r['project'],
+                        'created_at': r[3] if isinstance(r, (list, tuple)) else r['created_at'],
+                    })
+        except Exception:
+            pass
+
+        # --- Historical data (daily_summary) ---
+        history_days = request.args.get('history_days', 7, type=int)
+        history_days = min(history_days, 30)
+        history = []
+        try:
+            if 'daily_summary' in tables:
+                history_since = (datetime.now(timezone.utc) - timedelta(days=history_days)).strftime('%Y-%m-%d')
+                h_rows = db.execute(
+                    "SELECT date, project, hours FROM daily_summary WHERE date >= ? ORDER BY date DESC",
+                    (history_since,)
+                ).fetchall()
+                for r in h_rows:
+                    history.append({
+                        'date': r[0] if isinstance(r, (list, tuple)) else r['date'],
+                        'project': r[1] if isinstance(r, (list, tuple)) else r['project'],
+                        'hours': r[2] if isinstance(r, (list, tuple)) else r['hours'],
+                    })
+
+            # Supplement today from live data
+            today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            for ta in time_allocation:
+                if not any(h['date'] == today_str and h['project'] == ta['project'] for h in history):
+                    history.append({'date': today_str, 'project': ta['project'], 'hours': ta['hours']})
+                try:
+                    captures = project_counts.get(ta['project'], 0)
+                    db.execute(
+                        "INSERT OR REPLACE INTO daily_summary (date, project, hours, captures) VALUES (?, ?, ?, ?)",
+                        (today_str, ta['project'], ta['hours'], captures)
+                    )
+                except Exception:
+                    pass
+            db.commit()
+        except Exception:
+            pass
+
         db.close()
 
         return jsonify({
@@ -691,6 +793,8 @@ def dashboard():
             'neglected': neglected,
             'jc_activity': jc_activity,
             'handoffs': handoffs,
+            'jc_questions': jc_questions,
+            'history': history,
         })
     except Exception:
         logger.exception("Dashboard query failed")

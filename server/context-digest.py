@@ -169,12 +169,14 @@ def build_digest(hours_back=8):
         "SELECT * FROM activity_stream WHERE ts >= ? ORDER BY ts",
         (since,)
     ).fetchall()
-    db.close()
-    
+    # NOTE: db.close() moved to end of function so Task 5 cross-digest queries can still use DB
+
     if not rows:
+        db.close()
         return None
     
     # --- Time allocation ---
+    interval_min = 2  # moved here so it's available during accumulation
     project_captures = defaultdict(int)
     project_details = defaultdict(lambda: {
         'files': set(),
@@ -182,13 +184,28 @@ def build_digest(hours_back=8):
         'branches': set(),
         'apps': set(),
         'terminal_cmds': [],
+        'file_changes': [],
+        'whatsapp': [],
+        'codex_sessions': [],
+        'codex_running_count': 0,
+        'notifications': [],
+        'in_call_minutes': 0,
+        'call_apps': set(),
+        'focus_modes': [],
+        'calendar_events': [],
         'first_seen': None,
         'last_seen': None,
     })
-    
+
     total_active = 0
     total_idle = 0
-    
+
+    # Global (non-project-specific) accumulators
+    all_whatsapp = []
+    all_notifications = []
+    all_tabs_snapshots = []
+    all_codex_sessions = []
+
     for row in rows:
         if row['idle_state'] in ('idle', 'away', 'locked'):
             total_idle += 1
@@ -222,7 +239,52 @@ def build_digest(hours_back=8):
             details['first_seen'] = ts
         if not details['last_seen'] or ts > details['last_seen']:
             details['last_seen'] = ts
-    
+
+        # --- Accumulate new fields per project ---
+
+        # File changes
+        if row['file_changes']:
+            details['file_changes'].append(row['file_changes'])
+
+        # WhatsApp context
+        if row['whatsapp_context']:
+            details['whatsapp'].append({'ts': row['ts'], 'context': row['whatsapp_context']})
+
+        # Codex/Claude sessions
+        if row['codex_session']:
+            details['codex_sessions'].append(row['codex_session'])
+        if row['codex_running']:
+            details['codex_running_count'] += 1
+
+        # Notifications
+        if row.get('notifications'):
+            details['notifications'].append({'ts': row['ts'], 'data': row['notifications']})
+
+        # Call detection (Phase 2 columns -- safe to read even before daemon sends them)
+        if row.get('in_call'):
+            details['in_call_minutes'] += interval_min
+
+            if row.get('call_app'):
+                details['call_apps'].add(row['call_app'])
+
+        # Focus mode
+        if row.get('focus_mode'):
+            details['focus_modes'].append({'ts': row['ts'], 'mode': row['focus_mode']})
+
+        # Calendar
+        if row.get('calendar_events'):
+            details['calendar_events'].append({'ts': row['ts'], 'events': row['calendar_events']})
+
+        # --- Accumulate global (non-project-specific) lists ---
+        if row['whatsapp_context']:
+            all_whatsapp.append({'ts': row['ts'], 'context': row['whatsapp_context']})
+        if row.get('notifications'):
+            all_notifications.append({'ts': row['ts'], 'data': row['notifications']})
+        if row['all_tabs']:
+            all_tabs_snapshots.append(row['all_tabs'])
+        if row['codex_session']:
+            all_codex_sessions.append({'ts': row['ts'], 'session': row['codex_session']})
+
     # --- Commits ---
     commits = get_recent_commits(since)
     commits_by_project = defaultdict(list)
@@ -239,7 +301,6 @@ def build_digest(hours_back=8):
     google_urls = extract_google_doc_urls(rows)
     
     # --- Build output ---
-    interval_min = 2
     today = datetime.now().strftime('%Y-%m-%d')
     now = datetime.now().strftime('%H:%M')
     
@@ -308,7 +369,78 @@ def build_digest(hours_back=8):
                     lines.append(diff_text)
                     lines.append("```")
                     lines.append("")
-    
+
+        # Terminal commands (last 5 blocks)
+        if details['terminal_cmds']:
+            lines.append("\n### Terminal Commands")
+            for cmd_block in details['terminal_cmds'][-5:]:
+                lines.append(f"```\n{cmd_block}\n```")
+
+        # File changes
+        if details['file_changes']:
+            lines.append("\n### File Changes")
+            seen = set()
+            for fc in details['file_changes']:
+                for line in str(fc).split('\n'):
+                    line = line.strip()
+                    if line and line not in seen:
+                        seen.add(line)
+                        lines.append(f"- {line}")
+
+        # Call time
+        if details['in_call_minutes'] > 0:
+            call_apps_str = ', '.join(details['call_apps']) if details['call_apps'] else 'unknown'
+            lines.append(f"\n*Includes {details['in_call_minutes']} min in calls ({call_apps_str})*")
+
+    # --- Global sections (Communication, AI sessions, tabs, notifications) ---
+
+    # Communication section
+    if all_whatsapp:
+        lines.append("")
+        lines.append("## Communication")
+        lines.append("")
+        seen_contexts = set()
+        for entry in all_whatsapp:
+            ctx = entry['context']
+            if ctx not in seen_contexts:
+                seen_contexts.add(ctx)
+                lines.append(f"- {entry['ts']}: WhatsApp — {ctx}")
+
+    # AI Agent Sessions
+    if all_codex_sessions:
+        lines.append("")
+        lines.append("## AI Agent Sessions")
+        lines.append("")
+        for entry in all_codex_sessions:
+            lines.append(f"- {entry['ts']}: {entry['session'][:200]}")
+
+    # Open Tabs (deduplicated, last snapshot)
+    if all_tabs_snapshots:
+        lines.append("")
+        lines.append("## Open Tabs (Last Snapshot)")
+        lines.append("")
+        last_tabs = all_tabs_snapshots[-1]
+        for tab_entry in str(last_tabs).split(';;;')[:30]:
+            parts = tab_entry.split('|', 1)
+            if len(parts) == 2:
+                url, title = parts
+                lines.append(f"- [{title.strip()[:80]}]({url.strip()})")
+            elif parts[0].strip():
+                lines.append(f"- {parts[0].strip()[:100]}")
+
+    # Notifications
+    if all_notifications:
+        lines.append("")
+        lines.append("## Notifications")
+        lines.append("")
+        for entry in all_notifications:
+            try:
+                notifs = json.loads(entry['data']) if isinstance(entry['data'], str) else entry['data']
+                for n in notifs[:3]:
+                    lines.append(f"- {entry['ts']}: {n.get('app', '?')} — {n.get('title', '')}")
+            except:
+                pass
+
     # Google docs found - read content via gog
     if google_urls:
         lines.append("## Google Workspace Documents Accessed")
@@ -333,6 +465,7 @@ def build_digest(hours_back=8):
             lines.append(f"- ⚠️ {p}")
         lines.append("")
     
+    db.close()
     return '\n'.join(lines)
 
 

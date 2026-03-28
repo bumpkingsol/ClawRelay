@@ -249,11 +249,18 @@ do_list_handoffs() {
   fi
 
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer $auth_token" \
-    --connect-timeout 5 --max-time 10 \
-    "${curl_args[@]}" \
-    "$handoffs_url" 2>/dev/null || echo "[]")
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      "$handoffs_url" 2>/dev/null || echo "[]")
+  else
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "$handoffs_url" 2>/dev/null || echo "[]")
+  fi
 
   echo "$response"
 }
@@ -288,11 +295,18 @@ do_fetch_dashboard() {
   fi
 
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer $auth_token" \
-    --connect-timeout 5 --max-time 10 \
-    "${curl_args[@]}" \
-    "$dashboard_url" 2>/dev/null || echo "{}")
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      "$dashboard_url" 2>/dev/null || echo "{}")
+  else
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "$dashboard_url" 2>/dev/null || echo "{}")
+  fi
 
   echo "$response"
 }

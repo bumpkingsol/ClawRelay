@@ -549,6 +549,24 @@ if [ "$CAMERA_ACTIVE" = "true" ] || [ "$MIC_ACTIVE" = "true" ]; then
   fi
 fi
 
+# --- macOS Focus / DND Mode ---
+FOCUS_MODE=""
+FOCUS_MODE=$(osascript -e '
+  try
+    set focusState to do shell script "defaults read com.apple.controlcenter NSStatusItem\\ Visible\\ FocusModes 2>/dev/null || echo 0"
+    if focusState is "1" then
+      return "Focus"
+    end if
+  end try
+  try
+    set dndState to do shell script "plutil -extract dnd_prefs.userPref.enabled raw ~/Library/DoNotDisturb/DB/Assertions/DND.json 2>/dev/null || echo false"
+    if dndState is "true" then
+      return "Do Not Disturb"
+    end if
+  end try
+  return ""
+' 2>/dev/null || echo "")
+
 # Export for Python payload builder
 export CB_APP="$ACTIVE_APP"
 export CB_WINDOW_TITLE="$WINDOW_TITLE"
@@ -567,6 +585,7 @@ export CB_NOTIFICATIONS="${NOTIFICATIONS:-""}"
 export CB_IN_CALL="$IN_CALL"
 export CB_CALL_APP="$CALL_APP"
 export CB_CALL_TYPE="$CALL_TYPE"
+export CB_FOCUS_MODE="$FOCUS_MODE"
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
 
 PAYLOAD=$(python3 -c "
@@ -590,6 +609,7 @@ data = {
     'in_call': os.environ.get('CB_IN_CALL', 'false') == 'true',
     'call_app': os.environ.get('CB_CALL_APP', ''),
     'call_type': os.environ.get('CB_CALL_TYPE', 'unknown'),
+    'focus_mode': os.environ.get('CB_FOCUS_MODE', '') or None,
     'idle_state': 'active',
     'idle_seconds': int(os.environ.get('CB_IDLE_SECONDS', '0')),
 }

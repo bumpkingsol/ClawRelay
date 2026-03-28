@@ -40,6 +40,8 @@ struct ControlCenterView: View {
                     PermissionsTabView(viewModel: viewModel)
                 case .privacy:
                     PrivacyTabView(viewModel: viewModel)
+                case .handoffs:
+                    HandoffsTabView(viewModel: HandoffsTabViewModel(runner: viewModel.runner))
                 case .none:
                     Text("Select a tab")
                         .foregroundStyle(.secondary)
@@ -60,6 +62,7 @@ struct ControlCenterView: View {
         case .overview: return "gauge.with.dots.needle.33percent"
         case .permissions: return "lock.shield"
         case .privacy: return "hand.raised"
+        case .handoffs: return "paperplane"
         case .diagnostics: return "wrench.and.screwdriver"
         }
     }

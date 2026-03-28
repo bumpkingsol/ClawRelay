@@ -436,6 +436,50 @@ def health():
         return jsonify({'status': 'error'}), 500
 
 
+@app.route('/context/jc-work-log', methods=['GET'])
+def jc_work_log():
+    """JC's work log - readable by ClawRelay app."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    try:
+        db = get_db()
+        # Check if table exists
+        tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if 'jc_work_log' not in tables:
+            db.close()
+            return jsonify({'entries': [], 'total': 0})
+        
+        # Get recent entries (last 48h by default, or use ?hours= param)
+        hours = request.args.get('hours', 48, type=int)
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        
+        rows = db.execute(
+            "SELECT * FROM jc_work_log WHERE started_at >= ? ORDER BY started_at DESC",
+            (since,)
+        ).fetchall()
+        db.close()
+        
+        entries = []
+        for r in rows:
+            entries.append({
+                'id': r[0],
+                'project': r[1],
+                'description': r[2],
+                'status': r[3],
+                'result': r[4],
+                'started_at': r[5],
+                'completed_at': r[6],
+                'duration_minutes': r[7],
+            })
+        
+        return jsonify({'entries': entries, 'total': len(entries)})
+    except Exception:
+        logger.exception("JC work log query failed")
+        return jsonify({'error': 'internal error'}), 500
+
+
 @app.errorhandler(413)
 def payload_too_large(_error):
     return jsonify({'error': 'payload too large'}), 413

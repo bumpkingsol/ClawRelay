@@ -28,7 +28,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 def get_db():
     """Get SQLite connection with WAL mode and optional encryption."""
     db = _get_db()
-    db.row_factory = sqlite3.Row
+    db.row_factory = lambda cursor, row: {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
     return db
 
 def init_db():
@@ -415,15 +415,15 @@ def health():
 
     try:
         db = get_db()
-        count = db.execute("SELECT COUNT(*) FROM activity_stream").fetchone()[0]
+        count = db.execute("SELECT COUNT(*) as cnt FROM activity_stream").fetchone()['cnt']
         latest = db.execute(
             "SELECT ts FROM activity_stream ORDER BY id DESC LIMIT 1"
         ).fetchone()
         
         # Check if captures are arriving (last 10 minutes)
         recent = db.execute(
-            "SELECT COUNT(*) FROM activity_stream WHERE created_at > datetime('now', '-10 minutes')"
-        ).fetchone()[0]
+            "SELECT COUNT(*) as cnt FROM activity_stream WHERE created_at > datetime('now', '-10 minutes')"
+        ).fetchone()['cnt']
         
         # Check if captures are stale (nothing in last 15 minutes while not idle)
         last_active = db.execute(
@@ -483,13 +483,13 @@ def jc_work_log():
         for r in rows:
             entries.append({
                 'id': dict(r).get('id'),
-                'project': r[1],
-                'description': r[2],
-                'status': r[3],
+                'project': r.get('project'),
+                'description': r.get('description'),
+                'status': r.get('status'),
                 'result': r[4],
-                'started_at': r[5],
-                'completed_at': r[6],
-                'duration_minutes': r[7],
+                'started_at': r.get('started_at'),
+                'completed_at': r.get('completed_at'),
+                'duration_minutes': r.get('duration_minutes'),
             })
         
         return jsonify({'entries': entries, 'total': len(entries)})
@@ -640,8 +640,8 @@ def dashboard():
             last_seen_rows = db.execute("SELECT project, last_seen FROM project_last_seen").fetchall()
             last_seen = {}
             for r in last_seen_rows:
-                ls_proj = r[0] if isinstance(r, (list, tuple)) else r['project']
-                ls_ts = r[1] if isinstance(r, (list, tuple)) else r['last_seen']
+                ls_proj = r.get('id') if isinstance(r, (list, tuple)) else r['project']
+                ls_ts = r.get('project') if isinstance(r, (list, tuple)) else r['last_seen']
                 last_seen[ls_proj] = ls_ts
         except Exception:
             last_seen = {}
@@ -654,10 +654,10 @@ def dashboard():
                 (raw_since,)
             ).fetchall()
             for r in raw_rows:
-                wt = r[0] if isinstance(r, (list, tuple)) else r['window_title']
-                gr = r[1] if isinstance(r, (list, tuple)) else r['git_repo']
-                u = r[2] if isinstance(r, (list, tuple)) else r['url']
-                fp = r[3] if isinstance(r, (list, tuple)) else r['file_path']
+                wt = r.get('id') if isinstance(r, (list, tuple)) else r['window_title']
+                gr = r.get('project') if isinstance(r, (list, tuple)) else r['git_repo']
+                u = r.get('description') if isinstance(r, (list, tuple)) else r['url']
+                fp = r.get('status') if isinstance(r, (list, tuple)) else r['file_path']
                 lt = r[4] if isinstance(r, (list, tuple)) else r['latest']
                 h = f"{wt} {gr} {u} {fp}".lower()
                 for p, kws in PORTFOLIO_PROJECTS.items():
@@ -735,17 +735,17 @@ def dashboard():
         # --- JC Questions (unseen) ---
         jc_questions = []
         try:
-            tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            tables = [list(r.values())[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
             if 'jc_questions' in tables:
                 q_rows = db.execute(
                     "SELECT id, question, project, created_at FROM jc_questions WHERE seen = 0 ORDER BY created_at DESC LIMIT 10"
                 ).fetchall()
                 for r in q_rows:
                     jc_questions.append({
-                        'id': r[0] if isinstance(r, (list, tuple)) else r['id'],
-                        'question': r[1] if isinstance(r, (list, tuple)) else r['question'],
-                        'project': r[2] if isinstance(r, (list, tuple)) else r['project'],
-                        'created_at': r[3] if isinstance(r, (list, tuple)) else r['created_at'],
+                        'id': r.get('id') if isinstance(r, (list, tuple)) else r['id'],
+                        'question': r.get('project') if isinstance(r, (list, tuple)) else r['question'],
+                        'project': r.get('description') if isinstance(r, (list, tuple)) else r['project'],
+                        'created_at': r.get('status') if isinstance(r, (list, tuple)) else r['created_at'],
                     })
         except Exception:
             pass
@@ -763,9 +763,9 @@ def dashboard():
                 ).fetchall()
                 for r in h_rows:
                     history.append({
-                        'date': r[0] if isinstance(r, (list, tuple)) else r['date'],
-                        'project': r[1] if isinstance(r, (list, tuple)) else r['project'],
-                        'hours': r[2] if isinstance(r, (list, tuple)) else r['hours'],
+                        'date': r.get('id') if isinstance(r, (list, tuple)) else r['date'],
+                        'project': r.get('project') if isinstance(r, (list, tuple)) else r['project'],
+                        'hours': r.get('description') if isinstance(r, (list, tuple)) else r['hours'],
                     })
 
             # Supplement today from live data

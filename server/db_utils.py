@@ -41,7 +41,7 @@ def get_db(db_path=None):
 
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA busy_timeout=5000")
-    db.row_factory = sqlite3.Row
+    db.row_factory = lambda cursor, row: {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
     return db
 
 

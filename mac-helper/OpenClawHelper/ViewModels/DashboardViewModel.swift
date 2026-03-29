@@ -9,7 +9,6 @@ final class DashboardViewModel: ObservableObject {
     private let runner: BridgeCommandRunner
     private var refreshTimer: RefreshTimer?
     private var previousHandoffStatuses: [Int: String] = [:]
-    private var lastNeglectNotifyDate: [String: String] = [:]
 
     init(runner: BridgeCommandRunner) {
         self.runner = runner
@@ -68,19 +67,21 @@ final class DashboardViewModel: ObservableObject {
             previousHandoffStatuses[handoff.id] = handoff.status
         }
 
-        // 2. Neglect alerts (once daily per project)
+        // 2. Neglect alerts (once daily per project, skip 999 = no data)
         let todayStr = {
             let f = DateFormatter()
             f.dateFormat = "yyyy-MM-dd"
             return f.string(from: Date())
         }()
-        for item in newData.neglected where item.days >= 7 {
-            if lastNeglectNotifyDate[item.project] != todayStr {
+        for item in newData.neglected where item.days >= 7 && item.days < 999 {
+            let key = "neglect-notified-\(item.project)"
+            let lastNotified = UserDefaults.standard.string(forKey: key)
+            if lastNotified != todayStr {
                 NotificationService.shared.send(
                     title: "\(item.project.capitalized) needs attention",
                     body: "\(item.days) days since last activity"
                 )
-                lastNeglectNotifyDate[item.project] = todayStr
+                UserDefaults.standard.set(todayStr, forKey: key)
             }
         }
 

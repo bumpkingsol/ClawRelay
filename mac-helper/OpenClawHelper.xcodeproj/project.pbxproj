@@ -530,7 +530,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = OpenClawHelper/Support/OpenClawHelper-Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "OpenClaw Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = ClawRelay;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = "";
 				INFOPLIST_KEY_NSPrincipalClass = "";
@@ -539,8 +539,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -555,7 +555,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = OpenClawHelper/Support/OpenClawHelper-Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "OpenClaw Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = ClawRelay;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = "";
 				INFOPLIST_KEY_NSPrincipalClass = "";
@@ -564,8 +564,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -581,7 +581,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";
@@ -598,7 +598,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";

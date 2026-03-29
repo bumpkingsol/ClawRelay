@@ -110,7 +110,15 @@ struct DashboardTabView: View {
                     .frame(width: 8, height: 8)
             }
 
-            Text(data.status.currentProject.isEmpty ? "Unknown" : data.status.currentProject)
+            // Fall back to top project from time allocation if current is unknown
+            let displayProject: String = {
+                if data.status.currentProject != "unknown" && !data.status.currentProject.isEmpty {
+                    return data.status.currentProject
+                }
+                return data.timeAllocation.first?.project ?? data.status.currentApp
+            }()
+
+            Text(displayProject.capitalized)
                 .font(.title3.bold())
                 .lineLimit(1)
 
@@ -119,7 +127,7 @@ struct DashboardTabView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            if let projectTime = data.timeAllocation.first(where: { $0.project.lowercased() == data.status.currentProject.lowercased() }) {
+            if let projectTime = data.timeAllocation.first(where: { $0.project.lowercased() == displayProject.lowercased() }) {
                 Text(String(format: "%.1fh today (%d%%)", projectTime.hours, projectTime.percentage))
                     .font(DarkUtilityGlass.monoCaption)
                     .foregroundStyle(.secondary)
@@ -249,7 +257,7 @@ struct DashboardTabView: View {
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
 
-            let neglected = data.neglected.filter { $0.days > 2 }.sorted { $0.days > $1.days }
+            let neglected = data.neglected.filter { $0.days > 2 && $0.days < 999 }.sorted { $0.days > $1.days }
             let inProgressJC = data.jcActivity.filter { $0.status == "in-progress" }
             let completedJC = Array(data.jcActivity.filter { $0.status == "completed" }.prefix(3))
 

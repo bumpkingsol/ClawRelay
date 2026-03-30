@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-DB_PATH="${CONTEXT_BRIDGE_DB:-/home/admin/clawd/data/context-bridge.db}"
+DB_PATH="${CONTEXT_BRIDGE_DB:-/home/user/clawrelay/data/context-bridge.db}"
 STALE_FLAG="/tmp/context-bridge-stale"
 THRESHOLD_MINUTES=10
 

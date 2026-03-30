@@ -14,7 +14,7 @@ The app is being renamed to **ClawRelay** to give it a distinct identity from th
 
 - macOS app built in SwiftUI (Apple Silicon, latest macOS)
 - Handoffs flow through `context-helperctl.sh` CLI → JSON files in `~/.context-bridge/handoff-outbox/` → daemon flushes to server
-- Server runs Flask on Hetzner VPS, accessed via Tailscale
+- Server runs Flask on VPS, accessed via Tailscale
 - Bearer token auth on all server endpoints
 - All UI uses the existing DarkUtilityGlass theme with `.environment(\.colorScheme, .dark)`
 - Portfolio projects list is hardcoded in the Swift app (matching server/config.py's PORTFOLIO_PROJECTS)
@@ -41,7 +41,7 @@ Added to the menu bar popover (MenuBarPopoverView), between the quick actions gr
 
 **Layout (compact, fits popover width of 340pt):**
 - Row 1: Combo box for project (dropdown with portfolio projects + freeform typing)
-- Row 2: Single-line text field (placeholder: "What should JC do?") + send button (SF Symbol `arrow.up.circle.fill`)
+- Row 2: Single-line text field (placeholder: "What should the agent do?") + send button (SF Symbol `arrow.up.circle.fill`)
 - Visual separator (thin divider) above the handoff row to distinguish it from quick actions
 
 **Behavior:**
@@ -69,7 +69,7 @@ New 5th tab in the sidebar, between Privacy and Diagnostics. Icon: `paperplane` 
 
 ### 3a. Compose Section (top)
 
-- **Project:** Combo box — dropdown with portfolio projects (Prescrivia, Leverwork, JSVHQ, Sonopeace, OpenClaw) + freeform typing. Remembers last selection.
+- **Project:** Combo box — dropdown with portfolio projects (Project Gamma, Project Alpha, Project Beta, Project Delta, OpenClaw) + freeform typing. Remembers last selection.
 - **Task:** Single-line text field. Required.
 - **Message:** Multi-line TextEditor for detailed context (links, file paths, instructions). Optional.
 - **Priority:** Segmented picker — Normal (default), High, Urgent.
@@ -154,7 +154,7 @@ Response body:
 [
   {
     "id": 1,
-    "project": "prescrivia",
+    "project": "project-gamma",
     "task": "fix deploy script",
     "message": "The staging deploy is broken since the last merge...",
     "priority": "high",
@@ -166,7 +166,7 @@ Response body:
 
 ### 4d. New endpoint: `PATCH /context/handoffs/<id>`
 
-JC updates handoff status. Requires Bearer auth.
+The agent updates handoff status. Requires Bearer auth.
 
 Request body: `{"status": "in-progress"}` or `{"status": "done"}`
 
@@ -228,6 +228,6 @@ Remove the old handoff sheet and its references:
 
 - Keyboard shortcut / global hotkey for handoff (could add later)
 - File attachments on handoffs
-- JC auto-acknowledging handoffs (JC updates status manually or via its own logic)
+- the agent auto-acknowledging handoffs (The agent updates status manually or via its own logic)
 - Handoff editing or deletion after sending
-- Push notifications when JC updates status (polling only)
+- Push notifications when the agent updates status (polling only)

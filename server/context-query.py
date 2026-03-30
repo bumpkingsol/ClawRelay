@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OpenClaw Context Bridge - Query Tool
-CLI for JC to check what Jonas is doing / has done.
+CLI for the agent to check what the operator is doing / has done.
 """
 
 import os
@@ -21,7 +21,7 @@ def get_db():
     return _shared_get_db()
 
 def cmd_now(args):
-    """What is Jonas doing right now?"""
+    """What is the operator doing right now?"""
     db = get_db()
     row = db.execute(
         "SELECT * FROM activity_stream ORDER BY id DESC LIMIT 1"
@@ -33,10 +33,10 @@ def cmd_now(args):
     
     idle = row['idle_state']
     if idle in ('locked', 'away'):
-        print(f"Jonas is {idle} (idle for {row['idle_seconds']}s)")
+        print(f"Operator is {idle} (idle for {row['idle_seconds']}s)")
         return
     if idle == 'idle':
-        print(f"Jonas is idle ({row['idle_seconds']}s since last input)")
+        print(f"Operator is idle ({row['idle_seconds']}s since last input)")
         return
     
     parts = [f"App: {row['app']}"]
@@ -192,7 +192,7 @@ def cmd_gaps(args):
         print(f"All known projects touched in last {days} days.")
 
 def cmd_status(args):
-    """One-shot pre-action summary for JC."""
+    """One-shot pre-action summary for the agent."""
     conn = get_db()
     row = conn.execute(
         "SELECT * FROM activity_stream ORDER BY ts DESC LIMIT 1"
@@ -377,7 +377,7 @@ def main():
     parser = argparse.ArgumentParser(description='Context Bridge Query Tool')
     sub = parser.add_subparsers(dest='command')
 
-    sub.add_parser('now', help="What is Jonas doing right now?")
+    sub.add_parser('now', help="What is the operator doing right now?")
     sub.add_parser('today', help="Summary of today's activity")
 
     p_proj = sub.add_parser('project', help="Activity for a specific project")
@@ -387,7 +387,7 @@ def main():
     p_gaps = sub.add_parser('gaps', help="Projects not touched recently")
     p_gaps.add_argument('--days', type=int, default=3, help="Lookback days (default: 3)")
 
-    sub.add_parser('status', help='Pre-action summary for JC')
+    sub.add_parser('status', help='Pre-action summary for the agent')
 
     sp_since = sub.add_parser('since', help='Cross-digest diff for last N hours')
     sp_since.add_argument('hours', type=int, help='Hours to look back')

@@ -11,7 +11,7 @@ final class HandoffsTabViewModel: ObservableObject {
     private let runner: BridgeCommandRunner
     private var refreshTimer: RefreshTimer?
 
-    static let portfolioProjects = ["prescrivia", "leverwork", "jsvhq", "sonopeace", "openclaw"]
+    static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
 
     init(runner: BridgeCommandRunner) {
         self.runner = runner

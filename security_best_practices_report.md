@@ -33,7 +33,7 @@ def verify_auth(req):
         return True
 ```
 
-- Impact: If the environment variable is missing or the service starts with a bad environment, any host that can reach the receiver can inject fake activity, commits, or handoffs and poison JC's operational context.
+- Impact: If the environment variable is missing or the service starts with a bad environment, any host that can reach the receiver can inject fake activity, commits, or handoffs and poison the agent's operational context.
 - Fix: Fail closed. Refuse to start the app if `CONTEXT_BRIDGE_TOKEN` is unset, or reject all protected routes with a 503 until configuration is fixed.
 - Mitigation: Restrict network exposure to a private interface or VPN until the app is changed to fail closed.
 - False positive notes: If another layer guarantees the variable is always present, the risk is reduced, but the application code still violates the repo's own design assumption that token auth is the security boundary.
@@ -45,7 +45,7 @@ def verify_auth(req):
 - Evidence:
 
 ```ini
-ExecStart=/usr/bin/python3 /home/admin/clawd/openclaw-computer-vision/server/context-receiver.py
+ExecStart=/usr/bin/python3 /home/user/clawrelay/openclaw-computer-vision/server/context-receiver.py
 ```
 
 ```python
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 - Impact: The production systemd unit is running Flask's development server, which Flask's own deployment guidance treats as unsuitable for production hardening and resilience.
 - Fix: Run the app with Gunicorn in the systemd unit, for example `gunicorn --bind 0.0.0.0:7890 context-receiver:app`, and keep `app.run()` for local development only.
 - Mitigation: Put the service behind a reverse proxy with buffering and request limits until the runtime is replaced.
-- False positive notes: If this service file is only for local testing, severity drops, but `server/setup-server.sh` installs it as the production systemd unit on the Hetzner server.
+- False positive notes: If this service file is only for local testing, severity drops, but `server/setup-server.sh` installs it as the production systemd unit on the VPS.
 
 ### OCV-003
 - Rule ID: Sensitive data minimization / repo design mismatch
@@ -174,7 +174,7 @@ except Exception as e:
 - Server endpoint only accepts authenticated POST requests, no GET/read access from outside
 ```
 
-- Impact: Anyone who can reach the server can learn whether captures are flowing, whether Jonas appears active or idle, and potentially receive internal error details.
+- Impact: Anyone who can reach the server can learn whether captures are flowing, whether the operator appears active or idle, and potentially receive internal error details.
 - Fix: Require the same Bearer auth on `/context/health`, or bind a separate unauthenticated health check to loopback/private monitoring only and remove detailed error strings from responses.
 - Mitigation: Restrict ingress to the server so the health endpoint is not reachable from the public internet.
 - False positive notes: If the service is only reachable over Tailscale, localhost, or a tightly controlled firewall, the exposure is smaller, but that restriction is not visible in application code.

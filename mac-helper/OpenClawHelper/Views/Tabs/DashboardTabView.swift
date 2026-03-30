@@ -170,14 +170,14 @@ struct DashboardTabView: View {
         .glassCard()
     }
 
-    // MARK: - JC Card
+    // MARK: - Agent Card
 
     private func jcCard(_ data: DashboardData) -> some View {
         let inProgress = data.jcActivity.first(where: { $0.status == "in-progress" })
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("JC")
+                Text("AGENT")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -283,7 +283,7 @@ struct DashboardTabView: View {
                 }
             }
 
-            // JC in-progress items
+            // Agent in-progress items
             ForEach(inProgressJC) { entry in
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.right.circle")
@@ -296,7 +296,7 @@ struct DashboardTabView: View {
                 }
             }
 
-            // JC completed items
+            // Agent completed items
             ForEach(completedJC) { entry in
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle")
@@ -437,10 +437,10 @@ struct DashboardTabView: View {
 
     private func projectColor(_ project: String) -> Color {
         switch project.lowercased() {
-        case "prescrivia": return .green
-        case "leverwork": return .blue
-        case "jsvhq": return .orange
-        case "sonopeace": return .purple
+        case "project-gamma": return .green
+        case "project-alpha": return .blue
+        case "project-beta": return .orange
+        case "project-delta": return .purple
         case "openclaw": return .cyan
         default: return .gray
         }

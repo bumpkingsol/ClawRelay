@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-bridge.db')
+DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/user/clawrelay/data/context-bridge.db')
 
 # Derive encryption key from the auth token + a fixed salt.
 # This means there's only one secret to protect (.env token).

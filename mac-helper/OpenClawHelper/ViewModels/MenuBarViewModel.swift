@@ -74,7 +74,7 @@ final class MenuBarViewModel: ObservableObject {
     @Published var handoffTask: String = ""
     @Published var handoffSent: Bool = false
 
-    static let portfolioProjects = ["prescrivia", "leverwork", "jsvhq", "sonopeace", "openclaw"]
+    static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
 
     func sendQuickHandoff() {
         let project = handoffProject.isEmpty ? "general" : handoffProject

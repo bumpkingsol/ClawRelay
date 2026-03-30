@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-28
 **Status:** Approved
-**Goal:** Three independent improvements: (1) push macOS notifications for handoff updates, neglect alerts, and JC questions; (2) add a historical time view to the dashboard; (3) fix the "999 days" bootstrap problem so the dashboard shows real data immediately.
+**Goal:** Three independent improvements: (1) push macOS notifications for handoff updates, neglect alerts, and the agent questions; (2) add a historical time view to the dashboard; (3) fix the "999 days" bootstrap problem so the dashboard shows real data immediately.
 
 ---
 
@@ -34,16 +34,16 @@ This is a server-side change only. No Swift changes needed.
 
 Three events trigger native macOS notifications from ClawRelay:
 
-1. **Handoff status change** — JC marks a handoff as "in-progress" or "done"
-   - Example: "JC started: fix deploy script (leverwork)"
-   - Example: "JC completed: PR review (leverwork)"
+1. **Handoff status change** — the agent marks a handoff as "in-progress" or "done"
+   - Example: "The agent started: fix deploy script (project-alpha)"
+   - Example: "The agent completed: PR review (project-alpha)"
 
 2. **Neglect threshold** — any portfolio project crosses 7+ days of inactivity
-   - Example: "Sonopeace hasn't been touched in 10 days"
+   - Example: "Project Delta hasn't been touched in 10 days"
    - Checked once daily (tracked via UserDefaults date flag, not on every poll)
 
-3. **JC question** — JC posts a question that needs Jonas's attention
-   - Example: "JC asks: Should I pick up the auth migration on leverwork?"
+3. **Agent question** — the agent posts a question that needs the operator's attention
+   - Example: "The agent asks: Should I pick up the auth migration on project-alpha?"
 
 ### Detection Mechanism
 
@@ -51,13 +51,13 @@ ClawRelay already polls the dashboard every 2 minutes (DashboardViewModel). On e
 
 - **Handoffs:** Diff handoff statuses. If any changed to "in-progress" or "done" since last poll, send notification. Track seen handoff state by ID in a local dictionary (not persisted — resets on app restart, which is fine).
 - **Neglect:** On each poll, check if any project in `neglected` has `days >= 7`. Only notify once per day per project (store last-notified date per project in UserDefaults).
-- **JC questions:** Dashboard response includes a `jc_questions` array. If it contains entries with IDs not seen before, notify for each. Mark as seen via PATCH.
+- **agent questions:** Dashboard response includes a `agent_questions` array. If it contains entries with IDs not seen before, notify for each. Mark as seen via PATCH.
 
 ### Server-Side Additions
 
 **New table:**
 ```sql
-CREATE TABLE IF NOT EXISTS jc_questions (
+CREATE TABLE IF NOT EXISTS agent_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     question TEXT NOT NULL,
     project TEXT,
@@ -67,16 +67,16 @@ CREATE TABLE IF NOT EXISTS jc_questions (
 ```
 
 **New endpoint: `POST /context/jc-question`**
-JC writes a question. Requires Bearer auth. Body: `{"question": "Should I pick up X?", "project": "leverwork"}`
+The agent writes a question. Requires Bearer auth. Body: `{"question": "Should I pick up X?", "project": "project-alpha"}`
 
 **New endpoint: `PATCH /context/jc-question/<id>`**
 ClawRelay marks a question as seen. Requires Bearer auth. Body: `{"seen": true}`
 
 **Dashboard response addition:**
-Add `jc_questions` to the dashboard response — unseen questions only:
+Add `agent_questions` to the dashboard response — unseen questions only:
 ```json
-"jc_questions": [
-    {"id": 1, "question": "Should I pick up the auth migration?", "project": "leverwork", "created_at": "2026-03-28T20:00:00"}
+"agent_questions": [
+    {"id": 1, "question": "Should I pick up the auth migration?", "project": "project-alpha", "created_at": "2026-03-28T20:00:00"}
 ]
 ```
 
@@ -89,7 +89,7 @@ Add `jc_questions` to the dashboard response — unseen questions only:
 
 **Detection logic in DashboardViewModel:**
 - After each successful `refreshDashboard()`, call `checkForNotifications(old: previousData, new: data)`
-- This method diffs handoffs, checks neglect, checks jc_questions
+- This method diffs handoffs, checks neglect, checks agent_questions
 - Calls `NotificationService` for each trigger
 - Stores previous data snapshot for comparison
 
@@ -99,15 +99,15 @@ Add `jc_questions` to the dashboard response — unseen questions only:
 
 Add to `DashboardData`:
 ```swift
-let jcQuestions: [JCQuestion]
+let agentQuestions: [AgentQuestion]
 
 // In CodingKeys:
-case jcQuestions = "jc_questions"
+case agentQuestions = "agent_questions"
 ```
 
 New model:
 ```swift
-struct JCQuestion: Decodable, Identifiable {
+struct AgentQuestion: Decodable, Identifiable {
     let id: Int
     let question: String
     let project: String?
@@ -122,10 +122,10 @@ struct JCQuestion: Decodable, Identifiable {
 
 **Files:**
 - Create: `mac-helper/OpenClawHelper/Services/NotificationService.swift`
-- Modify: `mac-helper/OpenClawHelper/Models/DashboardData.swift` — add `jcQuestions` and `JCQuestion`
+- Modify: `mac-helper/OpenClawHelper/Models/DashboardData.swift` — add `agentQuestions` and `AgentQuestion`
 - Modify: `mac-helper/OpenClawHelper/ViewModels/DashboardViewModel.swift` — add notification detection
 - Modify: `mac-daemon/context-helperctl.sh` — add `mark-question-seen` command
-- Modify: `server/context-receiver.py` — add jc_questions table, POST/PATCH endpoints, include in dashboard
+- Modify: `server/context-receiver.py` — add agent_questions table, POST/PATCH endpoints, include in dashboard
 
 ---
 
@@ -158,9 +158,9 @@ Extend `GET /context/dashboard` with optional `?history_days=7` query parameter 
 Add to the response:
 ```json
 "history": [
-    {"date": "2026-03-28", "project": "prescrivia", "hours": 2.3},
-    {"date": "2026-03-28", "project": "leverwork", "hours": 1.5},
-    {"date": "2026-03-27", "project": "prescrivia", "hours": 4.1}
+    {"date": "2026-03-28", "project": "project-gamma", "hours": 2.3},
+    {"date": "2026-03-28", "project": "project-alpha", "hours": 1.5},
+    {"date": "2026-03-27", "project": "project-gamma", "hours": 4.1}
 ]
 ```
 
@@ -209,4 +209,4 @@ New "This Week" section in `DashboardTabView`, below Time Allocation:
 - Notification preferences UI in ClawRelay (all three types are always on)
 - Historical data export or CSV download
 - Weekly/monthly summary reports
-- JC question response from ClawRelay (Jonas responds via Telegram, not the app)
+- the agent question response from ClawRelay (the operator responds via Telegram, not the app)

@@ -33,7 +33,7 @@ New `AppSwitchTracker.swift` singleton that:
    - Writes a JSON line to `~/.context-bridge/app-switches.jsonl`
 3. Format per line:
    ```json
-   {"ts":"2026-03-28T21:15:00Z","app":"Code","title":"sonopeace-comingsoon-site"}
+   {"ts":"2026-03-28T21:15:00Z","app":"Code","title":"project-delta-comingsoon-site"}
    ```
 4. Prunes entries older than 5 minutes on each write (keeps file small)
 

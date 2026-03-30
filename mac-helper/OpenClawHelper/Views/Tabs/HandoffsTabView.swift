@@ -19,7 +19,7 @@ struct HandoffsTabView: View {
 
     private var composeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Hand Off to JC")
+            Text("Hand Off to Agent")
                 .font(.title2)
 
             HStack {
@@ -36,7 +36,7 @@ struct HandoffsTabView: View {
                 Text("Task")
                     .frame(width: 60, alignment: .trailing)
                     .foregroundStyle(.secondary)
-                TextField("What should JC do?", text: $viewModel.draft.task)
+                TextField("What should the agent do?", text: $viewModel.draft.task)
                     .textFieldStyle(.roundedBorder)
             }
 

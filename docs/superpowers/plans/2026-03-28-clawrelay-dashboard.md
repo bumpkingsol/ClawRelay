@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a personal operations dashboard to ClawRelay showing time allocation, focus level, JC's activity, project neglect, and handoff status — closing the intelligence loop so Jonas sees the same data JC sees.
+**Goal:** Add a personal operations dashboard to ClawRelay showing time allocation, focus level, the agent's activity, project neglect, and handoff status — closing the intelligence loop so the operator sees the same data the agent sees.
 
 **Architecture:** Server-side `GET /context/dashboard` endpoint aggregates all data in one response. ClawRelay's new Dashboard tab (first in sidebar) renders a cards grid layout. Data flows: server DB → Flask endpoint → helperctl curl → BridgeCommandRunner → DashboardViewModel → SwiftUI. Refreshes every 2 min when visible.
 
@@ -161,14 +161,14 @@ def dashboard():
             neglected.append({'project': p, 'days': days})
         neglected.sort(key=lambda x: -x['days'])
 
-        # --- JC activity ---
+        # --- the agent activity ---
         jc_activity = []
         try:
             tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-            if 'jc_work_log' in tables:
+            if 'agent_work_log' in tables:
                 jc_since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
                 jc_rows = db.execute(
-                    "SELECT * FROM jc_work_log WHERE started_at >= ? ORDER BY started_at DESC LIMIT 10",
+                    "SELECT * FROM agent_work_log WHERE started_at >= ? ORDER BY started_at DESC LIMIT 10",
                     (jc_since,)
                 ).fetchall()
                 for r in jc_rows:
@@ -310,14 +310,14 @@ struct DashboardData: Decodable {
     let status: DashboardStatus
     let timeAllocation: [ProjectTime]
     let neglected: [ProjectNeglect]
-    let jcActivity: [JCWorkEntry]
+    let agentActivity: [AgentWorkEntry]
     let handoffs: [Handoff]  // uses existing Handoff model from Handoff.swift
 
     enum CodingKeys: String, CodingKey {
         case status
         case timeAllocation = "time_allocation"
         case neglected
-        case jcActivity = "jc_activity"
+        case agentActivity = "jc_activity"
         case handoffs
     }
 }
@@ -361,7 +361,7 @@ struct ProjectNeglect: Decodable, Identifiable {
     let days: Int
 }
 
-struct JCWorkEntry: Decodable, Identifiable {
+struct AgentWorkEntry: Decodable, Identifiable {
     let id: Int
     let project: String
     let description: String
@@ -575,25 +575,25 @@ struct DashboardTabView: View {
                 color: focusColor(data.status.focusLevel)
             )
 
-            // JC card
+            // the agent card
             statusCard(
-                label: "JC",
+                label: "The agent",
                 value: {
-                    if let active = data.jcActivity.first(where: { $0.status == "in-progress" }) {
+                    if let active = data.agentActivity.first(where: { $0.status == "in-progress" }) {
                         return "Working"
                     }
                     return "Idle"
                 }(),
                 detail: {
-                    if let active = data.jcActivity.first(where: { $0.status == "in-progress" }) {
+                    if let active = data.agentActivity.first(where: { $0.status == "in-progress" }) {
                         return "\(active.project) — \(active.description)"
                     }
-                    if let last = data.jcActivity.first {
+                    if let last = data.agentActivity.first {
                         return "Last: \(last.project)"
                     }
                     return "No recent activity"
                 }(),
-                color: data.jcActivity.contains(where: { $0.status == "in-progress" }) ? .blue : .secondary
+                color: data.agentActivity.contains(where: { $0.status == "in-progress" }) ? .blue : .secondary
             )
         }
     }
@@ -672,32 +672,32 @@ struct DashboardTabView: View {
                     }
                 }
 
-                // JC in-progress
-                ForEach(data.jcActivity.filter { $0.status == "in-progress" }) { entry in
+                // the agent in-progress
+                ForEach(data.agentActivity.filter { $0.status == "in-progress" }) { entry in
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.right.circle.fill")
                             .foregroundStyle(.blue)
                             .font(.caption)
-                        Text("JC: \(entry.description)")
+                        Text("The agent: \(entry.description)")
                             .font(.caption)
                             .lineLimit(1)
                     }
                 }
 
-                // JC completed (recent)
-                ForEach(Array(data.jcActivity.filter { $0.status == "done" }.prefix(3))) { entry in
+                // the agent completed (recent)
+                ForEach(Array(data.agentActivity.filter { $0.status == "done" }.prefix(3))) { entry in
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                             .font(.caption)
-                        Text("JC done: \(entry.description)")
+                        Text("The agent done: \(entry.description)")
                             .font(.caption)
                             .lineLimit(1)
                     }
                 }
 
                 if data.neglected.filter({ $0.days > 2 }).isEmpty &&
-                   data.jcActivity.isEmpty {
+                   data.agentActivity.isEmpty {
                     Text("Nothing needs attention")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -751,10 +751,10 @@ struct DashboardTabView: View {
 
     private func projectColor(_ project: String) -> Color {
         switch project {
-        case "prescrivia": return .green
-        case "leverwork": return .blue
-        case "jsvhq": return .orange
-        case "sonopeace": return .purple
+        case "project-gamma": return .green
+        case "project-alpha": return .blue
+        case "project-beta": return .orange
+        case "project-delta": return .purple
         case "openclaw": return .cyan
         default: return .secondary
         }
@@ -844,12 +844,12 @@ if let dash = viewModel.dashboard {
             .foregroundStyle(.secondary)
             .font(.caption)
 
-        if let active = dash.jcActivity.first(where: { $0.status == "in-progress" }) {
-            Text("JC: \(active.project)")
+        if let active = dash.agentActivity.first(where: { $0.status == "in-progress" }) {
+            Text("The agent: \(active.project)")
                 .font(.caption)
                 .foregroundStyle(.blue)
         } else {
-            Text("JC: idle")
+            Text("The agent: idle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix the "999 days" bootstrap problem, add macOS notifications for handoff/neglect/JC questions, and add a historical time view with daily summaries.
+**Goal:** Fix the "999 days" bootstrap problem, add macOS notifications for handoff/neglect/agent questions, and add a historical time view with daily summaries.
 
 **Architecture:** Three independent features sharing the same server endpoint and Swift app. Bootstrap is a server-side fix to the dashboard endpoint. Notifications use UNUserNotificationCenter triggered by diffing dashboard poll results. Historical view adds a daily_summary table populated by the digest and queried by an extended dashboard endpoint.
 
@@ -16,13 +16,13 @@
 
 **New files:**
 - `mac-helper/OpenClawHelper/Services/NotificationService.swift` — UNUserNotificationCenter wrapper
-- `mac-helper/OpenClawHelper/Models/JCQuestion.swift` — decodable model
+- `mac-helper/OpenClawHelper/Models/AgentQuestion.swift` — decodable model
 - `mac-helper/OpenClawHelper/Models/DailyEntry.swift` — decodable model
 
 **Modified files:**
-- `server/context-receiver.py` — bootstrap fix in dashboard, daily_summary table, jc_questions table + endpoints, history in dashboard
+- `server/context-receiver.py` — bootstrap fix in dashboard, daily_summary table, agent_questions table + endpoints, history in dashboard
 - `server/context-digest.py` — write daily_summary rows
-- `mac-helper/OpenClawHelper/Models/DashboardData.swift` — add jcQuestions, history
+- `mac-helper/OpenClawHelper/Models/DashboardData.swift` — add agentQuestions, history
 - `mac-helper/OpenClawHelper/ViewModels/DashboardViewModel.swift` — notification detection, historyDays state
 - `mac-helper/OpenClawHelper/Views/Tabs/DashboardTabView.swift` — history section with stacked bars
 - `mac-daemon/context-helperctl.sh` — add mark-question-seen command
@@ -100,10 +100,10 @@ git commit -m "fix: bootstrap project_last_seen from raw activity_stream in dash
 
 ---
 
-## Task 2: Server — daily_summary table + jc_questions table + endpoints
+## Task 2: Server — daily_summary table + agent_questions table + endpoints
 
 **Files:**
-- Modify: `server/context-receiver.py` — init_db (add tables), add POST/PATCH jc_questions endpoints, add history + jc_questions to dashboard response
+- Modify: `server/context-receiver.py` — init_db (add tables), add POST/PATCH agent_questions endpoints, add history + agent_questions to dashboard response
 
 - [ ] **Step 1: Add tables to init_db()**
 
@@ -120,7 +120,7 @@ In `init_db()`, after the `project_last_seen` table creation (around line 93), a
         )
     """)
     db.execute("""
-        CREATE TABLE IF NOT EXISTS jc_questions (
+        CREATE TABLE IF NOT EXISTS agent_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             question TEXT NOT NULL,
             project TEXT,
@@ -132,12 +132,12 @@ In `init_db()`, after the `project_last_seen` table creation (around line 93), a
 
 - [ ] **Step 2: Add POST /context/jc-question endpoint**
 
-Add after the existing jc_work_log endpoint:
+Add after the existing agent_work_log endpoint:
 
 ```python
 @app.route('/context/jc-question', methods=['POST'])
 def post_jc_question():
-    """JC posts a question for Jonas."""
+    """The agent posts a question for the operator."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
 
@@ -147,7 +147,7 @@ def post_jc_question():
 
     db = get_db()
     db.execute("""
-        CREATE TABLE IF NOT EXISTS jc_questions (
+        CREATE TABLE IF NOT EXISTS agent_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             question TEXT NOT NULL,
             project TEXT,
@@ -156,7 +156,7 @@ def post_jc_question():
         )
     """)
     db.execute(
-        "INSERT INTO jc_questions (question, project) VALUES (?, ?)",
+        "INSERT INTO agent_questions (question, project) VALUES (?, ?)",
         (data.get('question', ''), data.get('project', ''))
     )
     db.commit()
@@ -171,27 +171,27 @@ def mark_jc_question(qid):
         return jsonify({'error': 'unauthorized'}), 401
 
     db = get_db()
-    db.execute("UPDATE jc_questions SET seen = 1 WHERE id = ?", (qid,))
+    db.execute("UPDATE agent_questions SET seen = 1 WHERE id = ?", (qid,))
     db.commit()
     db.close()
     return jsonify({'status': 'ok'})
 ```
 
-- [ ] **Step 3: Add jc_questions and history to dashboard response**
+- [ ] **Step 3: Add agent_questions and history to dashboard response**
 
 In the `dashboard()` function, after the handoffs section and before `db.close()`, add:
 
 ```python
-        # --- JC Questions (unseen) ---
-        jc_questions = []
+        # --- the agent Questions (unseen) ---
+        agent_questions = []
         try:
             tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-            if 'jc_questions' in tables:
+            if 'agent_questions' in tables:
                 q_rows = db.execute(
-                    "SELECT id, question, project, created_at FROM jc_questions WHERE seen = 0 ORDER BY created_at DESC LIMIT 10"
+                    "SELECT id, question, project, created_at FROM agent_questions WHERE seen = 0 ORDER BY created_at DESC LIMIT 10"
                 ).fetchall()
                 for r in q_rows:
-                    jc_questions.append({
+                    agent_questions.append({
                         'id': r[0] if isinstance(r, (list, tuple)) else r['id'],
                         'question': r[1] if isinstance(r, (list, tuple)) else r['question'],
                         'project': r[2] if isinstance(r, (list, tuple)) else r['project'],
@@ -248,7 +248,7 @@ Update the return jsonify to include the new fields:
             'neglected': neglected,
             'jc_activity': jc_activity,
             'handoffs': handoffs,
-            'jc_questions': jc_questions,
+            'agent_questions': agent_questions,
             'history': history,
         })
 ```
@@ -258,7 +258,7 @@ Update the return jsonify to include the new fields:
 ```bash
 cd server && python3 -c "import ast; ast.parse(open('context-receiver.py').read()); print('OK')"
 git add server/context-receiver.py
-git commit -m "feat: add daily_summary table, jc_questions endpoints, history + questions in dashboard"
+git commit -m "feat: add daily_summary table, agent_questions endpoints, history + questions in dashboard"
 ```
 
 ---
@@ -303,21 +303,21 @@ git commit -m "feat: digest writes daily_summary rows per project"
 
 ---
 
-## Task 4: Swift models — JCQuestion, DailyEntry, update DashboardData
+## Task 4: Swift models — AgentQuestion, DailyEntry, update DashboardData
 
 **Files:**
-- Create: `mac-helper/OpenClawHelper/Models/JCQuestion.swift`
+- Create: `mac-helper/OpenClawHelper/Models/AgentQuestion.swift`
 - Create: `mac-helper/OpenClawHelper/Models/DailyEntry.swift`
 - Modify: `mac-helper/OpenClawHelper/Models/DashboardData.swift`
 
-- [ ] **Step 1: Create JCQuestion model**
+- [ ] **Step 1: Create AgentQuestion model**
 
-Create `mac-helper/OpenClawHelper/Models/JCQuestion.swift`:
+Create `mac-helper/OpenClawHelper/Models/AgentQuestion.swift`:
 
 ```swift
 import Foundation
 
-struct JCQuestion: Decodable, Identifiable {
+struct AgentQuestion: Decodable, Identifiable {
     let id: Int
     let question: String
     let project: String?
@@ -350,34 +350,34 @@ struct DailyEntry: Decodable, Identifiable {
 In `DashboardData.swift`, add two new properties to `DashboardData`:
 
 ```swift
-let jcQuestions: [JCQuestion]
+let agentQuestions: [AgentQuestion]
 let history: [DailyEntry]
 ```
 
 Add to the CodingKeys enum:
 
 ```swift
-case jcQuestions = "jc_questions"
+case agentQuestions = "agent_questions"
 case history
 ```
 
-Make both optional with defaults for backward compatibility. Use `init(from:)` or make them optional (`[JCQuestion]?`) and default to `[]` in the view model.
+Make both optional with defaults for backward compatibility. Use `init(from:)` or make them optional (`[AgentQuestion]?`) and default to `[]` in the view model.
 
 Actually, simplest approach — make them optional:
 
 ```swift
-let jcQuestions: [JCQuestion]?
+let agentQuestions: [AgentQuestion]?
 let history: [DailyEntry]?
 ```
 
 - [ ] **Step 4: Register new files in Xcode project, build and commit**
 
-Add JCQuestion.swift and DailyEntry.swift to the Xcode project (update project.pbxproj).
+Add AgentQuestion.swift and DailyEntry.swift to the Xcode project (update project.pbxproj).
 
 ```bash
 cd mac-helper && xcodebuild -scheme OpenClawHelper -configuration Release build 2>&1 | tail -3
 git add mac-helper/
-git commit -m "feat: add JCQuestion and DailyEntry models, update DashboardData"
+git commit -m "feat: add AgentQuestion and DailyEntry models, update DashboardData"
 ```
 
 ---
@@ -474,7 +474,7 @@ private func checkForNotifications(_ newData: DashboardData) {
            (handoff.status == "in-progress" || handoff.status == "done") {
             let verb = handoff.status == "done" ? "completed" : "started"
             NotificationService.shared.send(
-                title: "JC \(verb): \(handoff.task)",
+                title: "The agent \(verb): \(handoff.task)",
                 body: handoff.project.capitalized
             )
         }
@@ -494,11 +494,11 @@ private func checkForNotifications(_ newData: DashboardData) {
         }
     }
 
-    // 3. JC questions
-    if let questions = newData.jcQuestions {
+    // 3. the agent questions
+    if let questions = newData.agentQuestions {
         for q in questions {
             NotificationService.shared.send(
-                title: "JC asks about \(q.project ?? "general")",
+                title: "The agent asks about \(q.project ?? "general")",
                 body: q.question
             )
             // Mark as seen
@@ -521,7 +521,7 @@ Also update `refreshDashboard()` to pass `historyDays` as a parameter. The helpe
 ```bash
 cd mac-helper && xcodebuild -scheme OpenClawHelper -configuration Release build 2>&1 | tail -3
 git add mac-helper/OpenClawHelper/ViewModels/DashboardViewModel.swift
-git commit -m "feat: add notification detection for handoffs, neglect, and JC questions"
+git commit -m "feat: add notification detection for handoffs, neglect, and the agent questions"
 ```
 
 ---

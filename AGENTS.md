@@ -4,7 +4,7 @@
 
 ## Your Role
 
-You are contributing to a system that enables an autonomous AI agent (Jean-Claude) to have operational visibility into a human operator's (Jonas's) computer activity. This is not a surveillance tool - it's a coordination mechanism between two operators (one human, one AI) who need shared context to work effectively without duplicating effort.
+You are contributing to a system that enables an autonomous AI agent to have operational visibility into a human operator's computer activity. This is not a surveillance tool - it's a coordination mechanism between two operators (one human, one AI) who need shared context to work effectively without duplicating effort.
 
 ## What You Need to Know Before Writing Code
 
@@ -21,15 +21,15 @@ You are contributing to a system that enables an autonomous AI agent (Jean-Claud
 - Runs as a systemd service
 - Receives pushes from the Mac daemon via HTTPS
 - The digest processor is the brain - it interprets raw data into actionable intelligence
-- JC (the AI agent that consumes this data) runs on the same server
+- The agent that consumes this data runs on the same server
 
-### What Jonas Cares About
+### What the Operator Cares About
 - **It works reliably.** A daemon that crashes or misses captures is worse than no daemon.
 - **It's secure.** No data leaves the Mac→server pipeline. No third parties.
 - **It's lightweight.** Shouldn't drain battery, spike CPU, or slow down the Mac.
-- **It enables real autonomy.** The goal isn't data collection - it's enabling JC to make good decisions without asking Jonas first.
+- **It enables real autonomy.** The goal isn't data collection - it's enabling the agent to make good decisions without asking the operator first.
 
-### What Jonas Does NOT Care About
+### What the Operator Does NOT Care About
 - Pretty UIs or dashboards
 - Comprehensive analytics
 - Historical trends beyond what the digest captures
@@ -49,8 +49,8 @@ You are contributing to a system that enables an autonomous AI agent (Jean-Claud
 |-----------|---------------|-------|
 | `mac-daemon/*` | Any agent | Must test on actual macOS |
 | `server/*` | Any agent | Can test on Linux server |
-| `*.md` docs | JC / Jonas | Update when design changes |
-| `DESIGN.md` | JC + Jonas | Canonical design decisions |
+| `*.md` docs | The agent / the operator | Update when design changes |
+| `DESIGN.md` | The agent + the operator | Canonical design decisions |
 
 ## Questions?
 

@@ -2,19 +2,19 @@
 
 **This file tells you exactly what to do. Follow it step by step. Do not skip steps.**
 
-If you are an LLM / coding agent setting this up for Jonas: read this entire file first, then execute each section in order. Every command is provided. Every file path is absolute. Every credential is referenced by location, not value.
+If you are an LLM / coding agent setting this up: read this entire file first, then execute each section in order. Every command is provided. Every file path is absolute. Every credential is referenced by location, not value.
 
 ---
 
 ## Prerequisites
 
-### Server (Hetzner - already running)
-- Ubuntu Linux (admin user)
+### Server (VPS - already running)
+- Ubuntu Linux
 - Python 3.10+
 - Flask + Gunicorn installed
-- Repo cloned at: `/home/admin/clawd/openclaw-computer-vision/`
+- Repo cloned at: `/home/user/clawrelay/openclaw-computer-vision/`
 
-### Mac (Jonas's MacBook)
+### Mac (Operator's MacBook)
 - macOS (Apple Silicon)
 - Homebrew installed
 - Chrome browser
@@ -24,62 +24,62 @@ If you are an LLM / coding agent setting this up for Jonas: read this entire fil
 
 ## Part 1: Server Setup
 
-The server receives activity data from Jonas's Mac and stores it for JC to read.
+The server receives activity data from the operator's Mac and stores it for the agent to read.
 
 ### 1.1 Verify repo is cloned
 
 ```bash
-ls /home/admin/clawd/openclaw-computer-vision/server/context-receiver.py
+ls /home/user/clawrelay/openclaw-computer-vision/server/context-receiver.py
 ```
 
 If not found:
 ```bash
-cd /home/admin/clawd
-GIT_SSH_COMMAND="ssh -i ~/.ssh/github_bumpkingsol" git clone git@github-bumpkingsol:bumpkingsol/openclaw-computer-vision.git
+cd /home/user/clawrelay
+git clone <your-repo-url> openclaw-computer-vision
 ```
 
 ### 1.2 Install Python dependencies
 
 ```bash
-pip3 install --break-system-packages -r /home/admin/clawd/openclaw-computer-vision/server/requirements.txt
+pip3 install --break-system-packages -r /home/user/clawrelay/openclaw-computer-vision/server/requirements.txt
 ```
 
 ### 1.3 Check for auth token
 
-The auth token should already be in `/home/admin/clawd/.env`. Verify:
+The auth token should already be in `/home/user/clawrelay/.env`. Verify:
 
 ```bash
-grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env
+grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env
 ```
 
 If missing, generate one:
 ```bash
 umask 077
 TOKEN=$(openssl rand -hex 32)
-touch /home/admin/clawd/.env
-chmod 600 /home/admin/clawd/.env
-echo "CONTEXT_BRIDGE_TOKEN=$TOKEN" >> /home/admin/clawd/.env
-echo "CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db" >> /home/admin/clawd/.env
-echo "CONTEXT_BRIDGE_PORT=7890" >> /home/admin/clawd/.env
-echo "Generated token and stored it in /home/admin/clawd/.env"
+touch /home/user/clawrelay/.env
+chmod 600 /home/user/clawrelay/.env
+echo "CONTEXT_BRIDGE_TOKEN=$TOKEN" >> /home/user/clawrelay/.env
+echo "CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db" >> /home/user/clawrelay/.env
+echo "CONTEXT_BRIDGE_PORT=7890" >> /home/user/clawrelay/.env
+echo "Generated token and stored it in /home/user/clawrelay/.env"
 ```
 
 Retrieve the token when needed with:
 ```bash
-grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2
+grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2
 ```
 
 ### 1.4 Create data directory
 
 ```bash
-mkdir -p /home/admin/clawd/data
-mkdir -p /home/admin/clawd/memory/activity-digest
+mkdir -p /home/user/clawrelay/data
+mkdir -p /home/user/clawrelay/memory/activity-digest
 ```
 
 ### 1.5 Generate TLS certificates (if not already done)
 
 ```bash
-CERT_DIR="/home/admin/clawd/data/certs"
+CERT_DIR="/home/user/clawrelay/data/certs"
 SERVER_IP="$(hostname -I | awk '{print $1}')"
 SERVER_HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 mkdir -p "$CERT_DIR"
@@ -99,8 +99,8 @@ fi
 ### 1.6 Initialize the database
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 -c "
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 -c "
 import sys; sys.path.insert(0, '.')
 exec(open('context-receiver.py').read().split(\"if __name__\")[0])
 init_db()
@@ -111,7 +111,7 @@ print('DB initialized')
 ### 1.7 Start the receiver
 
 ```bash
-bash /home/admin/clawd/openclaw-computer-vision/server/setup-server.sh
+bash /home/user/clawrelay/openclaw-computer-vision/server/setup-server.sh
 ```
 
 Or, if the service is already installed, restart it:
@@ -122,8 +122,8 @@ sudo systemctl restart context-bridge
 ### 1.8 Verify the server is running
 
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2)
-curl -sf --cacert /home/admin/clawd/data/certs/context-bridge.pem \
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -H "Authorization: Bearer $TOKEN" \
   https://localhost:7890/context/health
 ```
@@ -136,8 +136,8 @@ Expected output:
 ### 1.9 Test with a simulated push
 
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2)
-curl -sf --cacert /home/admin/clawd/data/certs/context-bridge.pem \
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -X POST https://localhost:7890/context/push \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -161,7 +161,7 @@ sudo systemctl status context-bridge
 
 If missing:
 ```bash
-sudo cp /home/admin/clawd/openclaw-computer-vision/server/context-bridge.service /etc/systemd/system/
+sudo cp /home/user/clawrelay/openclaw-computer-vision/server/context-bridge.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now context-bridge
 ```
@@ -177,20 +177,20 @@ sudo ufw allow 7890/tcp
 
 ## Part 2: Mac Setup
 
-**This part runs on Jonas's MacBook.** If you're an agent on the server, provide these instructions to Jonas.
+**This part runs on the operator's MacBook.** If you're an agent on the server, provide these instructions to the operator.
 
 ### 2.1 Get server details
 
 You need two things from the server:
 1. **Server IP or hostname**: Check with `hostname -I` on the server
-2. **Auth token**: `grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2`
-3. **TLS cert PEM** (for self-signed deployments): `/home/admin/clawd/data/certs/context-bridge.pem`
+2. **Auth token**: `grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2`
+3. **TLS cert PEM** (for self-signed deployments): `/home/user/clawrelay/data/certs/context-bridge.pem`
 
 ### 2.2 Clone the repo on Mac
 
 ```bash
 cd ~
-git clone git@github.com:bumpkingsol/openclaw-computer-vision.git
+git clone <your-repo-url> openclaw-computer-vision
 ```
 
 ### 2.3 Install fswatch
@@ -246,8 +246,8 @@ tail -f /tmp/context-bridge.log
 
 On the **server**, run:
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2)
-curl -sf --cacert /home/admin/clawd/data/certs/context-bridge.pem \
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -H "Authorization: Bearer $TOKEN" \
   https://localhost:7890/context/health
 ```
@@ -256,8 +256,8 @@ Should show `"capture_status": "healthy"` and `"total_rows"` increasing.
 
 Or use the query tool:
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-query.py now
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-query.py now
 ```
 
 ---
@@ -288,33 +288,33 @@ The helper reads from `~/.context-bridge/` (queue database, logs, pause state) a
 ### 3.1 On the server, check current state
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-query.py now
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-query.py today
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-query.py now
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-query.py today
 ```
 
 ### 3.2 Run a digest
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-digest.py --dry-run
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-digest.py --dry-run
 ```
 
 ### 3.3 Run the watchdog
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 watchdog.py
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 watchdog.py
 ```
 
 ### 3.4 Test a handoff
 
 ```bash
-TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/admin/clawd/.env | cut -d= -f2)
+TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2)
 curl -sf -X POST http://localhost:7890/context/handoff \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"project": "prescrivia", "task": "test-task", "message": "test handoff"}'
+  -d '{"project": "project-gamma", "task": "test-task", "message": "test handoff"}'
 ```
 
 ---
@@ -325,14 +325,14 @@ curl -sf -X POST http://localhost:7890/context/handoff \
 
 Add to crontab for 3x daily digests:
 ```bash
-(crontab -l 2>/dev/null; echo "0 10,16,23 * * * cd /home/admin/clawd/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 context-digest.py >> /tmp/context-digest.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 10,16,23 * * * cd /home/user/clawrelay/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-digest.py >> /tmp/context-digest.log 2>&1") | crontab -
 ```
 
 ### Watchdog cron (server side)
 
 Add to crontab for 15-minute watchdog checks:
 ```bash
-(crontab -l 2>/dev/null; echo "*/15 * * * * cd /home/admin/clawd/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 watchdog.py --json >> /tmp/context-watchdog.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/15 * * * * cd /home/user/clawrelay/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 watchdog.py --json >> /tmp/context-watchdog.log 2>&1") | crontab -
 ```
 
 ### Stopping the daemon (Mac side)
@@ -358,16 +358,16 @@ tail -f /tmp/context-bridge-server.log
 ### Checking database size
 
 ```bash
-ls -lh /home/admin/clawd/data/context-bridge.db
+ls -lh /home/user/clawrelay/data/context-bridge.db
 ```
 
 ### Manual purge (if needed)
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/admin/clawd/data/context-bridge.db python3 -c "
+cd /home/user/clawrelay/openclaw-computer-vision/server
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 -c "
 import sqlite3
-db = sqlite3.connect('/home/admin/clawd/data/context-bridge.db')
+db = sqlite3.connect('/home/user/clawrelay/data/context-bridge.db')
 deleted = db.execute(\"DELETE FROM activity_stream WHERE created_at < datetime('now', '-48 hours')\").rowcount
 db.commit()
 print(f'Purged {deleted} rows')
@@ -404,17 +404,17 @@ print(f'Purged {deleted} rows')
 
 | Credential | Location | Notes |
 |-----------|----------|-------|
-| Auth token (server) | `/home/admin/clawd/.env` as `CONTEXT_BRIDGE_TOKEN` | Generated during setup |
+| Auth token (server) | `/home/user/clawrelay/.env` as `CONTEXT_BRIDGE_TOKEN` | Generated during setup |
 | Auth token (Mac) | macOS Keychain, service: `context-bridge`, account: `token` | Stored by installer |
-| TLS cert | `/home/admin/clawd/data/certs/context-bridge.pem` | Self-signed, 365 days |
-| TLS key | `/home/admin/clawd/data/certs/context-bridge-key.pem` | Permissions: 600 |
-| DB | `/home/admin/clawd/data/context-bridge.db` | Permissions: 600 |
+| TLS cert | `/home/user/clawrelay/data/certs/context-bridge.pem` | Self-signed, 365 days |
+| TLS key | `/home/user/clawrelay/data/certs/context-bridge-key.pem` | Permissions: 600 |
+| DB | `/home/user/clawrelay/data/context-bridge.db` | Permissions: 600 |
 
 ## Troubleshooting
 
 | Problem | Check | Fix |
 |---------|-------|-----|
-| No data arriving | `TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/admin/clawd/.env \| cut -d= -f2) && curl -H "Authorization: Bearer $TOKEN" localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
+| No data arriving | `TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env \| cut -d= -f2) && curl -H "Authorization: Bearer $TOKEN" localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
 | Auth failures | Check token matches on both sides | Regenerate: `openssl rand -hex 32` and update both |
 | AppleScript errors | `tail /tmp/context-bridge-error.log` | Grant Accessibility permission in System Settings |
 | Chrome URLs empty | Check Automation permission | System Settings > Privacy > Automation > Terminal > Chrome |

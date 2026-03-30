@@ -2,7 +2,7 @@
 set -e
 
 echo "1. Updating URL to Tailscale..."
-sudo sed -i '' 's|https://46.62.236.101:7890|http://100.71.165.128:7890|' /usr/local/bin/context-bridge-daemon.sh
+sudo sed -i '' 's|https://<SERVER_IP>:7890|http://<TAILSCALE_IP>:7890|' /usr/local/bin/context-bridge-daemon.sh
 
 echo "2. Verifying..."
 grep 'SERVER_URL=' /usr/local/bin/context-bridge-daemon.sh | head -1

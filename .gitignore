@@ -5,6 +5,7 @@ __pycache__/
 .env
 *.pem
 *.key
+.DS_Store
 
 # Xcode
 DerivedData/

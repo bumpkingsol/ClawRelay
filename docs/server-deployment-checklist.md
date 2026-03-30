@@ -1,11 +1,11 @@
 # Server Deployment Checklist
 
-Everything here must be done on the Hetzner VPS (`ssh admin@<server>`). These are tasks that cannot be performed from Jonas's Mac.
+Everything here must be done on the VPS (`ssh user@<server>`). These are tasks that cannot be performed from the operator's Mac.
 
 ## 1. Pull latest code
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision
+cd /home/user/clawrelay/openclaw-computer-vision
 git pull origin main
 ```
 
@@ -19,7 +19,7 @@ sudo apt-get install -y sqlcipher libsqlcipher-dev
 ## 3. Install Python dependencies
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision/server
+cd /home/user/clawrelay/openclaw-computer-vision/server
 pip3 install -r requirements.txt
 ```
 
@@ -28,32 +28,32 @@ This installs `pysqlcipher3` which provides encrypted SQLite. If `pysqlcipher3` 
 ## 4. Run server setup (generates TLS certs if missing)
 
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision
+cd /home/user/clawrelay/openclaw-computer-vision
 bash server/setup-server.sh
 ```
 
 This will:
-- Generate a self-signed TLS cert at `/home/admin/clawd/data/certs/context-bridge.pem`
+- Generate a self-signed TLS cert at `/home/user/clawrelay/data/certs/context-bridge.pem`
 - Install/restart the systemd service (gunicorn with `--certfile`/`--keyfile`)
 - Verify the auth token exists in `.env`
 
 ## 5. Verify HTTPS is working
 
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/admin/clawd/.env | cut -d= -f2)
+TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
 curl -sk https://localhost:7890/context/health -H "Authorization: Bearer $TOKEN"
 ```
 
 Expected: `{"status": "ok", "db_encrypted": true, ...}`
 
-## 6. Copy the TLS cert to Jonas's Mac
+## 6. Copy the TLS cert to the operator's Mac
 
 From the server, display the cert:
 ```bash
-cat /home/admin/clawd/data/certs/context-bridge.pem
+cat /home/user/clawrelay/data/certs/context-bridge.pem
 ```
 
-On Jonas's Mac, save it:
+On the operator's Mac, save it:
 ```bash
 # Paste the cert content into this file:
 nano ~/.context-bridge/server-ca.pem
@@ -62,15 +62,15 @@ chmod 600 ~/.context-bridge/server-ca.pem
 
 ## 7. Switch Mac daemon to HTTPS
 
-On Jonas's Mac:
+On the operator's Mac:
 ```bash
 # Update the server URL
-echo "https://100.71.165.128:7890/context/push" > ~/.context-bridge/server-url
+echo "https://<TAILSCALE_IP>:7890/context/push" > ~/.context-bridge/server-url
 
 # Test the connection
 TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w)
 curl -v --cacert ~/.context-bridge/server-ca.pem \
-  https://100.71.165.128:7890/context/health \
+  https://<TAILSCALE_IP>:7890/context/health \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -82,7 +82,7 @@ The existing unencrypted DB cannot be read by SQLCipher. Since raw data has 48h 
 
 ```bash
 sudo systemctl stop context-bridge
-rm /home/admin/clawd/data/context-bridge.db
+rm /home/user/clawrelay/data/context-bridge.db
 sudo systemctl start context-bridge
 ```
 
@@ -97,12 +97,12 @@ crontab -e
 Add:
 ```cron
 # Context Bridge - staleness watchdog (every 5 min)
-*/5 * * * * cd /home/admin/clawd/openclaw-computer-vision/server && bash staleness-watchdog.sh
+*/5 * * * * cd /home/user/clawrelay/openclaw-computer-vision/server && bash staleness-watchdog.sh
 
 # Context Bridge - digests (10:00, 16:00, 23:00 CET = 09:00, 15:00, 22:00 UTC)
-0 9 * * * cd /home/admin/clawd/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
-0 15 * * * cd /home/admin/clawd/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
-0 22 * * * cd /home/admin/clawd/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
+0 9 * * * cd /home/user/clawrelay/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
+0 15 * * * cd /home/user/clawrelay/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
+0 22 * * * cd /home/user/clawrelay/openclaw-computer-vision/server && python3 context-digest.py >> /var/log/context-digest.log 2>&1
 ```
 
 ## 10. Verify everything
@@ -115,7 +115,7 @@ sudo systemctl status context-bridge
 curl -sk https://localhost:7890/context/health -H "Authorization: Bearer $TOKEN"
 
 # DB encrypted?
-sqlite3 /home/admin/clawd/data/context-bridge.db "SELECT 1;"
+sqlite3 /home/user/clawrelay/data/context-bridge.db "SELECT 1;"
 # ^ Should FAIL (file is encrypted)
 
 # Cron installed?
@@ -128,12 +128,12 @@ crontab -l | grep context
 
 On the server:
 ```bash
-cd /home/admin/clawd/openclaw-computer-vision
+cd /home/user/clawrelay/openclaw-computer-vision
 bash server/setup-server.sh rotate-token
 sudo systemctl restart context-bridge
 ```
 
-On Jonas's Mac (using the token printed by the command above):
+On the operator's Mac (using the token printed by the command above):
 ```bash
 security delete-generic-password -s "context-bridge" -a "token" 2>/dev/null
 security add-generic-password -s "context-bridge" -a "token" -w "NEW_TOKEN_HERE"
@@ -145,7 +145,7 @@ The self-signed cert is valid for 365 days. To regenerate:
 
 On the server:
 ```bash
-rm /home/admin/clawd/data/certs/context-bridge*.pem
+rm /home/user/clawrelay/data/certs/context-bridge*.pem
 bash server/setup-server.sh
 ```
 

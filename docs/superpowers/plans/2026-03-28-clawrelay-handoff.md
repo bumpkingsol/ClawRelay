@@ -227,7 +227,7 @@ final class HandoffsTabViewModel: ObservableObject {
     private let runner: BridgeCommandRunner
     private var refreshTimer: RefreshTimer?
 
-    static let portfolioProjects = ["prescrivia", "leverwork", "jsvhq", "sonopeace", "openclaw"]
+    static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
 
     init(runner: BridgeCommandRunner) {
         self.runner = runner
@@ -328,7 +328,7 @@ struct HandoffsTabView: View {
 
     private var composeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Hand Off to JC")
+            Text("Hand Off to the agent")
                 .font(.title2)
 
             // Project
@@ -347,7 +347,7 @@ struct HandoffsTabView: View {
                 Text("Task")
                     .frame(width: 60, alignment: .trailing)
                     .foregroundStyle(.secondary)
-                TextField("What should JC do?", text: $viewModel.draft.task)
+                TextField("What should the agent do?", text: $viewModel.draft.task)
                     .textFieldStyle(.roundedBorder)
             }
 
@@ -562,7 +562,7 @@ Add published properties and methods to `MenuBarViewModel.swift` (after existing
 @Published var handoffTask: String = ""
 @Published var handoffSent: Bool = false
 
-static let portfolioProjects = ["prescrivia", "leverwork", "jsvhq", "sonopeace", "openclaw"]
+static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
 
 func sendQuickHandoff() {
     let project = handoffProject.isEmpty ? "general" : handoffProject
@@ -605,7 +605,7 @@ VStack(spacing: 8) {
         .frame(width: 20)
     }
     HStack(spacing: 8) {
-        TextField("What should JC do?", text: $viewModel.handoffTask)
+        TextField("What should the agent do?", text: $viewModel.handoffTask)
             .textFieldStyle(.roundedBorder)
             .onSubmit {
                 if !viewModel.handoffTask.isEmpty {
@@ -917,7 +917,7 @@ def list_handoffs():
 ```python
 @app.route('/context/handoffs/<int:handoff_id>', methods=['PATCH'])
 def update_handoff(handoff_id):
-    """JC updates handoff status."""
+    """The agent updates handoff status."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
 

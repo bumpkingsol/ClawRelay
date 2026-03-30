@@ -11,7 +11,7 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/admin/clawd/data/context-bridge.db')
+DB_PATH = os.environ.get('CONTEXT_BRIDGE_DB', '/home/user/clawrelay/data/context-bridge.db')
 STALE_MINUTES = 15  # Alert if no captures for this long (and not idle/away)
 
 
@@ -40,7 +40,7 @@ def check():
     age_minutes = (datetime.now(timezone.utc) - latest_dt).total_seconds() / 60
     idle_state = latest['idle_state']
     
-    # If Jonas is idle/away/locked, no alert needed
+    # If the operator is idle/away/locked, no alert needed
     if idle_state in ('idle', 'away', 'locked'):
         return {
             'status': 'ok',

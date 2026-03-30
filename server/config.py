@@ -2,10 +2,10 @@
 
 # Canonical portfolio project list.
 PORTFOLIO_PROJECTS = {
-    'prescrivia': ['prescrivia'],
-    'leverwork': ['leverwork'],
-    'sonopeace': ['sonopeace'],
-    'jsvhq': ['jsvhq', 'jsvcapital'],
+    'project-gamma': ['prescrivia'],
+    'project-alpha': ['leverwork'],
+    'project-delta': ['sonopeace'],
+    'project-beta': ['jsvhq', 'jsvcapital'],
     'openclaw': ['openclaw-computer-vision', 'openclaw-macos-helper', 'clawd'],
 }
 

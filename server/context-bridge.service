@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=admin
-WorkingDirectory=/home/admin/clawd/openclaw-computer-vision/server
-EnvironmentFile=/home/admin/clawd/.env
-ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 --certfile /home/admin/clawd/data/certs/context-bridge.pem --keyfile /home/admin/clawd/data/certs/context-bridge-key.pem wsgi:app
+User=user
+WorkingDirectory=/home/user/clawrelay/openclaw-computer-vision/server
+EnvironmentFile=/home/user/clawrelay/.env
+ExecStart=/usr/bin/python3 -m gunicorn --bind 0.0.0.0:7890 --workers 1 --threads 4 --timeout 30 --certfile /home/user/clawrelay/data/certs/context-bridge.pem --keyfile /home/user/clawrelay/data/certs/context-bridge-key.pem wsgi:app
 Restart=always
 RestartSec=5
 UMask=0077
@@ -15,7 +15,7 @@ UMask=0077
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/home/admin/clawd/data
+ReadWritePaths=/home/user/clawrelay/data
 PrivateTmp=true
 
 [Install]

@@ -75,6 +75,17 @@ chmod 700 "$CB_DIR/bin/context-bridge-daemon.sh" \
 chmod 600 "$CB_DIR/bin/context-common.sh" \
           "$CB_DIR/context-shell-hook.zsh"
 
+# Build claw-whatsapp if Go is available
+if command -v go &>/dev/null; then
+    echo "  Building claw-whatsapp..."
+    (cd "$SCRIPT_DIR/claw-whatsapp" && go build -tags sqlite_fts5 -o "$CB_DIR/bin/claw-whatsapp" .) || {
+        echo "  Warning: claw-whatsapp build failed. WhatsApp capture will not be available."
+        echo "  Install Go and re-run install.sh to enable WhatsApp capture."
+    }
+else
+    echo "  Skipping claw-whatsapp (Go not installed). WhatsApp capture will not be available."
+fi
+
 # 3. Store auth token in macOS Keychain
 echo "[3/8] Storing auth token in Keychain..."
 security delete-generic-password -s "context-bridge" -a "token" 2>/dev/null || true
@@ -148,6 +159,16 @@ if command -v fswatch &>/dev/null; then
   echo "  File watcher installed"
 else
   echo "  File watcher skipped (fswatch not available)"
+fi
+
+# WhatsApp sync service (only if binary exists)
+if [ -f "$CB_DIR/bin/claw-whatsapp" ]; then
+    WA_PLIST="$HOME/Library/LaunchAgents/com.openclaw.context-bridge-whatsapp.plist"
+    sed "s#__CONTEXT_BRIDGE_BIN_DIR__#$CB_DIR/bin#g" \
+        "$SCRIPT_DIR/com.openclaw.context-bridge-whatsapp.plist" > "$WA_PLIST"
+    launchctl unload "$WA_PLIST" 2>/dev/null
+    # Don't auto-load — user needs to run --auth first
+    echo "  WhatsApp plist installed. Run 'claw-whatsapp --auth' to link, then load the service."
 fi
 
 # 8. Permissions check

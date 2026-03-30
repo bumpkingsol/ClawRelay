@@ -20,6 +20,7 @@ struct BridgeSnapshot: Decodable, Equatable {
     var queueDepth: Int
     var daemonLaunchdState: String
     var watcherLaunchdState: String
+    var whatsappLaunchdState: String?
 
     static let placeholder = BridgeSnapshot(
         trackingState: .active,
@@ -27,7 +28,8 @@ struct BridgeSnapshot: Decodable, Equatable {
         sensitiveMode: false,
         queueDepth: 0,
         daemonLaunchdState: "unknown",
-        watcherLaunchdState: "unknown"
+        watcherLaunchdState: "unknown",
+        whatsappLaunchdState: nil
     )
 
     static let needsAttentionPlaceholder = BridgeSnapshot(
@@ -36,6 +38,7 @@ struct BridgeSnapshot: Decodable, Equatable {
         sensitiveMode: false,
         queueDepth: 0,
         daemonLaunchdState: "unknown",
-        watcherLaunchdState: "unknown"
+        watcherLaunchdState: "unknown",
+        whatsappLaunchdState: nil
     )
 }

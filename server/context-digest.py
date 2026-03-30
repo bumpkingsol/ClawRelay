@@ -230,6 +230,7 @@ def build_digest(hours_back=8):
 
     # Global (non-project-specific) accumulators
     all_whatsapp = []
+    all_whatsapp_messages = []
     all_notifications = []
     all_tabs_snapshots = []
     all_codex_sessions = []
@@ -306,6 +307,12 @@ def build_digest(hours_back=8):
         # --- Accumulate global (non-project-specific) lists ---
         if row['whatsapp_context']:
             all_whatsapp.append({'ts': row['ts'], 'context': row['whatsapp_context']})
+        if row.get('whatsapp_messages'):
+            try:
+                msgs = json.loads(row['whatsapp_messages'])
+                all_whatsapp_messages.extend(msgs)
+            except (json.JSONDecodeError, TypeError):
+                pass
         if row.get('notifications'):
             all_notifications.append({'ts': row['ts'], 'data': row['notifications']})
         if row['all_tabs']:
@@ -571,6 +578,68 @@ def build_digest(hours_back=8):
             if ctx not in seen_contexts:
                 seen_contexts.add(ctx)
                 lines.append(f"- {entry['ts']}: WhatsApp — {ctx}")
+
+    # WhatsApp Messages section (full message content)
+    if all_whatsapp_messages:
+        lines.append("")
+        lines.append("## WhatsApp Messages")
+        lines.append("")
+        # Group by chat
+        chats = {}
+        for msg in all_whatsapp_messages:
+            chat_key = msg.get('chat_label', msg.get('chat_id', 'Unknown'))
+            chat_id = msg.get('chat_id', '')
+            if chat_key not in chats:
+                chats[chat_key] = {'id': chat_id, 'messages': []}
+            chats[chat_key]['messages'].append(msg)
+
+        for chat_label, chat_data in chats.items():
+            msgs = chat_data['messages']
+            timestamps = [m.get('ts', '') for m in msgs if m.get('ts')]
+            time_range = ""
+            if timestamps:
+                first = timestamps[0].split('T')[1][:5] if 'T' in timestamps[0] else timestamps[0]
+                last = timestamps[-1].split('T')[1][:5] if 'T' in timestamps[-1] else timestamps[-1]
+                time_range = f", {first}–{last}"
+
+            lines.append(f"**{chat_label}** ({chat_data['id']}) — {len(msgs)} messages{time_range}")
+            lines.append("")
+
+            urls = set()
+            for msg in msgs:
+                text = msg.get('text', '')
+                for word in text.split():
+                    if word.startswith('http://') or word.startswith('https://'):
+                        urls.add(word)
+
+            for msg in msgs:
+                sender = msg.get('sender', '?')
+                text = msg.get('text', '')
+                msg_type = msg.get('type', 'text')
+                caption = msg.get('caption', '')
+
+                if msg_type != 'text' and msg_type != 'reply':
+                    type_tag = f"[{msg_type}]"
+                    line = f"- {sender}: {type_tag}"
+                    if caption:
+                        line += f' "{caption}"'
+                    elif text:
+                        line += f" {text}"
+                else:
+                    line = f'- {sender}: "{text}"'
+                    reply_to = msg.get('reply_to', '')
+                    if reply_to:
+                        line += f' (replying to: "{reply_to[:80]}...")'
+
+                lines.append(line)
+
+            if urls:
+                lines.append("")
+                lines.append("Links shared:")
+                for url in urls:
+                    lines.append(f"  - {url}")
+
+            lines.append("")
 
     # AI Agent Sessions
     if all_codex_sessions:

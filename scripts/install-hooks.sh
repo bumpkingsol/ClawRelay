@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install git post-commit hooks on all repos
-# Run on Jonas's Mac: bash install-hooks.sh <server-url-or-endpoint>
+# Run on the operator's Mac: bash install-hooks.sh <server-url-or-endpoint>
 
 set -euo pipefail
 umask 077
@@ -91,8 +91,8 @@ DIFF_STAT=$(git diff --stat HEAD~1 2>/dev/null || echo "initial commit")
 AUTHOR=$(git log -1 --pretty=%an)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# Only capture Jonas's commits
-if [[ "$AUTHOR" != *"Jonas"* && "$AUTHOR" != *"jonas"* && "$AUTHOR" != *"clawrelay-org"* && "$AUTHOR" != *"bumpy"* ]]; then
+# Only capture the operator's commits (configure your git author name here)
+if [[ "$AUTHOR" != *"<your-name>"* ]]; then
   exit 0
 fi
 

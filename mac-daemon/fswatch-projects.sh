@@ -61,7 +61,7 @@ for root in "${SEARCH_ROOTS[@]}"; do
     add_watch_dir "$dir"
   done < <(
     find "$root" -maxdepth 5 -type d \
-      \( -name 'project-gamma' -o -name 'project-alpha' -o -name 'jsvcapital' -o -name 'project-delta' -o -name 'clawd' -o -name 'aeoa-studio' -o -name 'nilsy-astro' -o -name 'openclaw-computer-vision' \) \
+      \( -name 'project-gamma' -o -name 'project-alpha' -o -name 'project-beta' -o -name 'project-delta' -o -name 'clawd' -o -name 'aeoa-studio' -o -name 'nilsy-astro' -o -name 'openclaw-computer-vision' \) \
       2>/dev/null
   )
 done

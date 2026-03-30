@@ -2,13 +2,13 @@
 
 Date: 2026-03-27
 Status: Approved for implementation planning
-Owner: Jonas / OpenClaw
+Owner: the operator / OpenClaw
 
 ## 1. Purpose
 
-OpenClaw needs a production-grade local control surface on Jonas's Mac for trust, privacy, repair, and operator confidence.
+OpenClaw needs a production-grade local control surface on the operator's Mac for trust, privacy, repair, and operator confidence.
 
-The helper is not a dashboard for curiosity. It is a native macOS utility that makes the Context Bridge safe and usable day to day by giving Jonas fast control over capture behavior, clear health visibility, and reliable repair flows when something breaks.
+The helper is not a dashboard for curiosity. It is a native macOS utility that makes the Context Bridge safe and usable day to day by giving the operator fast control over capture behavior, clear health visibility, and reliable repair flows when something breaks.
 
 This design is explicitly local-first:
 - it must remain useful when the server is offline
@@ -19,7 +19,7 @@ This design is explicitly local-first:
 
 ### Primary goals
 
-- Give Jonas one-click control over capture state from the macOS menu bar.
+- Give the operator one-click control over capture state from the macOS menu bar.
 - Make privacy actions explicit, trustworthy, and fast.
 - Detect missing permissions and broken local components and guide repair.
 - Surface the health of the local capture pipeline without turning the helper into a noisy dashboard.

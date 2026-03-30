@@ -2,13 +2,13 @@
 
 **Date:** 2026-03-28
 **Status:** Approved
-**Goal:** Add a personal operations dashboard to ClawRelay's Control Center that surfaces the intelligence the system produces — time allocation, focus level, JC's activity, project neglect, and handoff status — so Jonas has the same operational visibility that JC has.
+**Goal:** Add a personal operations dashboard to ClawRelay's Control Center that surfaces the intelligence the system produces — time allocation, focus level, the agent's activity, project neglect, and handoff status — so the operator has the same operational visibility that the agent has.
 
 ## Background
 
-ClawRelay sends data out but gives nothing back. The daemon captures activity, the digest produces intelligence (time allocation, neglect, focus level, cross-digest diffs), and JC can query all of it. But Jonas — the person doing the work — sees none of it. The dashboard closes this loop.
+ClawRelay sends data out but gives nothing back. The daemon captures activity, the digest produces intelligence (time allocation, neglect, focus level, cross-digest diffs), and the agent can query all of it. But the operator — the person doing the work — sees none of it. The dashboard closes this loop.
 
-JC recently added a `/context/jc-work-log` endpoint that exposes JC's own work activity (project, description, status, duration). This makes bidirectional visibility possible.
+The agent recently added a `/context/jc-work-log` endpoint that exposes the agent's own work activity (project, description, status, duration). This makes bidirectional visibility possible.
 
 ## Constraints
 
@@ -74,7 +74,7 @@ Single endpoint that aggregates all dashboard data. Requires Bearer auth.
 1. **Status:** Latest `activity_stream` row for current app/project/idle state. Focus level computed from last 60 min of transitions (same logic as `cmd_status` in context-query.py). `focus_switches_per_hour` is the raw count of (app, project) transitions in the last hour.
 2. **Time allocation:** Count captures per project from today's `activity_stream` rows, multiply by 2 min interval (same logic as `cmd_today`).
 3. **Neglect:** Query `project_last_seen` table for days since last activity per portfolio project (same logic as `cmd_neglected`).
-4. **JC activity:** Query `jc_work_log` table for last 48h entries.
+4. **agent activity:** Query `agent_work_log` table for last 48h entries.
 5. **Handoffs:** Query `handoffs` table for last 10, include `message` field.
 
 **NOW card data path:** The NOW card shows "time on it today" by looking up `status.current_project` in the `time_allocation` array to find matching hours. This cross-reference happens in the SwiftUI view, not the server.
@@ -103,7 +103,7 @@ struct DashboardData: Decodable {
     let status: DashboardStatus
     let timeAllocation: [ProjectTime]
     let neglected: [ProjectNeglect]
-    let jcActivity: [JCWorkEntry]
+    let agentActivity: [AgentWorkEntry]
     let handoffs: [Handoff]  // reuse existing Handoff model
 }
 ```
@@ -136,7 +136,7 @@ struct ProjectNeglect: Decodable, Identifiable {
     let days: Int
 }
 
-struct JCWorkEntry: Decodable, Identifiable {
+struct AgentWorkEntry: Decodable, Identifiable {
     let id: Int
     let project: String
     let description: String
@@ -179,7 +179,7 @@ Fetches dashboard data via `BridgeCommandRunner.runActionWithOutput("dashboard")
 |------|---------|
 | NOW | Current project name (bold), time on it today, idle state indicator |
 | FOCUS | Focus level label (focused/multitasking/scattered), switches/hr, color-coded |
-| JC | What JC is doing — latest in-progress entry from `jcActivity`, or "Idle" if none |
+| the agent | What the agent is doing — latest in-progress entry from `agentActivity`, or "Idle" if none |
 
 **Middle — Time allocation:**
 - Horizontal progress bars per project, sorted by hours desc
@@ -190,7 +190,7 @@ Fetches dashboard data via `BridgeCommandRunner.runActionWithOutput("dashboard")
 
 | Panel | Content |
 |-------|---------|
-| Needs Attention | Three groups in order: (1) Neglected projects >2 days, sorted by days desc; (2) JC in-progress items; (3) JC completed items (last 24h only). Each group has a distinct icon/color prefix. |
+| Needs Attention | Three groups in order: (1) Neglected projects >2 days, sorted by days desc; (2) the agent in-progress items; (3) the agent completed items (last 24h only). Each group has a distinct icon/color prefix. |
 | Recent Handoffs | Last 5 handoffs with status badges (reuse badge components from HandoffsTabView) |
 
 **Empty/error states:**
@@ -205,11 +205,11 @@ Fetches dashboard data via `BridgeCommandRunner.runActionWithOutput("dashboard")
 
 ## 7. Popover Summary Line
 
-Add a single compact line at the top of the menu bar popover showing the current project and JC status. This is NOT a full dashboard — just a glanceable summary.
+Add a single compact line at the top of the menu bar popover showing the current project and the agent status. This is NOT a full dashboard — just a glanceable summary.
 
-Placed after the StatusHeaderView and before HealthStripView. Format: `project-gamma 2.3h | JC: project-alpha`
+Placed after the StatusHeaderView and before HealthStripView. Format: `project-gamma 2.3h | The agent: project-alpha`
 
-Data source: same `dashboard` helperctl command. `MenuBarViewModel` decodes the full `DashboardData` model but the popover only renders `data.status.currentProject`, `data.timeAllocation` (to find hours for current project), and `data.jcActivity.first` (latest JC entry). Fetched once on `onAppear`, no timer. Independent from `DashboardViewModel` — two separate fetches is acceptable since they don't overlap (popover opens when Control Center is closed and vice versa).
+Data source: same `dashboard` helperctl command. `MenuBarViewModel` decodes the full `DashboardData` model but the popover only renders `data.status.currentProject`, `data.timeAllocation` (to find hours for current project), and `data.agentActivity.first` (latest the agent entry). Fetched once on `onAppear`, no timer. Independent from `DashboardViewModel` — two separate fetches is acceptable since they don't overlap (popover opens when Control Center is closed and vice versa).
 
 **Files:**
 - Modify: `mac-helper/OpenClawHelper/Views/MenuBarPopoverView.swift` — add summary line above StatusHeaderView

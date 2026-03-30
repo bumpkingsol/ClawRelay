@@ -1,10 +1,10 @@
-# JC Autonomous Action Loop — Implementation Notes
+# Agent Autonomous Action Loop — Implementation Notes
 
-These are recommendations for wiring JC to actively use the context bridge data before every autonomous action.
+These are recommendations for wiring the agent to actively use the context bridge data before every autonomous action.
 
 ## The Core Loop
 
-Every JC cron job should follow this pattern:
+Every agent cron job should follow this pattern:
 
 ```
 1. Check context     →  python3 context-query.py status
@@ -15,7 +15,7 @@ Every JC cron job should follow this pattern:
 
 ## Pre-Action Check
 
-Before any autonomous action, JC runs:
+Before any autonomous action, the agent runs:
 
 ```bash
 python3 /home/user/clawrelay/openclaw-computer-vision/server/context-query.py status
@@ -38,11 +38,11 @@ last_activity: 2026-03-28T14:32:00Z
 
 | Condition | Action |
 |-----------|--------|
-| `current_project` matches what JC wants to work on | **Don't.** Pick a different project. |
+| `current_project` matches what the agent wants to work on | **Don't.** Pick a different project. |
 | `in_call: True` | **Don't send Telegram.** Wait until call ends. |
-| `focus_mode` is non-null | **Don't interrupt.** Jonas is in deep work. |
+| `focus_mode` is non-null | **Don't interrupt.** The operator is in deep work. |
 | `focus_level: focused` | Only interrupt for urgent items. |
-| `focus_level: scattered` | Good time to take things off Jonas's plate. |
+| `focus_level: scattered` | Good time to take things off the operator's plate. |
 | `idle_state: away` or `locked` | Safe to work autonomously. Don't expect input. |
 | `daemon_stale: True` | **Be conservative.** No recent data — operating blind. |
 
@@ -74,7 +74,7 @@ Pending handoffs with `priority: urgent` or `priority: high` take precedence ove
 python3 /home/user/clawrelay/openclaw-computer-vision/server/context-query.py since 8
 ```
 
-If something shows as "Dropped" that was active in the previous period, consider asking Jonas via Telegram:
+If something shows as "Dropped" that was active in the previous period, consider asking the operator via Telegram:
 
 > "You were working on [X] earlier but stopped — should I pick it up or are you continuing later?"
 
@@ -94,18 +94,18 @@ curl -X PATCH http://localhost:7890/context/handoffs/<id> \
 
 ## End-of-Day Summary
 
-At ~22:00 CET, JC generates a daily wrap-up posted to Telegram:
+At ~22:00 CET, the agent generates a daily wrap-up posted to Telegram:
 
 ```
 Daily Summary — 2026-03-28
 
-Jonas worked on:
+The operator worked on:
 - project-gamma: 4.2h (branch: feature/notifications)
 - project-alpha: 1.5h
 
-JC worked on:
+The agent worked on:
 - project-beta: reviewed PR #42, merged
-- project-delta: fixed deploy script (handoff from Jonas)
+- project-delta: fixed deploy script (handoff from operator)
 
 Still open:
 - project-alpha: auth migration started but not finished
@@ -115,26 +115,26 @@ Neglected:
 - aeoa: 12 days since last activity
 ```
 
-This requires JC to track its own work log alongside the digest data.
+This requires the agent to track its own work log alongside the digest data.
 
 ## Escalating Neglect Signals
 
-The `neglected` command shows days since last activity, but JC should escalate its response based on duration:
+The `neglected` command shows days since last activity, but the agent should escalate its response based on duration:
 
-| Days inactive | JC behavior |
+| Days inactive | Agent behavior |
 |---------------|-------------|
 | 1-2 days | Note it, no action needed |
 | 3-5 days | Mention in end-of-day summary |
 | 6-10 days | Proactively check if there's pending work to pick up |
-| 10+ days | Flag to Jonas via Telegram: "X hasn't been touched in N days — is this intentional?" |
+| 10+ days | Flag to the operator via Telegram: "X hasn't been touched in N days — is this intentional?" |
 
 ## Implementation Approach
 
-These behaviors should be wired into JC's existing cron infrastructure:
+These behaviors should be wired into the agent's existing cron infrastructure:
 
 1. **Before every cron action:** Add a `status` check as preamble
 2. **Project selection cron (e.g., hourly):** Run `neglected` + check handoffs, pick work
 3. **End-of-day cron (22:00 CET):** Generate and post the daily summary
 4. **Escalation check (daily):** Scan neglect data and trigger Telegram messages for 10+ day items
 
-The context bridge provides the data. JC's own logic decides what to do with it.
+The context bridge provides the data. The agent's own logic decides what to do with it.

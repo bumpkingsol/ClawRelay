@@ -4,7 +4,7 @@
 
 ## What This Is
 
-A real-time activity monitoring bridge between Jonas's MacBook and his autonomous AI agent (Jean-Claude / JC). It gives JC operational visibility into what Jonas is working on so JC can make better autonomous decisions.
+A real-time activity monitoring bridge between the operator's MacBook and their autonomous AI agent. It gives the agent operational visibility into what the operator is working on so the agent can make better autonomous decisions.
 
 **Read these in order:**
 1. `PURPOSE.md` - Why this exists and what failures it solves
@@ -16,14 +16,14 @@ A real-time activity monitoring bridge between Jonas's MacBook and his autonomou
 ## Critical Context
 
 ### The People
-- **Jonas** (github: clawrelay-org) - CEO. Builds products, runs deals, handles legal. Works exclusively on a MacBook. Nomadic (IP changes constantly). Uses Chrome only. Switches contexts frequently throughout the day.
-- **Jean-Claude / JC** - Autonomous AI agent running on a Hetzner server (Ubuntu). Operates as COO across Jonas's portfolio: Project Alpha, Project Beta, Project Gamma, Project Delta. JC is the primary consumer of the data this system produces.
+- **The operator** - Works exclusively on a MacBook. Nomadic (IP changes constantly). Uses Chrome only. Switches contexts frequently throughout the day.
+- **The agent** - Autonomous AI agent running on a VPS (Ubuntu). Operates as an autonomous assistant across the operator's project portfolio. The agent is the primary consumer of the data this system produces.
 
 ### The Problem in One Sentence
-JC has deep business knowledge but zero visibility into what Jonas is doing right now, which causes duplicated work, wasted effort, and an inability to act autonomously on the right things.
+The agent has deep business knowledge but zero visibility into what the operator is doing right now, which causes duplicated work, wasted effort, and an inability to act autonomously on the right things.
 
 ### The Solution in One Sentence
-A Mac daemon captures Jonas's activity (apps, windows, URLs, git, terminal) and pushes it to JC's server, where it's processed into operational intelligence that informs JC's autonomous decisions.
+A Mac daemon captures the operator's activity (apps, windows, URLs, git, terminal) and pushes it to the agent's server, where it's processed into operational intelligence that informs the agent's autonomous decisions.
 
 ## Architecture Quick Reference
 
@@ -34,13 +34,13 @@ Mac Daemon (every 2 min) → HTTPS + Bearer token → Server Receiver → SQLite
                                                                           ↓
                                                               Structured summaries (permanent)
                                                                           ↓
-                                                              JC reads before autonomous actions
+                                                              Agent reads before autonomous actions
 ```
 
 ## Development Rules
 
 ### Security is Non-Negotiable
-- **No third-party services.** Data flows Mac → Hetzner server only. No cloud storage, no external APIs, no analytics.
+- **No third-party services.** Data flows Mac → VPS only. No cloud storage, no external APIs, no analytics.
 - **No credentials in code.** Auth tokens in macOS Keychain (Mac side) and `.env` (server side).
 - **Filter sensitive data before transmission.** Passwords, API keys, banking app content never leave the Mac.
 - **48-hour purge on raw data.** Only digest summaries persist.
@@ -55,17 +55,17 @@ Mac Daemon (every 2 min) → HTTPS + Bearer token → Server Receiver → SQLite
 ### The Server Runs on Linux (Ubuntu)
 - Python 3, Flask, SQLite
 - systemd service for persistence
-- JC (the AI agent) reads the database directly via Python scripts
+- The agent reads the database directly via Python scripts
 - The digest processor is the intelligence layer - it interprets raw data, not just stores it
 
 ### Chrome Only
-Jonas uses Chrome exclusively. Do not build support for Safari, Firefox, Arc, or any other browser. If this changes, Jonas will say so.
+The operator uses Chrome exclusively. Do not build support for Safari, Firefox, Arc, or any other browser. If this changes, the operator will say so.
 
 ### The Daemon Does NOT Read Documents
-The daemon captures URLs. JC reads the actual Google Docs/Slides/Sheets content during digest processing using the `gog` CLI tool on the server. The daemon is lightweight and fast - it captures metadata, not content.
+The daemon captures URLs. The agent reads the actual Google Docs/Slides/Sheets content during digest processing using the `gog` CLI tool on the server. The daemon is lightweight and fast - it captures metadata, not content.
 
 ### Capture Quality > Feature Count
-A reliable 2-minute capture cycle that accurately reflects what Jonas is doing is worth more than fancy features that break. If something is fragile (like notification DB access), make it optional and fail silently.
+A reliable 2-minute capture cycle that accurately reflects what the operator is doing is worth more than fancy features that break. If something is fragile (like notification DB access), make it optional and fail silently.
 
 ## Testing
 
@@ -131,9 +131,9 @@ curl -X POST http://localhost:7890/context/push \
 ## What Success Looks Like
 
 When this system is working correctly:
-- JC knows what Jonas is working on within 2 minutes
-- JC never duplicates Jonas's active work
-- JC picks up abandoned tasks without being asked
-- JC works on neglected projects while Jonas focuses elsewhere
+- The agent knows what the operator is working on within 2 minutes
+- The agent never duplicates the operator's active work
+- The agent picks up abandoned tasks without being asked
+- The agent works on neglected projects while the operator focuses elsewhere
 - The daily self-maintenance overhead drops to near zero
-- Jonas can see what JC is doing via Telegram status updates
+- The operator can see what the agent is doing via Telegram status updates

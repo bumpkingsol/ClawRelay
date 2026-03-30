@@ -27,24 +27,24 @@
 - [ ] **First real data flowing**
 
 ## Phase 2: Integration ✅ (enhancement work complete)
-**Goal:** JC makes better autonomous decisions using the data.
+**Goal:** The agent makes better autonomous decisions using the data.
 
-- [x] JC checks `context-query.py now` before any autonomous action — covered by `status` command
-- [x] JC checks `context-query.py project <name>` before working on any project
+- [x] The agent checks `context-query.py now` before any autonomous action — covered by `status` command
+- [x] The agent checks `context-query.py project <name>` before working on any project
 - [x] Digest comparison: detect started-but-abandoned work across days — cross-digest comparison added to digest processor
-- [x] JC Telegram status updates when starting/completing autonomous work — documented in JC integration guide
-- [x] Watchdog cron alerting JC if daemon goes stale — `server/staleness-watchdog.sh` + `daemon_stale` field in `status` output
-- [x] Handoff processing: JC reads pending handoffs and acts — `/handoff` endpoint and `status` output include handoff queue
+- [x] The agent posts Telegram status updates when starting/completing autonomous work — documented in integration guide
+- [x] Watchdog cron alerting the agent if daemon goes stale — `server/staleness-watchdog.sh` + `daemon_stale` field in `status` output
+- [x] Handoff processing: the agent reads pending handoffs and acts — `/handoff` endpoint and `status` output include handoff queue
 - [x] Pre-action decision rules documented — `docs/jc-integration-guide.md`
 - [x] `neglected` and `since` query commands for autonomous project selection
 
 ## Phase 3: Autonomy
-**Goal:** JC operates as a true second operator.
+**Goal:** The agent operates as a true second operator.
 *Note: Phase 3 items build on the Phase 2 integration foundation now in place.*
 
-- [ ] JC autonomously picks up abandoned work without being asked
-- [ ] JC autonomously shifts focus based on what Jonas is NOT doing
-- [ ] JC provides end-of-day summary: "You did X, I did Y, Z is still open"
-- [ ] Feedback loop: Jonas rates JC's autonomous actions, JC adjusts
+- [ ] The agent autonomously picks up abandoned work without being asked
+- [ ] The agent autonomously shifts focus based on what the operator is NOT doing
+- [ ] The agent provides end-of-day summary: "You did X, I did Y, Z is still open"
+- [ ] Feedback loop: the operator rates the agent's autonomous actions, the agent adjusts
 - [ ] Pattern tracking: "X hasn't been touched in N days" escalating signals
 - [ ] Let's Encrypt TLS upgrade

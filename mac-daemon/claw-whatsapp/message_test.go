@@ -43,3 +43,30 @@ func TestMessage_ReplyToTruncation(t *testing.T) {
 		t.Errorf("reply_to should be truncated to 200 chars, got %d", len(msg.ReplyTo))
 	}
 }
+
+func TestExtractMessageType(t *testing.T) {
+	tests := []struct {
+		name     string
+		hasText  bool
+		hasImage bool
+		hasVideo bool
+		hasDoc   bool
+		hasAudio bool
+		want     string
+	}{
+		{"text only", true, false, false, false, false, "text"},
+		{"image", false, true, false, false, false, "image"},
+		{"video", false, false, true, false, false, "video"},
+		{"document", false, false, false, true, false, "document"},
+		{"audio", false, false, false, false, true, "voice"},
+		{"nothing", false, false, false, false, false, "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := classifyMessageType(tt.hasText, tt.hasImage, tt.hasVideo, tt.hasDoc, tt.hasAudio)
+			if got != tt.want {
+				t.Errorf("classifyMessageType() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}

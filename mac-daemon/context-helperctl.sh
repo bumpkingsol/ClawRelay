@@ -55,6 +55,7 @@ snapshot = {
     "queueDepth": queue_depth,
     "daemonLaunchdState": launchd_state("com.openclaw.context-bridge"),
     "watcherLaunchdState": launchd_state("com.openclaw.context-bridge-fswatch"),
+    "whatsappLaunchdState": launchd_state("com.openclaw.context-bridge-whatsapp"),
 }
 print(json.dumps(snapshot))
 PY
@@ -376,8 +377,17 @@ case "$cmd" in
   pause)           do_pause "$@" ;;
   resume)          do_resume ;;
   sensitive)       do_sensitive "$@" ;;
-  restart-daemon)  restart_launchd "com.openclaw.context-bridge" ;;
-  restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
+  restart-daemon)    restart_launchd "com.openclaw.context-bridge" ;;
+  restart-watcher)   restart_launchd "com.openclaw.context-bridge-fswatch" ;;
+  restart-whatsapp)  restart_launchd "com.openclaw.context-bridge-whatsapp" ;;
+  whatsapp-status)
+    HEALTH_FILE="$HOME/.context-bridge/whatsapp-health.json"
+    if [ -f "$HEALTH_FILE" ]; then
+      cat "$HEALTH_FILE"
+    else
+      echo '{"status": "not running"}'
+    fi
+    ;;
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
   list-handoffs)   do_list_handoffs ;;
@@ -385,7 +395,7 @@ case "$cmd" in
   mark-question-seen)   do_mark_question_seen "$@" ;;
   privacy-rules)        do_privacy_rules "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|mark-question-seen|privacy-rules"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|restart-whatsapp|whatsapp-status|purge-local|queue-handoff|list-handoffs|dashboard|mark-question-seen|privacy-rules"}' >&2
     exit 1
     ;;
 esac

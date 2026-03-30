@@ -540,6 +540,42 @@ if [ -f "$FSWATCH_LOG" ] && [ -s "$FSWATCH_LOG" ]; then
   > "$FSWATCH_LOG"
 fi
 
+# --- WhatsApp messages (atomic rotation) ---
+WA_BUFFER="$CB_DIR/whatsapp-buffer.jsonl"
+WA_PROCESSING="$CB_DIR/whatsapp-buffer.jsonl.processing"
+WA_MESSAGES_FILE=""
+
+# Recover any leftover .processing file from a failed previous cycle
+if [ -f "$WA_PROCESSING" ] && [ ! -f "$WA_BUFFER" ]; then
+    WA_MESSAGES_FILE="$WA_PROCESSING"
+elif [ -f "$WA_PROCESSING" ] && [ -f "$WA_BUFFER" ]; then
+    cat "$WA_PROCESSING" "$WA_BUFFER" > "$WA_PROCESSING.merged"
+    mv "$WA_PROCESSING.merged" "$WA_PROCESSING"
+    rm -f "$WA_BUFFER"
+    WA_MESSAGES_FILE="$WA_PROCESSING"
+elif mv "$WA_BUFFER" "$WA_PROCESSING" 2>/dev/null; then
+    WA_MESSAGES_FILE="$WA_PROCESSING"
+fi
+
+# Parse JSONL to JSON array via temp file (avoids ARG_MAX limits)
+WA_JSON_TMP=""
+if [ -n "$WA_MESSAGES_FILE" ] && [ -s "$WA_MESSAGES_FILE" ]; then
+    WA_JSON_TMP="$CB_DIR/whatsapp-payload.json"
+    python3 -c "
+import sys, json
+lines = []
+for line in sys.stdin:
+    line = line.strip()
+    if line:
+        try:
+            lines.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+with open(sys.argv[1], 'w') as f:
+    json.dump(lines, f)
+" "$WA_JSON_TMP" < "$WA_MESSAGES_FILE"
+fi
+
 # --- Codex / Claude Code session detection ---
 CODEX_SESSION=""
 # Check for active Codex sessions (Codex stores sessions in ~/.codex/sessions/)
@@ -724,9 +760,15 @@ export CB_CALL_TYPE="$CALL_TYPE"
 export CB_FOCUS_MODE="$FOCUS_MODE"
 export CB_CALENDAR_EVENTS="$CALENDAR_EVENTS"
 export CB_IDLE_SECONDS="${idle_seconds:-0}"
+export CB_WHATSAPP_MESSAGES_FILE="${WA_JSON_TMP:-""}"
 
 PAYLOAD=$(python3 -c "
 import json, os
+wa_msgs = []
+wa_file = os.environ.get('CB_WHATSAPP_MESSAGES_FILE', '')
+if wa_file and os.path.exists(wa_file):
+    with open(wa_file) as f:
+        wa_msgs = json.load(f)
 data = {
     'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
     'app': os.environ.get('CB_APP', ''),
@@ -742,6 +784,7 @@ data = {
     'codex_session': os.environ.get('CB_CODEX_SESSION', ''),
     'codex_running': os.environ.get('CB_CODEX_RUNNING', 'false') == 'true',
     'whatsapp_context': os.environ.get('CB_WHATSAPP', ''),
+    'whatsapp_messages': wa_msgs,
     'notifications': os.environ.get('CB_NOTIFICATIONS', ''),
     'in_call': os.environ.get('CB_IN_CALL', 'false') == 'true',
     'call_app': os.environ.get('CB_CALL_APP', ''),
@@ -759,7 +802,10 @@ if [ -z "$PAYLOAD" ]; then
   exit 1
 fi
 
-send_payload "$PAYLOAD" || true
+if send_payload "$PAYLOAD"; then
+  # Clean up WhatsApp buffer files after successful send
+  rm -f "$WA_PROCESSING" "$WA_JSON_TMP"
+fi
 
 # --- Flush handoff outbox ---
 flush_handoff_outbox

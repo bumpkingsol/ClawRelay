@@ -4,7 +4,10 @@ import SwiftUI
 final class MenuBarViewModel: ObservableObject {
     @Published private(set) var snapshot: BridgeSnapshot = .placeholder
     @Published var dashboard: DashboardData?
+    @Published private(set) var whatsAppStatus: String = "Not installed"
+    @Published private(set) var whatsAppContacts: [WhatsAppStatusService.WhitelistContact] = []
     private let runner: BridgeCommandRunner
+    private let waService = WhatsAppStatusService()
     private var refreshTimer: RefreshTimer?
 
     init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
@@ -18,6 +21,26 @@ final class MenuBarViewModel: ObservableObject {
     func refresh() {
         snapshot = runner.fetchStatus()
         fetchDashboard()
+        refreshWhatsApp()
+    }
+
+    private func refreshWhatsApp() {
+        whatsAppStatus = waService.displayStatus
+        whatsAppContacts = waService.fetchWhitelistContacts()
+    }
+
+    func relinkWhatsApp() {
+        let command = "\(NSHomeDirectory())/.context-bridge/bin/claw-whatsapp --auth"
+        let script = NSAppleScript(source: "tell application \"Terminal\" to do script \"\(command)\"")
+        script?.executeAndReturnError(nil)
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+    }
+
+    func addWhatsAppContact() {
+        let command = "\(NSHomeDirectory())/.context-bridge/bin/claw-whatsapp --setup"
+        let script = NSAppleScript(source: "tell application \"Terminal\" to do script \"\(command)\"")
+        script?.executeAndReturnError(nil)
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
     }
 
     func fetchDashboard() {

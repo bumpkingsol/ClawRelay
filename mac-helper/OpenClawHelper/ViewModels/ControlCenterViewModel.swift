@@ -127,6 +127,10 @@ final class ControlCenterViewModel: ObservableObject {
             ("Daemon errors", "/tmp/context-bridge-error.log"),
             ("Watcher log", "/tmp/context-bridge-fswatch.log"),
             ("Watcher errors", "/tmp/context-bridge-fswatch-error.log"),
+            ("WhatsApp log", "/tmp/claw-whatsapp.log"),
+            ("WhatsApp errors", "/tmp/claw-whatsapp-error.log"),
+            ("WhatsApp health", "\(home)/.context-bridge/whatsapp-health.json"),
+            ("Privacy rules", "\(home)/.context-bridge/privacy-rules.json"),
         ]
     }
 }

@@ -61,7 +61,7 @@ mac-helper/claw-meeting/
 
 **Files:**
 - Create: `mac-helper/claw-meeting/Package.swift`
-- Create: `mac-helper/claw-meeting/Sources/ClawMeeting/main.swift`
+- Create: `mac-helper/claw-meeting/Sources/ClawMeeting/ClawMeeting.swift`
 - Create: `mac-helper/claw-meeting/Sources/ClawMeeting/Config.swift`
 - Create: `mac-helper/claw-meeting/Tests/ClawMeetingTests/ConfigTests.swift`
 
@@ -856,18 +856,19 @@ final class SocketServer {
                           userInfo: [NSLocalizedDescriptionKey: "Failed to create socket"])
         }
 
+        // Verify path fits in sockaddr_un.sun_path (104 bytes on macOS)
+        guard path.utf8.count < 104 else {
+            close(fileDescriptor)
+            throw NSError(domain: "SocketServer", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "Socket path too long (\(path.utf8.count) bytes, max 103)"])
+        }
+
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
             path.withCString { cstr in
                 _ = memcpy(ptr, cstr, min(Int(MemoryLayout.size(ofValue: addr.sun_path)), path.count + 1))
             }
-        }
-
-        // Verify path fits in sockaddr_un.sun_path (104 bytes on macOS)
-        guard path.utf8.count < 104 else {
-            throw NSError(domain: "SocketServer", code: 3,
-                          userInfo: [NSLocalizedDescriptionKey: "Socket path too long (\(path.utf8.count) bytes, max 103)"])
         }
 
         let bindResult = withUnsafePointer(to: &addr) { ptr in

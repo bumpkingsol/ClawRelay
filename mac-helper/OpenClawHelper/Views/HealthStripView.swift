@@ -8,6 +8,9 @@ struct HealthStripView: View {
             healthItem("Queue", value: "\(snapshot.queueDepth)", warn: snapshot.queueDepth > 10)
             healthItem("Daemon", value: snapshot.daemonLaunchdState, warn: snapshot.daemonLaunchdState != "loaded")
             healthItem("Watcher", value: snapshot.watcherLaunchdState, warn: snapshot.watcherLaunchdState != "loaded")
+            if let waState = snapshot.whatsappLaunchdState {
+                healthItem("WhatsApp", value: waState, warn: waState != "loaded")
+            }
         }
         .font(.caption2)
         .padding(.vertical, 6)

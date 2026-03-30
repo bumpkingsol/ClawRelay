@@ -44,6 +44,9 @@ struct MenuBarPopoverView: View {
 
             HealthStripView(snapshot: viewModel.snapshot)
             QuickActionsGrid(viewModel: viewModel)
+
+            WhatsAppSectionView(viewModel: viewModel)
+
             Divider()
 
             // Quick handoff

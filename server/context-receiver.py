@@ -109,6 +109,10 @@ def init_db():
             seen INTEGER DEFAULT 0
         )
     """)
+    try:
+        db.execute("ALTER TABLE activity_stream ADD COLUMN whatsapp_messages TEXT")
+    except Exception:
+        pass  # Column already exists
     db.commit()
     db.execute("UPDATE activity_stream SET clipboard = NULL WHERE clipboard IS NOT NULL")
     scrub_raw_payloads(db)
@@ -204,6 +208,7 @@ def sanitize_activity_payload(data):
     sanitized['call_type'] = str(data.get('call_type', ''))[:20]
     sanitized['focus_mode'] = data.get('focus_mode') or None
     sanitized['calendar_events'] = data.get('calendar_events', '')
+    sanitized['whatsapp_messages'] = json.dumps(data.get('whatsapp_messages', [])) if data.get('whatsapp_messages') else None
 
     return sanitized
 
@@ -222,6 +227,14 @@ def push_activity():
 
     sanitized = sanitize_activity_payload(data)
 
+    log_safe = dict(sanitized)
+    if log_safe.get('whatsapp_messages'):
+        try:
+            msgs = json.loads(log_safe['whatsapp_messages'])
+            log_safe['whatsapp_messages'] = f"[{len(msgs)} messages]"
+        except Exception:
+            pass
+
     db = get_db()
     db.execute("""
         INSERT INTO activity_stream
@@ -229,8 +242,8 @@ def push_activity():
          terminal_cmds, notifications, all_tabs, clipboard, clipboard_changed, file_changes,
          codex_session, codex_running, whatsapp_context,
          idle_state, idle_seconds, in_call, call_app, call_type, focus_mode, calendar_events,
-         raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         whatsapp_messages, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         sanitized['ts'],
         sanitized['app'],
@@ -255,6 +268,7 @@ def push_activity():
         sanitized.get('call_type', ''),
         sanitized.get('focus_mode'),
         sanitized.get('calendar_events', ''),
+        sanitized.get('whatsapp_messages'),
         json.dumps(sanitized)
     ))
     db.commit()

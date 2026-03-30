@@ -15,8 +15,8 @@ The Context Bridge has four layers:
 ┌─────────────────────────┴───────────────────────────┐
 │                    LAYER 3                           │
 │              Mutual Visibility                       │
-│    Jonas sees JC's work via Telegram                 │
-│    JC sees Jonas's work via activity stream          │
+│    The operator sees the agent's work via Telegram   │
+│    The agent sees the operator's work via stream     │
 └─────────────────────────┬───────────────────────────┘
                           │ reads
 ┌─────────────────────────┴───────────────────────────┐
@@ -51,7 +51,7 @@ Native SwiftUI menu bar app that observes, controls, and repairs the local captu
 | Mode | What happens | Use when |
 |------|-------------|----------|
 | **Pause** | Stops all local context generation. No shell commands, file changes, or window info is captured. The daemon does nothing until resumed. | You want complete privacy. Personal calls, sensitive meetings, off-the-clock hours. |
-| **Sensitive** | Keeps the system operational but reduces capture to minimal heartbeat payloads. Shell commands and git commits still flow; window titles and URLs are suppressed. | You're working on something confidential but still want JC to know you're active on a project. |
+| **Sensitive** | Keeps the system operational but reduces capture to minimal heartbeat payloads. Shell commands and git commits still flow; window titles and URLs are suppressed. | You're working on something confidential but still want the agent to know you're active on a project. |
 
 Both modes can be activated from the menu bar popover or the Privacy tab in the Control Center.
 
@@ -74,7 +74,7 @@ A bash script running every 2 minutes via macOS `launchd`. Captures:
 
 ### Browser Coverage
 
-Chrome only. Jonas does not use Safari or other browsers.
+Chrome only. The operator does not use Safari or other browsers.
 
 ### Transport
 
@@ -85,7 +85,7 @@ Mac daemon → HTTPS POST → Server receiver
              Self-signed TLS (upgradeable to Let's Encrypt)
 ```
 
-No IP allowlisting - Jonas is nomadic, changes networks frequently. Security is token-based.
+No IP allowlisting - the operator is nomadic, changes networks frequently. Security is token-based.
 
 ### Offline Handling
 
@@ -119,7 +119,7 @@ File permissions: `600` (owner only). Not in any git-tracked directory.
 | `away` | Idle > 30 min | Minimal payload |
 | `locked` | Screen locked | Minimal payload |
 
-Prevents: "Jonas left Cursor open on Project Gamma and went to dinner → JC thinks he's still coding for 3 hours."
+Prevents: "The operator left Cursor open on Project Gamma and went to dinner, the agent thinks they're still coding for 3 hours."
 
 ## Layer 2: Intelligence (Digest Processor)
 
@@ -131,7 +131,7 @@ Runs 3x daily as a cron job. Transforms raw captures into structured operational
 
 1. **Extract** - Query raw stream for last 8 hours
 2. **Classify** - Group captures by project (keyword matching against known project identifiers)
-3. **Enrich** - For each Google Doc/Slides/Sheet URL found: JC reads content via `gog` CLI tools (NOT the daemon)
+3. **Enrich** - For each Google Doc/Slides/Sheet URL found: the agent reads content via `gog` CLI tools (NOT the daemon)
 4. **Enrich** - For each git repo with activity: read recent commit diffs from local clones
 5. **Compare** - Diff against previous digest to detect: new work, continued work, dropped work
 6. **Synthesize** - Write structured markdown summary
@@ -161,7 +161,7 @@ Commits: [2] Fixed doctor approval notification, Started RPC refactor
 
 ### Synthesis Approach
 
-The digest processor generates rich, structured markdown directly from mechanical extraction — no LLM synthesis step is used during digest generation. JC reads the digest directly and applies its own reasoning to interpret context, detect patterns, and make decisions. This reduces cost, latency, and failure surface while giving JC full interpretive control over the raw evidence. The `context-query.py` CLI provides pre-computed views (status, neglected, since) that JC can call before any autonomous action without reading the full digest.
+The digest processor generates rich, structured markdown directly from mechanical extraction — no LLM synthesis step is used during digest generation. The agent reads the digest directly and applies its own reasoning to interpret context, detect patterns, and make decisions. This reduces cost, latency, and failure surface while giving the agent full interpretive control over the raw evidence. The `context-query.py` CLI provides pre-computed views (status, neglected, since) that the agent can call before any autonomous action without reading the full digest.
 
 ### Model Budget
 
@@ -169,7 +169,7 @@ The digest processor generates rich, structured markdown directly from mechanica
 |-------|-------|----------|
 | Mechanical extraction | Rule-based Python | $0 |
 | Google Doc reading | `gog` CLI (no model) | $0 |
-| Synthesis | JC interprets digest directly | $0 |
+| Synthesis | The agent interprets digest directly | $0 |
 | **Total per digest** | | **~$0** |
 | **Daily (3 runs)** | | **~$0** |
 
@@ -190,16 +190,16 @@ Known projects and their keyword identifiers:
 
 ## Layer 3: Mutual Visibility
 
-### Jonas → JC (this system)
+### Operator → Agent (this system)
 
-Activity stream + digests give JC real-time and historical visibility into Jonas's work.
+Activity stream + digests give the agent real-time and historical visibility into the operator's work.
 
-### JC → Jonas (Telegram)
+### Agent → Operator (Telegram)
 
-JC posts one-line status updates to the Telegram group when:
-- Starting autonomous work: `🔧 Starting: Project Alpha lead gen from Apollo`
-- Completing work: `✅ Done: 25 leads pulled, sequences in Instantly`
-- Hitting a blocker: `❓ Project Gamma P0 #6: v1/v2 mismatch - should I migrate?`
+The agent posts one-line status updates to the Telegram group when:
+- Starting autonomous work
+- Completing work
+- Hitting a blocker
 
 ### Handoff Protocol
 
@@ -208,13 +208,13 @@ Explicit task transfer via Telegram message:
 /handoff project-gamma p0-6
 ```
 
-JC acknowledges and takes over. Optional - JC should also infer handoffs from activity patterns (e.g., Jonas stopped touching a project 2+ hours ago).
+The agent acknowledges and takes over. Optional - the agent should also infer handoffs from activity patterns (e.g., the operator stopped touching a project 2+ hours ago).
 
 ## Git Commit Hooks
 
-Post-commit hooks installed on all repos on Jonas's Mac. On each commit:
+Post-commit hooks installed on all repos on the operator's Mac. On each commit:
 - Extracts: repo name, branch, commit message, diff stat
-- Filters: only Jonas's commits (by author name)
+- Filters: only the operator's commits (by author name)
 - Pushes to server: `POST /context/commit`
 - Runs async (background) - doesn't slow down git
 
@@ -223,16 +223,16 @@ Post-commit hooks installed on all repos on Jonas's Mac. On each commit:
 ### Data Flow
 
 ```
-Jonas MacBook → (HTTPS + Bearer token) → Hetzner Server
-                                          ↓
-                                     SQLite (600 perms)
-                                          ↓
-                                     JC reads via Python
-                                          ↓
-                                     Anthropic API (inference)
+Operator's MacBook → (HTTPS + Bearer token) → VPS Server
+                                                ↓
+                                           SQLite (600 perms)
+                                                ↓
+                                           Agent reads via Python
+                                                ↓
+                                           Anthropic API (inference)
 ```
 
-No third-party services. No cloud storage. No external APIs except Anthropic (same trust boundary as all other JC operations).
+No third-party services. No cloud storage. No external APIs except Anthropic (same trust boundary as all other agent operations).
 
 ### Sensitive Data Filtering
 

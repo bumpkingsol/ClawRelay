@@ -59,7 +59,7 @@ Native macOS menu bar app for controlling the Context Bridge capture pipeline.
 3. On first launch: right-click > Open (unsigned app)
 EOF
 )"
-  echo "Release published: https://github.com/clawrelay-org/openclaw-computer-vision/releases/tag/v${VERSION}"
+  echo "Release published: https://github.com/<your-org>/openclaw-computer-vision/releases/tag/v${VERSION}"
 else
   echo ""
   echo "To publish: bash scripts/build-release.sh --publish"

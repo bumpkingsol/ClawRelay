@@ -2,19 +2,19 @@
 
 **This file tells you exactly what to do. Follow it step by step. Do not skip steps.**
 
-If you are an LLM / coding agent setting this up for Jonas: read this entire file first, then execute each section in order. Every command is provided. Every file path is absolute. Every credential is referenced by location, not value.
+If you are an LLM / coding agent setting this up: read this entire file first, then execute each section in order. Every command is provided. Every file path is absolute. Every credential is referenced by location, not value.
 
 ---
 
 ## Prerequisites
 
-### Server (Hetzner - already running)
-- Ubuntu Linux (admin user)
+### Server (VPS - already running)
+- Ubuntu Linux
 - Python 3.10+
 - Flask + Gunicorn installed
 - Repo cloned at: `/home/user/clawrelay/openclaw-computer-vision/`
 
-### Mac (Jonas's MacBook)
+### Mac (Operator's MacBook)
 - macOS (Apple Silicon)
 - Homebrew installed
 - Chrome browser
@@ -24,7 +24,7 @@ If you are an LLM / coding agent setting this up for Jonas: read this entire fil
 
 ## Part 1: Server Setup
 
-The server receives activity data from Jonas's Mac and stores it for JC to read.
+The server receives activity data from the operator's Mac and stores it for the agent to read.
 
 ### 1.1 Verify repo is cloned
 
@@ -35,7 +35,7 @@ ls /home/user/clawrelay/openclaw-computer-vision/server/context-receiver.py
 If not found:
 ```bash
 cd /home/user/clawrelay
-GIT_SSH_COMMAND="ssh -i ~/.ssh/github_clawrelay-org" git clone git@github-clawrelay-org:clawrelay-org/openclaw-computer-vision.git
+git clone <your-repo-url> openclaw-computer-vision
 ```
 
 ### 1.2 Install Python dependencies
@@ -177,7 +177,7 @@ sudo ufw allow 7890/tcp
 
 ## Part 2: Mac Setup
 
-**This part runs on Jonas's MacBook.** If you're an agent on the server, provide these instructions to Jonas.
+**This part runs on the operator's MacBook.** If you're an agent on the server, provide these instructions to the operator.
 
 ### 2.1 Get server details
 
@@ -190,7 +190,7 @@ You need two things from the server:
 
 ```bash
 cd ~
-git clone git@github.com:clawrelay-org/openclaw-computer-vision.git
+git clone <your-repo-url> openclaw-computer-vision
 ```
 
 ### 2.3 Install fswatch

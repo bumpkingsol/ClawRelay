@@ -21,11 +21,11 @@ struct MenuBarPopoverView: View {
                         .font(.caption)
 
                     if let active = dash.jcActivity.first(where: { $0.status == "in-progress" }) {
-                        Text("JC: \(active.project)")
+                        Text("Agent: \(active.project)")
                             .font(.caption)
                             .foregroundStyle(.blue)
                     } else {
-                        Text("JC: idle")
+                        Text("Agent: idle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -67,7 +67,7 @@ struct MenuBarPopoverView: View {
                     .frame(width: 20)
                 }
                 HStack(spacing: 8) {
-                    TextField("What should JC do?", text: $viewModel.handoffTask)
+                    TextField("What should the agent do?", text: $viewModel.handoffTask)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
                             if !viewModel.handoffTask.isEmpty {

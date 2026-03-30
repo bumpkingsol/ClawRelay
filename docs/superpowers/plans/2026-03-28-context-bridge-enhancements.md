@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the context bridge deliver actionable intelligence to JC by fixing bugs, enriching the digest with all captured signals, adding new daemon signals, and wiring JC's pre-action context checks.
+**Goal:** Make the context bridge deliver actionable intelligence to the agent by fixing bugs, enriching the digest with all captured signals, adding new daemon signals, and wiring the agent's pre-action context checks.
 
-**Architecture:** Three-phase bottom-up approach. Phase 1 fixes the data foundation (notification bug, digest enrichment, cross-digest comparison). Phase 2 adds new daemon-side signals (meeting detection, Focus mode, calendar). Phase 3 wires JC integration (new query commands, staleness watchdog, pre-action pattern docs).
+**Architecture:** Three-phase bottom-up approach. Phase 1 fixes the data foundation (notification bug, digest enrichment, cross-digest comparison). Phase 2 adds new daemon-side signals (meeting detection, Focus mode, calendar). Phase 3 wires the agent integration (new query commands, staleness watchdog, pre-action pattern docs).
 
 **Tech Stack:** Bash (daemon), Python 3 / Flask / SQLite (server), AppleScript (macOS queries)
 
@@ -49,7 +49,7 @@ PORTFOLIO_PROJECTS = {
     'project-gamma': ['project-gamma'],
     'project-alpha': ['project-alpha'],
     'project-delta': ['project-delta'],
-    'project-beta': ['project-beta', 'jsvcapital'],
+    'project-beta': ['project-beta', 'project-beta'],
     'openclaw': ['openclaw-computer-vision', 'openclaw-macos-helper', 'clawd'],
 }
 
@@ -921,7 +921,7 @@ git commit -m "feat: add opt-in calendar awareness to daemon"
 
 ---
 
-## Phase 3: JC Integration
+## Phase 3: the agent Integration
 
 ### Task 9: Add `status`, `since`, and `neglected` commands to context-query
 
@@ -934,7 +934,7 @@ Add after the existing `cmd_gaps()` function:
 
 ```python
 def cmd_status(args):
-    """One-shot pre-action summary for JC."""
+    """One-shot pre-action summary for the agent."""
     conn = get_db()
     # Latest activity
     row = conn.execute(
@@ -1133,7 +1133,7 @@ def cmd_neglected(args):
 In the argparse setup section (around line 204), add the subparser definitions:
 
 ```python
-sp_status = subparsers.add_parser('status', help='Pre-action summary for JC')
+sp_status = subparsers.add_parser('status', help='Pre-action summary for the agent')
 
 sp_since = subparsers.add_parser('since', help='Cross-digest diff for last N hours')
 sp_since.add_argument('hours', type=int, help='Hours to look back')
@@ -1225,7 +1225,7 @@ git commit -m "feat: add staleness watchdog cron script"
 
 ---
 
-### Task 11: Write JC integration guide
+### Task 11: Write the agent integration guide
 
 **Files:**
 - Create: `docs/jc-integration-guide.md`
@@ -1233,11 +1233,11 @@ git commit -m "feat: add staleness watchdog cron script"
 - [ ] **Step 1: Write the guide**
 
 ```markdown
-# JC Integration Guide — Context Bridge
+# the agent Integration Guide — Context Bridge
 
 ## Pre-Action Check
 
-Before any autonomous action, JC should run:
+Before any autonomous action, the agent should run:
 
     STATUS=$(python3 /home/user/clawrelay/context-query.py status)
 
@@ -1245,12 +1245,12 @@ Before any autonomous action, JC should run:
 
 | Condition | Action |
 |-----------|--------|
-| `current_project: X` and JC wants to work on X | **Don't.** Jonas is active on it. Pick another project. |
-| `in_call: True` | **Don't send Telegram.** Jonas is in a meeting. |
-| `focus_mode: <anything non-null>` | **Don't interrupt.** Jonas enabled Focus mode. |
-| `focus_level: scattered` | Good time to take things off Jonas's plate. |
+| `current_project: X` and the agent wants to work on X | **Don't.** the operator is active on it. Pick another project. |
+| `in_call: True` | **Don't send Telegram.** the operator is in a meeting. |
+| `focus_mode: <anything non-null>` | **Don't interrupt.** the operator enabled Focus mode. |
+| `focus_level: scattered` | Good time to take things off the operator's plate. |
 | `focus_level: focused` | Don't interrupt unless urgent. |
-| `idle_state: away` or `locked` | Jonas is away. Safe to work, but don't expect input. |
+| `idle_state: away` or `locked` | the operator is away. Safe to work, but don't expect input. |
 | `daemon_stale: True` | **Be conservative.** No recent data — you're operating blind. |
 
 ## Choosing What to Work On
@@ -1263,7 +1263,7 @@ Pick the project with the highest inactivity that has pending work.
 
     python3 /home/user/clawrelay/context-query.py since 8
 
-Shows new/continued/dropped work in the last 8 hours. Use this to detect abandoned work Jonas started but didn't finish.
+Shows new/continued/dropped work in the last 8 hours. Use this to detect abandoned work the operator started but didn't finish.
 
 ## Reading the Digest
 
@@ -1277,7 +1277,7 @@ Read it for full context: time allocation, project details, communication, AI se
 
 Digests are generated 3x daily at 10:00, 16:00, 23:00 CET.
 
-## Crontab Setup (JC's Server)
+## Crontab Setup (the agent's Server)
 
 ```cron
 # Context Bridge - staleness watchdog
@@ -1294,7 +1294,7 @@ Digests are generated 3x daily at 10:00, 16:00, 23:00 CET.
 
 ```bash
 git add docs/jc-integration-guide.md
-git commit -m "docs: add JC integration guide with pre-action check pattern"
+git commit -m "docs: add the agent integration guide with pre-action check pattern"
 ```
 
 ---
@@ -1307,7 +1307,7 @@ git commit -m "docs: add JC integration guide with pre-action check pattern"
 
 - [ ] **Step 1: Update ARCHITECTURE.md**
 
-Add a note in the digest section clarifying that LLM synthesis has been replaced by JC's direct interpretation of rich mechanical digests.
+Add a note in the digest section clarifying that LLM synthesis has been replaced by the agent's direct interpretation of rich mechanical digests.
 
 - [ ] **Step 2: Update ROADMAP.md**
 

@@ -5,7 +5,7 @@ Processes raw activity stream into structured daily summaries.
 Runs 3x daily via cron (10:00, 16:00, 23:00 CET).
 
 This is the intelligence layer - it turns raw captures into
-operational context JC can act on.
+operational context the agent can act on.
 """
 
 import os
@@ -109,7 +109,7 @@ def extract_doc_id(url):
 def read_google_doc_content(url):
     """Read a Google Doc/Slides/Sheet content via gog CLI.
     
-    This is JC's tool, NOT the daemon's. The daemon captures URLs,
+    This is the agent's tool, NOT the daemon's. The daemon captures URLs,
     this function reads the actual content during digest processing.
     """
     doc_id = extract_doc_id(url)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # OpenClaw Context Bridge - Server Setup
-# Run on Hetzner server as admin user
+# Run on VPS server
 
 set -euo pipefail
 umask 077
@@ -18,7 +18,7 @@ if [ "${1:-}" = "rotate-token" ]; then
   echo ""
   echo "Next steps:"
   echo "  1. Restart the service: sudo systemctl restart context-bridge"
-  echo "  2. On Jonas's Mac, update the Keychain:"
+  echo "  2. On the operator's Mac, update the Keychain:"
   echo "     security delete-generic-password -s context-bridge -a token 2>/dev/null"
   echo "     security add-generic-password -s context-bridge -a token -w \"$NEW_TOKEN\""
   exit 0
@@ -82,7 +82,7 @@ elif printf '%s' "$CERT_SUBJECT" | grep -q "O = OpenClaw"; then
   echo "  Copy the updated PEM to the Mac so curl can verify the server"
 else
   echo "[4/5] Existing TLS certificate kept (not an auto-generated OpenClaw cert)"
-  echo "  Ensure it matches the URL Jonas's Mac uses and export the issuing CA if needed"
+  echo "  Ensure it matches the URL the operator's Mac uses and export the issuing CA if needed"
 fi
 
 # 5. Install systemd service
@@ -100,6 +100,6 @@ echo "Server URL:     https://$SERVER_IP:7890"
 echo "Auth token:     stored in $ENV_FILE"
 echo "Server cert:    $CERT_DIR/context-bridge.pem"
 echo ""
-echo "Next: On Jonas's Mac, run:"
+echo "Next: On the operator's Mac, run:"
 echo "  bash mac-daemon/install.sh https://$SERVER_IP:7890/context/push /path/to/context-bridge.pem"
 echo "  The installer will prompt for the token securely if you do not pass it as an argument."

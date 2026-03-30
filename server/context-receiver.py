@@ -304,11 +304,11 @@ def push_commit():
 
 @app.route('/context/handoff', methods=['POST'])
 def handoff():
-    """Receive explicit task handoff from Jonas.
-    
-    Jonas sends: /handoff project-gamma p0-6
+    """Receive explicit task handoff from the operator.
+
+    The operator sends: /handoff project-gamma p0-6
     Telegram bot (or direct POST) converts to API call.
-    JC reads handoffs and picks up the task.
+    The agent reads handoffs and picks up the task.
     """
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
@@ -387,7 +387,7 @@ def list_handoffs():
 
 @app.route('/context/handoffs/<int:handoff_id>', methods=['PATCH'])
 def update_handoff(handoff_id):
-    """JC updates handoff status."""
+    """The agent updates handoff status."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
 
@@ -470,7 +470,7 @@ def health():
 
 @app.route('/context/jc-work-log', methods=['GET'])
 def jc_work_log():
-    """JC's work log - readable by ClawRelay app."""
+    """Agent work log - readable by ClawRelay app."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
     
@@ -508,13 +508,13 @@ def jc_work_log():
         
         return jsonify({'entries': entries, 'total': len(entries)})
     except Exception:
-        logger.exception("JC work log query failed")
+        logger.exception("Agent work log query failed")
         return jsonify({'error': 'internal error'}), 500
 
 
 @app.route('/context/jc-question', methods=['POST'])
 def post_jc_question():
-    """JC posts a question for Jonas."""
+    """The agent posts a question for the operator."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
     data, error = parse_json_request()
@@ -533,7 +533,7 @@ def post_jc_question():
 
 @app.route('/context/jc-question/<int:qid>', methods=['PATCH'])
 def mark_jc_question(qid):
-    """ClawRelay marks a question as seen."""
+    """ClawRelay marks a question as seen by the operator."""
     if not verify_auth(request):
         return jsonify({'error': 'unauthorized'}), 401
     db = get_db()
@@ -702,7 +702,7 @@ def dashboard():
             neglected.append({'project': p, 'days': days})
         neglected.sort(key=lambda x: -x['days'])
 
-        # --- JC activity ---
+        # --- Agent activity ---
         jc_activity = []
         try:
             tables = [list(r.values())[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
@@ -746,7 +746,7 @@ def dashboard():
         except Exception:
             pass
 
-        # --- JC Questions (unseen) ---
+        # --- Agent Questions (unseen) ---
         jc_questions = []
         try:
             tables = [list(r.values())[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]

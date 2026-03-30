@@ -1,6 +1,6 @@
 # Server Deployment Checklist
 
-Everything here must be done on the Hetzner VPS (`ssh admin@<server>`). These are tasks that cannot be performed from Jonas's Mac.
+Everything here must be done on the VPS (`ssh user@<server>`). These are tasks that cannot be performed from the operator's Mac.
 
 ## 1. Pull latest code
 
@@ -46,14 +46,14 @@ curl -sk https://localhost:7890/context/health -H "Authorization: Bearer $TOKEN"
 
 Expected: `{"status": "ok", "db_encrypted": true, ...}`
 
-## 6. Copy the TLS cert to Jonas's Mac
+## 6. Copy the TLS cert to the operator's Mac
 
 From the server, display the cert:
 ```bash
 cat /home/user/clawrelay/data/certs/context-bridge.pem
 ```
 
-On Jonas's Mac, save it:
+On the operator's Mac, save it:
 ```bash
 # Paste the cert content into this file:
 nano ~/.context-bridge/server-ca.pem
@@ -62,7 +62,7 @@ chmod 600 ~/.context-bridge/server-ca.pem
 
 ## 7. Switch Mac daemon to HTTPS
 
-On Jonas's Mac:
+On the operator's Mac:
 ```bash
 # Update the server URL
 echo "https://<TAILSCALE_IP>:7890/context/push" > ~/.context-bridge/server-url
@@ -133,7 +133,7 @@ bash server/setup-server.sh rotate-token
 sudo systemctl restart context-bridge
 ```
 
-On Jonas's Mac (using the token printed by the command above):
+On the operator's Mac (using the token printed by the command above):
 ```bash
 security delete-generic-password -s "context-bridge" -a "token" 2>/dev/null
 security add-generic-password -s "context-bridge" -a "token" -w "NEW_TOKEN_HERE"

@@ -60,7 +60,7 @@ final class DashboardViewModel: ObservableObject {
                (handoff.status == "in-progress" || handoff.status == "done") {
                 let verb = handoff.status == "done" ? "completed" : "started"
                 NotificationService.shared.send(
-                    title: "JC \(verb): \(handoff.task)",
+                    title: "Agent \(verb): \(handoff.task)",
                     body: handoff.project.capitalized
                 )
             }
@@ -85,11 +85,11 @@ final class DashboardViewModel: ObservableObject {
             }
         }
 
-        // 3. JC questions
+        // 3. Agent questions
         if let questions = newData.jcQuestions {
             for q in questions {
                 NotificationService.shared.send(
-                    title: "JC asks about \(q.project ?? "general")",
+                    title: "Agent asks about \(q.project ?? "general")",
                     body: q.question
                 )
                 let capturedRunner = runner

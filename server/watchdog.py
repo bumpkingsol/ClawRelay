@@ -40,7 +40,7 @@ def check():
     age_minutes = (datetime.now(timezone.utc) - latest_dt).total_seconds() / 60
     idle_state = latest['idle_state']
     
-    # If Jonas is idle/away/locked, no alert needed
+    # If the operator is idle/away/locked, no alert needed
     if idle_state in ('idle', 'away', 'locked'):
         return {
             'status': 'ok',

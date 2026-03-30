@@ -1,22 +1,22 @@
 # Context Bridge - Design Document
 
 **Date:** 2026-03-27
-**Status:** DESIGN (brainstormed with Jonas)
-**Purpose:** Give JC real-time visibility into Jonas's work activity so autonomous actions don't duplicate or conflict with what Jonas is already doing.
+**Status:** DESIGN (brainstormed with the operator)
+**Purpose:** Give the agent real-time visibility into the operator's work activity so autonomous actions don't duplicate or conflict with what the operator is already doing.
 
 ---
 
 ## Problem Statement
 
-JC has deep business context but zero operational visibility. He doesn't know what Jonas is working on right now, what's half-finished, or what was completed today. This leads to:
-- Duplicated work (regenerating Cegid PDFs that already exist)
-- Follow-up emails for conversations Jonas already handled
+The agent has deep business context but zero operational visibility. It doesn't know what the operator is working on right now, what's half-finished, or what was completed today. This leads to:
+- Duplicated work (regenerating proposals that already exist)
+- Follow-up emails for conversations the operator already handled
 - Meeting prep for bus tickets
-- Inability to work on "everything else" because he doesn't know what "this" is
+- Inability to work on "everything else" because it doesn't know what "this" is
 
 ## Design Principles
 
-1. **Mac-only capture** - Jonas works exclusively on MacBook
+1. **Mac-only capture** - The operator works exclusively on MacBook
 2. **Server-to-server only** - no third-party services, no cloud storage, no external APIs
 3. **Raw data is ephemeral** - purged after 48 hours
 4. **Intelligence persists** - daily structured summaries survive indefinitely
@@ -27,7 +27,7 @@ JC has deep business context but zero operational visibility. He doesn't know wh
 ## Architecture
 
 ```
-Jonas MacBook                          Hetzner Server (admin)
+Operator's MacBook                     VPS Server
 ┌─────────────────┐                    ┌─────────────────────┐
 │ Context Daemon   │───HTTPS/SSH──────>│ Context Receiver     │
 │ (launchd)        │   every 2-3 min   │ (API endpoint)       │
@@ -36,7 +36,7 @@ Jonas MacBook                          Hetzner Server (admin)
 │ - Active app     │                    │ - SQLite DB (raw)    │
 │ - Window title   │                    │ - 48h retention      │
 │ - URLs (Chrome)  │                    │                      │
-│ - File paths     │                    │ JC reads DB          │
+│ - File paths     │                    │ Agent reads DB       │
 │ - Git branch     │                    │ before autonomous    │
 │ - Terminal cmds  │                    │ actions              │
 │ - Notifications  │                    │                      │
@@ -63,7 +63,7 @@ Jonas MacBook                          Hetzner Server (admin)
 | File paths (editors) | Parse from window title string (Electron apps like Cursor show `filename - folder - Cursor`) | `notificationService.ts - project-gamma - Cursor` |
 | Git branch | Shell: `git branch --show-current` in directory inferred from window title | `main`, `codex/launch-readiness` |
 | Terminal commands | `.zshrc` PROMPT_COMMAND hook (NOT history tail - history only writes on shell exit) | `npm run build`, `git push` |
-| macOS notifications | Notification center API | `Telegram: a business partner: Hey about the Cegid...` |
+| macOS notifications | Notification center API | `Telegram: Contact: Hey about the proposal...` |
 | Idle state | Screen lock / idle time via `ioreg` or CGEventSource | `idle_since: 2026-03-27T19:30:00Z` |
 
 ### Electron App File Path Strategy
@@ -107,21 +107,21 @@ These are one-time grants in System Preferences > Privacy & Security.
 ### Terminal Command Filtering
 
 Capture command lines but redact:
-- `export.*KEY=` → `export [REDACTED_KEY]`
-- `curl.*-H.*Bearer` → `curl [REDACTED_AUTH]`
+- `export.*KEY=` -> `export [REDACTED_KEY]`
+- `curl.*-H.*Bearer` -> `curl [REDACTED_AUTH]`
 - Any line containing `password`, `secret`, `token` in assignment context
 
 ### WhatsApp Desktop
 
 WhatsApp desktop app is a native macOS app. Capture approach:
-- Window title shows active chat name: `WhatsApp - a business partner` or `WhatsApp - Lulu`
+- Window title shows active chat name: `WhatsApp - Contact Name`
 - Notification content (if enabled in macOS) gives message previews
 - Cannot read full message history - only what surfaces via window title + notifications
-- Accept this as partial visibility. If a critical WhatsApp conversation needs JC context, Jonas forwards to Telegram.
+- Accept this as partial visibility. If a critical WhatsApp conversation needs agent context, the operator forwards to Telegram.
 
 ### Idle Detection
 
-Detect when Jonas is away from the Mac to avoid misinterpreting stale window state as active work.
+Detect when the operator is away from the Mac to avoid misinterpreting stale window state as active work.
 
 Method: `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'` returns seconds since last input event.
 
@@ -131,7 +131,7 @@ Rules:
 - Screen locked (`CGSessionCopyCurrentDictionary` shows `CGSSessionScreenIsLocked`): mark as `locked`
 - Resume from idle: capture immediately on first input
 
-This prevents: "Jonas left Cursor open on Project Gamma and went to dinner, JC thinks he's still coding Project Gamma for 3 hours."
+This prevents: "The operator left Cursor open on Project Gamma and went to dinner, the agent thinks they're still coding for 3 hours."
 
 ### Offline Handling
 
@@ -145,7 +145,7 @@ If the Mac can't reach the server (airplane mode, no wifi, VPN down):
 
 - HTTPS POST to server endpoint
 - Authenticated with strong pre-shared Bearer token (stored in macOS Keychain on Mac, `.env` on server)
-- **No IP restriction** - Jonas is nomadic, IP changes constantly. Authentication via token is sufficient.
+- **No IP restriction** - the operator is nomadic, IP changes constantly. Authentication via token is sufficient.
 - Alternative: mutual TLS with client certificate for additional security
 - Payload: JSON with timestamp, app, title, url, filepath, git_branch, terminal_cmd, notification, idle_state
 - Endpoint: `https://<server-ip>:PORT/context/push`
@@ -164,13 +164,13 @@ If the Mac can't reach the server (airplane mode, no wifi, VPN down):
 
 ### Trigger
 
-Runs three times daily (10:00, 16:00, 23:00 CET) as a cron job. Three times because Jonas context-switches frequently - twice daily would miss mid-day pivots.
+Runs three times daily (10:00, 16:00, 23:00 CET) as a cron job. Three times because the operator context-switches frequently - twice daily would miss mid-day pivots.
 
 ### Model Budget
 
 The digest job has two phases with different compute requirements:
-1. **Mechanical extraction** (cheap): query DB, group by project, extract URLs/paths, fetch git diffs → MiniMax M2.7
-2. **Synthesis** (reasoning): interpret what Jonas was doing, what's finished vs abandoned, what JC should pick up → Sonnet 4.6
+1. **Mechanical extraction** (cheap): query DB, group by project, extract URLs/paths, fetch git diffs
+2. **Synthesis** (reasoning): interpret what the operator was doing, what's finished vs abandoned, what the agent should pick up
 
 Total estimated cost per digest run: ~$0.10-0.30. Three runs/day = ~$1/day max.
 
@@ -221,38 +221,38 @@ Saved to `memory/activity-digest/YYYY-MM-DD.md`:
 - No email activity detected
 ```
 
-### How JC Uses This
+### How the Agent Uses This
 
-Before any autonomous action, JC checks:
-1. **Real-time stream** (what is Jonas doing RIGHT NOW?) → don't touch that workstream
-2. **Latest digest** (what did Jonas do today/yesterday?) → pick up unfinished work or work on neglected areas
-3. **Digest history** (what's been untouched for days?) → flag or act on abandoned tasks
+Before any autonomous action, the agent checks:
+1. **Real-time stream** (what is the operator doing RIGHT NOW?) -> don't touch that workstream
+2. **Latest digest** (what did the operator do today/yesterday?) -> pick up unfinished work or work on neglected areas
+3. **Digest history** (what's been untouched for days?) -> flag or act on abandoned tasks
 
 ---
 
-## Layer 3: JC Status Visibility (Jonas → JC transparency)
+## Layer 3: Agent Status Visibility (Operator <-> Agent transparency)
 
 ### Telegram Group Updates
 
-JC posts to the main Telegram group topic when:
-- Starting a significant autonomous task: `🔧 Starting: Project Alpha lead generation from Apollo`
-- Completing something: `✅ Done: 25 qualified leads pulled, sequences drafted in Instantly`
-- Hitting a blocker or question: `❓ Project Gamma P0 #6: clarification RPC has a version mismatch between v1/v2. Should I migrate to v2 or keep both?`
+The agent posts to the main Telegram group topic when:
+- Starting a significant autonomous task
+- Completing something
+- Hitting a blocker or question
 
 Format: one-line, emoji prefix, no essays.
 
-Jonas reads when he wants, responds when he wants. No urgency implied.
+The operator reads when they want, responds when they want. No urgency implied.
 
 ### Handoff Command
 
-For explicit task handoffs, Jonas can send a quick message:
+For explicit task handoffs, the operator can send a quick message:
 ```
 /handoff project-gamma p0-6
 ```
 
-JC interprets this as: "I'm done working on this, pick it up." JC acknowledges with a one-liner and takes over.
+The agent interprets this as: "I'm done working on this, pick it up." The agent acknowledges with a one-liner and takes over.
 
-This is optional - JC should infer handoffs from the activity stream when possible (e.g., Jonas stopped touching Project Gamma 2 hours ago and switched to Project Delta). But explicit handoffs remove ambiguity for critical tasks.
+This is optional - the agent should infer handoffs from the activity stream when possible (e.g., the operator stopped touching Project Gamma 2 hours ago and switched to Project Delta). But explicit handoffs remove ambiguity for critical tasks.
 
 ---
 
@@ -260,11 +260,7 @@ This is optional - JC should infer handoffs from the activity stream when possib
 
 ### Installation
 
-Add post-commit hooks to all repos on Jonas's Mac:
-- `~/project-gamma/.git/hooks/post-commit`
-- `~/jsvcapital/.git/hooks/post-commit`
-- `~/project-alpha/.git/hooks/post-commit`
-- Any other active repos
+Add post-commit hooks to all repos on the operator's Mac.
 
 ### Hook Content
 
@@ -277,8 +273,8 @@ MSG=$(git log -1 --pretty=%s)
 DIFF_STAT=$(git diff --stat HEAD~1 2>/dev/null || echo "initial commit")
 AUTHOR=$(git log -1 --pretty=%an)
 
-# Only capture Jonas's commits
-if [[ "$AUTHOR" != *"Jonas"* && "$AUTHOR" != *"jonas"* && "$AUTHOR" != *"clawrelay-org"* ]]; then
+# Only capture the operator's commits (configure your name here)
+if [[ "$AUTHOR" != *"<your-name>"* ]]; then
   exit 0
 fi
 
@@ -315,7 +311,7 @@ curl -sf -X POST "https://<server>/context/commit" \
 
 - HTTPS with TLS 1.3 to server endpoint
 - Authenticated with strong pre-shared Bearer token (stored in macOS Keychain on Mac side, `.env` on server side)
-- **No IP allowlisting** - Jonas is nomadic, IP changes with every location/network. Token auth is the security boundary.
+- **No IP allowlisting** - the operator is nomadic, IP changes with every location/network. Token auth is the security boundary.
 - Optional upgrade: mutual TLS with client certificate installed on Mac for defense-in-depth
 
 ### Storage Security
@@ -328,7 +324,7 @@ curl -sf -X POST "https://<server>/context/commit" \
 
 ### Access Control
 
-- Only JC (the agent running on this server) reads the data
+- Only the agent (running on this server) reads the data
 - No web UI, no external access, no API for querying from outside
 - Server endpoint only accepts authenticated POST requests, no GET/read access from outside
 
@@ -348,14 +344,14 @@ curl -sf -X POST "https://<server>/context/commit" \
 
 1. **`context-receiver.py`** - HTTP endpoint that accepts pushes and writes to SQLite
 2. **`context-digest.py`** - Processes raw stream into daily summaries
-3. **`context-query.py`** - CLI tool for JC to query current state
+3. **`context-query.py`** - CLI tool for the agent to query current state
 4. **Cron job** - Runs digest twice daily (13:00 + 23:00 CET)
 5. **Purge job** - Deletes raw data older than 48h
 
-### Integration with JC
+### Integration with the Agent
 
-- Before any autonomous action: `python3 scripts/context-query.py --now` (what is Jonas doing?)
-- Before starting work on a project: `python3 scripts/context-query.py --project project-gamma --since today` (has Jonas touched this?)
+- Before any autonomous action: `python3 scripts/context-query.py --now` (what is the operator doing?)
+- Before starting work on a project: `python3 scripts/context-query.py --project project-gamma --since today` (has the operator touched this?)
 - Daily digest available at: `memory/activity-digest/YYYY-MM-DD.md`
 
 ---
@@ -363,20 +359,20 @@ curl -sf -X POST "https://<server>/context/commit" \
 ## Rollout Plan
 
 1. **Build server-side receiver + DB** (can do now)
-2. **Build Mac-side daemon** (Jonas installs)
+2. **Build Mac-side daemon** (the operator installs)
 3. **Test with 24h of data** - verify capture quality, filtering, no leaks
-4. **Build digest processor** - JC reads and produces first summary
-5. **Wire into autonomous workflow** - JC checks context before acting
+4. **Build digest processor** - the agent reads and produces first summary
+5. **Wire into autonomous workflow** - the agent checks context before acting
 6. **Iterate** - adjust capture frequency, filtering, digest format based on real usage
 
 ---
 
 ## Success Criteria
 
-- JC never duplicates work Jonas is actively doing
-- JC picks up half-finished work without being asked
-- JC works on neglected workstreams while Jonas focuses elsewhere
-- Jonas can see what JC is doing with a glance at Telegram
+- The agent never duplicates work the operator is actively doing
+- The agent picks up half-finished work without being asked
+- The agent works on neglected workstreams while the operator focuses elsewhere
+- The operator can see what the agent is doing with a glance at Telegram
 - Zero security incidents with captured data
 
 ---
@@ -385,11 +381,11 @@ curl -sf -X POST "https://<server>/context/commit" \
 
 1. ~~Should the digest run more than twice daily?~~ **Yes - three times daily** (10:00, 16:00, 23:00) due to frequent context-switching.
 2. ~~Do we need a focus mode override?~~ **Yes - `/handoff` command** for explicit task transfers.
-3. ~~Should JC activity also be tracked?~~ **Yes, via Telegram status updates** - not in the same DB, but visible to Jonas in the group chat.
-4. ~~WhatsApp gap - acceptable?~~ **Accept for now.** Window titles + notification previews give partial visibility. Jonas forwards critical context to Telegram when needed.
+3. ~~Should the agent's activity also be tracked?~~ **Yes, via Telegram status updates** - not in the same DB, but visible to the operator in the group chat.
+4. ~~WhatsApp gap - acceptable?~~ **Accept for now.** Window titles + notification previews give partial visibility. The operator forwards critical context to Telegram when needed.
 
 ## Remaining Open Questions
 
-1. Should the digest also track patterns over time? (e.g., "Jonas hasn't touched Project Alpha outreach in 5 days" - escalating signal)
+1. Should the digest also track patterns over time? (e.g., "The operator hasn't touched Project Alpha outreach in 5 days" - escalating signal)
 2. Do we need a kill switch on the Mac side? (Quick way to pause capture for sensitive work like banking, personal calls)
-3. Should JC proactively ask questions based on the digest? (e.g., "You started the clarification RPC yesterday but didn't finish - should I pick it up or are you continuing today?")
+3. Should the agent proactively ask questions based on the digest? (e.g., "You started the clarification RPC yesterday but didn't finish - should I pick it up or are you continuing today?")

@@ -2,24 +2,24 @@
 
 **Date:** 2026-03-28
 **Status:** Approved
-**Goal:** Make the context bridge deliver actionable intelligence to JC by fixing data loss bugs, enriching the digest with all captured signals, adding new daemon-side signals, and wiring JC's cron-based autonomy to check context before acting.
+**Goal:** Make the context bridge deliver actionable intelligence to the agent by fixing data loss bugs, enriching the digest with all captured signals, adding new daemon-side signals, and wiring the agent's cron-based autonomy to check context before acting.
 
 ## Background
 
-The context bridge captures activity from Jonas's Mac every 2 minutes and pushes it to JC's Hetzner server. An audit revealed:
+The context bridge captures activity from the operator's Mac every 2 minutes and pushes it to the agent's VPS. An audit revealed:
 
 - Several captured fields (WhatsApp, Codex sessions, terminal commands, file changes, notifications) are stored but never used by the digest processor.
 - Notifications are captured by the daemon but silently dropped at the server due to a field mapping bug.
 - The digest is mechanical extraction only — no cross-digest comparison, no abandoned work detection.
 - High-value signals (meetings, calendar, Focus mode) are not captured at all.
-- JC has no standard pattern for checking context before autonomous actions.
+- the agent has no standard pattern for checking context before autonomous actions.
 
 ## Constraints
 
 - Daemon runs on macOS (Apple Silicon, latest macOS).
 - No third-party service dependencies. Calendar via macOS Calendar.app only (not Google Calendar API).
-- JC interprets raw digests directly — no LLM synthesis in the digest. Note: ARCHITECTURE.md and DESIGN.md describe a Sonnet synthesis step in the digest. This spec intentionally removes that step — JC's own reasoning handles interpretation. The architecture docs should be updated to reflect this change.
-- JC operates on cron-based scheduling.
+- the agent interprets raw digests directly — no LLM synthesis in the digest. Note: ARCHITECTURE.md and DESIGN.md describe a Sonnet synthesis step in the digest. This spec intentionally removes that step — the agent's own reasoning handles interpretation. The architecture docs should be updated to reflect this change.
+- the agent operates on cron-based scheduling.
 - Privacy rules in `~/.context-bridge/privacy-rules.json` govern filtering. Calendar is opt-in.
 - All existing security/privacy guarantees (sensitive app filtering, credential redaction, 48h raw data purge) remain in effect.
 
@@ -29,7 +29,7 @@ Three phases, each building on the previous:
 
 1. Fix + enrich foundation (make existing data useful)
 2. New daemon signals (capture what's missing)
-3. JC integration (wire JC to use the data)
+3. the agent integration (wire the agent to use the data)
 
 ---
 
@@ -50,7 +50,7 @@ The digest processor (`context-digest.py`) currently outputs per-project time al
 
 **Communication context:**
 - WhatsApp active chat names from `whatsapp_context`, grouped by time period.
-- Format: `## Communication` with timestamped entries showing who Jonas was chatting with.
+- Format: `## Communication` with timestamped entries showing who the operator was chatting with.
 
 **AI agent activity:**
 - `codex_session` (task descriptions from active Claude/Codex sessions) and `codex_running` (boolean).
@@ -115,7 +115,7 @@ Each digest run queries the DB for the previous digest period's data (not by par
 
 ### 2a. Meeting/call detection
 
-At each capture cycle, the daemon detects whether Jonas is in a call.
+At each capture cycle, the daemon detects whether the operator is in a call.
 
 **Detection methods:**
 
@@ -135,7 +135,7 @@ At each capture cycle, the daemon detects whether Jonas is in a call.
 - `call_app`: detected app name or "unknown"
 - `call_type`: "video" (camera active), "audio" (mic only), "unknown"
 
-**Behavior:** When `in_call` is true, the daemon still captures full context (open tabs, files, git state). This is intentional — JC needs to know what project the meeting is about (from screen shares or open tabs). The digest marks these periods as "in meeting."
+**Behavior:** When `in_call` is true, the daemon still captures full context (open tabs, files, git state). This is intentional — the agent needs to know what project the meeting is about (from screen shares or open tabs). The digest marks these periods as "in meeting."
 
 **Server schema:** Add `in_call BOOLEAN DEFAULT FALSE`, `call_app TEXT`, `call_type TEXT` to `activity_stream`.
 
@@ -211,7 +211,7 @@ Computed in the digest, not the daemon. The daemon already sends `app` and proje
 
 ---
 
-## Phase 3: JC Integration
+## Phase 3: the agent Integration
 
 ### 3a. Enhanced `context-query.py`
 
@@ -219,7 +219,7 @@ Existing commands: `now`, `today`, `project <name>`, `gaps`.
 
 **New commands:**
 
-**`context-query.py status`** — one-shot pre-action summary for JC. Returns:
+**`context-query.py status`** — one-shot pre-action summary for the agent. Returns:
 ```
 current_app: Cursor
 current_project: project-gamma
@@ -235,9 +235,9 @@ daemon_stale: false
 last_activity: 2026-03-28T14:32:00Z
 ```
 
-The `focus_level` is computed live by querying the last 60 minutes of `activity_stream` data and counting app+project transitions (same logic as the digest's context switching metric in 2d). Designed to be parsed by JC and used as a decision input.
+The `focus_level` is computed live by querying the last 60 minutes of `activity_stream` data and counting app+project transitions (same logic as the digest's context switching metric in 2d). Designed to be parsed by the agent and used as a decision input.
 
-**`context-query.py since <hours>`** — cross-digest style diff for the last N hours. Returns new/continued/dropped work and neglect data. Useful when JC wants a fresh comparison without waiting for the next scheduled digest.
+**`context-query.py since <hours>`** — cross-digest style diff for the last N hours. Returns new/continued/dropped work and neglect data. Useful when the agent wants a fresh comparison without waiting for the next scheduled digest.
 
 **`context-query.py neglected`** — portfolio projects ranked by days since last activity. Returns:
 ```
@@ -247,9 +247,9 @@ project-delta: 1 day
 project-gamma: 0 days (active now)
 ```
 
-### 3b. JC pre-action check pattern
+### 3b. the agent pre-action check pattern
 
-JC's cron jobs follow this convention before any autonomous action:
+the agent's cron jobs follow this convention before any autonomous action:
 
 ```bash
 STATUS=$(python3 context-query.py status)
@@ -257,17 +257,17 @@ STATUS=$(python3 context-query.py status)
 
 Decision rules (documented, not enforced by code):
 
-- **Don't act on project X** if Jonas is currently active on X (`current_project` matches).
+- **Don't act on project X** if the operator is currently active on X (`current_project` matches).
 - **Don't send Telegram** if `in_call: true` or `focus_mode` is non-null.
 - **Prefer project Y** if Y appears in `neglected` output with highest inactivity.
-- **Be conservative** if `daemon_stale: true` — JC is operating blind.
-- **Delay if idle/away** and the action would need Jonas's input soon.
+- **Be conservative** if `daemon_stale: true` — the agent is operating blind.
+- **Delay if idle/away** and the action would need the operator's input soon.
 
-This pattern is documented in a `docs/jc-integration-guide.md` that JC's system prompt can reference.
+This pattern is documented in a `docs/jc-integration-guide.md` that the agent's system prompt can reference.
 
 ### 3c. Staleness watchdog
 
-A lightweight cron job on JC's server, independent of JC's main cron:
+A lightweight cron job on the agent's server, independent of the agent's main cron:
 
 - Runs every 5 minutes.
 - Checks: has a new record arrived in `activity_stream` in the last 10 minutes?
@@ -278,7 +278,7 @@ The `status` command reads this flag and includes `daemon_stale: true/false` in 
 
 ### 3d. Digest scheduling
 
-Install crontab entries on JC's server for 3x daily digest runs. The existing schedule documented in ARCHITECTURE.md, DESIGN.md, and the `context-digest.py` docstring is 10:00, 16:00, 23:00 CET. **Keep this existing schedule** — no change.
+Install crontab entries on the agent's server for 3x daily digest runs. The existing schedule documented in ARCHITECTURE.md, DESIGN.md, and the `context-digest.py` docstring is 10:00, 16:00, 23:00 CET. **Keep this existing schedule** — no change.
 
 - 10:00 CET — covers early morning work
 - 16:00 CET — covers midday work
@@ -297,7 +297,7 @@ These cron entries do not currently exist on the server and need to be installed
 | Column | Type | Description |
 |--------|------|-------------|
 | `notifications` | TEXT | JSON array of {app, title, body} (replaces unused notification_app/notification_text) |
-| `in_call` | BOOLEAN | Whether Jonas is in a call |
+| `in_call` | BOOLEAN | Whether the operator is in a call |
 | `call_app` | TEXT | Which app the call is on |
 | `call_type` | TEXT | "video", "audio", or "unknown" |
 | `focus_mode` | TEXT | Active macOS Focus mode name, or NULL |
@@ -323,7 +323,7 @@ Shared constants imported by `context-receiver.py`, `context-digest.py`, and `co
 PORTFOLIO_PROJECTS = {
     'project-gamma': ['project-gamma'],
     'project-alpha': ['project-alpha'],
-    'project-beta': ['project-beta', 'jsvcapital'],
+    'project-beta': ['project-beta', 'project-beta'],
     'project-delta': ['project-delta'],
     'openclaw': ['openclaw-computer-vision', 'openclaw-macos-helper'],
 }
@@ -339,7 +339,7 @@ This eliminates the current divergence between three separate hardcoded project 
 - `mac-daemon/context-daemon.sh` — add meeting detection, Focus mode, calendar capture
 - `~/.context-bridge/privacy-rules.json` — add `calendar_enabled` flag, calendar-specific sensitive title keywords
 
-**Server side (Hetzner):**
+**Server side (VPS provider):**
 - `server/context-receiver.py` — fix notification mapping, add new columns to schema + INSERT
 - `server/context-digest.py` — wire all fields into digest output, add cross-digest comparison, add focus level computation, add new sections (communication, AI sessions, terminal, file changes, tabs, notifications, calendar, changes since last digest)
 - `server/context-query.py` — add `status`, `since`, `neglected` commands
@@ -347,14 +347,14 @@ This eliminates the current divergence between three separate hardcoded project 
 **New files:**
 - `server/config.py` — shared constants (portfolio project list) imported by all server scripts
 - `server/staleness-watchdog.sh` — lightweight cron script for daemon staleness detection
-- `docs/jc-integration-guide.md` — documents the pre-action check pattern for JC
+- `docs/jc-integration-guide.md` — documents the pre-action check pattern for the agent
 
 ---
 
 ## What This Does NOT Include
 
-- LLM synthesis in the digest (JC reasons over raw data directly).
+- LLM synthesis in the digest (the agent reasons over raw data directly).
 - Google Calendar API integration (macOS Calendar.app only).
-- Content capture from documents (daemon captures metadata/URLs, JC reads docs via `gog` CLI during digest).
+- Content capture from documents (daemon captures metadata/URLs, the agent reads docs via `gog` CLI during digest).
 - Notification content filtering beyond what macOS provides (we store what the notification DB gives us).
-- Real-time push/websocket to JC (stays pull-based via cron + query).
+- Real-time push/websocket to the agent (stays pull-based via cron + query).

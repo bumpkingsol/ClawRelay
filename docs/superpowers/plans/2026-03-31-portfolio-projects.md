@@ -88,7 +88,7 @@ Add before the `cmd="${1:-}"` line:
 
 ```bash
 # ---------------------------------------------------------------------------
-# fetch-projects  – fetch portfolio projects from the server
+# projects  – fetch portfolio projects from the server
 # ---------------------------------------------------------------------------
 do_fetch_projects() {
   local server_url=""
@@ -134,19 +134,19 @@ do_fetch_projects() {
 }
 ```
 
-Then add `fetch-projects) do_fetch_projects ;;` to the dispatch case. Add it between `dashboard)` and `mark-question-seen)` in alphabetical order under the existing dispatch entries.
+Then add `projects) do_fetch_projects ;;` to the dispatch case. Add it between `dashboard)` and `mark-question-seen)` in alphabetical order under the existing dispatch entries.
 
 - [ ] **Step 2: Test the shell script locally**
 
 ```bash
 # Test with no server-url configured (should return {})
-~/.context-bridge/bin/context-helperctl.sh fetch-projects
+~/.context-bridge/bin/context-helperctl.sh projects
 # Expected: {}
 
 # Update server-url first if you want to test with a live server:
 # echo "http://localhost:7890/context/push" > ~/.context-bridge/server-url
 # CONTEXT_BRIDGE_TOKEN=dev-token python3 server/context-receiver.py &
-# ~/.context-bridge/bin/context-helperctl.sh fetch-projects
+# ~/.context-bridge/bin/context-helperctl.sh projects
 # Expected: {"projects": []}
 # kill %1
 ```
@@ -155,10 +155,8 @@ Then add `fetch-projects) do_fetch_projects ;;` to the dispatch case. Add it bet
 
 ```bash
 git add mac-helper/.context-bridge/bin/context-helperctl.sh
-git commit -m "feat(mac): add fetch-projects shell command for portfolio project list"
+git commit -m "feat(mac): add projects shell command for portfolio project list"
 ```
-
-**Note:** The script lives at `~/.context-bridge/bin/context-helperctl.sh`. The repo has a copy at `mac-helper/.context-bridge/bin/context-helperctl.sh` — edit both, or check where the canonical copy lives first with `ls ~/.context-bridge/bin/` on your Mac.
 
 ---
 
@@ -182,7 +180,7 @@ To:
 
 - [ ] **Step 2: Add fetch call in `refresh()`**
 
-In the `refresh()` function (line 21-25), add `fetchPortfolioProjects()` to the list:
+In the `refresh()` function, add `fetchPortfolioProjects()` to the list:
 ```swift
 func refresh() {
     snapshot = runner.fetchStatus()
@@ -194,13 +192,13 @@ func refresh() {
 
 - [ ] **Step 3: Add `fetchPortfolioProjects()` method**
 
-Add after `fetchDashboard()` (around line 59):
+Add after `fetchDashboard()`:
 ```swift
 func fetchPortfolioProjects() {
     let capturedRunner = runner
     Task.detached {
         do {
-            let raw = try capturedRunner.runActionWithOutput("fetch-projects")
+            let raw = try capturedRunner.runActionWithOutput("projects")
             let decoded = try JSONDecoder().decode(ProjectsResponse.self, from: raw)
             await MainActor.run { [weak self] in
                 self?.portfolioProjects = decoded.projects.sorted()
@@ -214,7 +212,7 @@ func fetchPortfolioProjects() {
 
 - [ ] **Step 4: Add response struct**
 
-Add after the `MenuBarViewModel` class closing brace (at the bottom of the file, after line 100):
+Add at the bottom of the file, outside the `MenuBarViewModel` class:
 
 ```swift
 private struct ProjectsResponse: Codable {
@@ -260,7 +258,7 @@ curl -s -H "Authorization: Bearer $CONTEXT_BRIDGE_TOKEN" \
 - [ ] **Step 3: Verify the shell script returns it**
 
 ```bash
-~/.context-bridge/bin/context-helperctl.sh fetch-projects
+~/.context-bridge/bin/context-helperctl.sh projects
 # Expected: {"projects": ["test-project"]}
 ```
 

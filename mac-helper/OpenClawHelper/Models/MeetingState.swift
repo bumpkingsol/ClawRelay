@@ -2,14 +2,16 @@ import Foundation
 
 enum MeetingLifecycleState: String, Codable, Equatable {
     case idle
+    case awaitingConsent
     case preparing
     case recording
     case finalizing
 
     var displayLabel: String {
         switch self {
-        case .idle:       return "Idle"
-        case .preparing:  return "Preparing..."
+        case .idle:             return "Idle"
+        case .awaitingConsent:  return "Consent Pending"
+        case .preparing:        return "Preparing..."
         case .recording:  return "Recording"
         case .finalizing: return "Finalizing..."
         }
@@ -21,8 +23,9 @@ enum MeetingLifecycleState: String, Codable, Equatable {
 
     var systemImage: String {
         switch self {
-        case .idle:       return "mic.slash"
-        case .preparing:  return "mic.badge.xmark"
+        case .idle:             return "mic.slash"
+        case .awaitingConsent:  return "questionmark.circle"
+        case .preparing:        return "mic.badge.xmark"
         case .recording:  return "mic.fill"
         case .finalizing: return "waveform"
         }
@@ -30,8 +33,9 @@ enum MeetingLifecycleState: String, Codable, Equatable {
 
     var tintColor: String {
         switch self {
-        case .idle:       return "secondary"
-        case .preparing:  return "orange"
+        case .idle:             return "secondary"
+        case .awaitingConsent:  return "orange"
+        case .preparing:        return "orange"
         case .recording:  return "red"
         case .finalizing: return "blue"
         }

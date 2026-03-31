@@ -64,6 +64,15 @@ struct MeetingStatusView: View {
             .buttonStyle(.bordered)
             .tint(.green)
 
+        case .awaitingConsent:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Consent Pending")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
         case .preparing:
             ProgressView()
                 .controlSize(.small)
@@ -99,8 +108,9 @@ struct MeetingStatusView: View {
 
     private var stateColor: Color {
         switch viewModel.state {
-        case .idle:       return .secondary
-        case .preparing:  return .orange
+        case .idle:             return .secondary
+        case .awaitingConsent:  return .orange
+        case .preparing:        return .orange
         case .recording:  return .red
         case .finalizing: return .blue
         }

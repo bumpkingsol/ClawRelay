@@ -269,9 +269,14 @@ def cmd_status(args):
         except:
             pass
 
-    # Staleness
-    stale_flag = '/tmp/context-bridge-stale'
-    print(f"daemon_stale: {os.path.exists(stale_flag)}")
+    # Staleness: stale if last activity is older than 5 minutes
+    try:
+        last_ts = datetime.fromisoformat(row['ts'].replace('Z', '+00:00'))
+        age_seconds = (datetime.now(timezone.utc) - last_ts).total_seconds()
+        stale = age_seconds > 300
+    except (ValueError, TypeError):
+        stale = True
+    print(f"daemon_stale: {stale}")
     print(f"last_activity: {row['ts']}")
 
     conn.close()

@@ -42,20 +42,33 @@ Projects returned sorted alphabetically by `name`.
 
 ## Mac Changes
 
+### Shell Script
+Add `do_fetch_projects` function and `projects` dispatch case to `~/.context-bridge/bin/context-helperctl.sh`. Follows the same pattern as `do_fetch_dashboard` — reads `server-url`, reads auth token from keychain, curls `GET /context/projects`.
+
+```bash
+do_fetch_projects() {
+  # Reads server-url from $(cb_dir)/server-url
+  # Reads auth token from keychain
+  # Curl: GET /context/projects
+  # Returns: { "projects": [...] } on success, {} on failure
+}
+```
+
 ### ViewModel
 Replace `static let portfolioProjects = [...]` with:
 ```swift
 @Published var portfolioProjects: [String] = []
 ```
 
-Projects fetched from `GET /context/projects` alongside the existing bridge snapshot poll. On fetch success, assign the returned array. On failure, retain the current value (don't clear it).
+Fetched via `runner.runActionWithOutput("projects")` in `refresh()`, on the same 5s poll cycle as everything else. On fetch success, decode `{"projects": [...]}` and assign. On failure, retain the current value.
 
 ### Data Flow
 ```
 Server GET /context/projects
-  → MenuBarViewModel.portfolioProjects (polled every 30s)
-    → MenuBarPopoverView project picker
-      → Handoff sends project slug to /handoff on selection
+  → context-helperctl.sh (projects action)
+    → MenuBarViewModel.portfolioProjects (polled every 5s with refresh())
+      → MenuBarPopoverView project picker
+        → Handoff sends project slug to /handoff on selection
 ```
 
 ### Fallback
@@ -73,4 +86,5 @@ If the fetch fails (network error, server down), the picker shows whatever was l
 | File | Change |
 |------|--------|
 | `server/context-receiver.py` | Add migration, `GET /context/projects` endpoint |
+| `~/.context-bridge/bin/context-helperctl.sh` | Add `do_fetch_projects` + `projects` dispatch case |
 | `mac-helper/.../ViewModels/MenuBarViewModel.swift` | Replace static array with `@Published`, add fetch |

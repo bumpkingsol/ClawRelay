@@ -16,10 +16,15 @@ final class MeetingDetectorService: ObservableObject {
     private let silenceTimeoutSeconds: TimeInterval = 60.0
     private var micActiveSince: Date?
     private var micSilentSince: Date?
+    private var suppressedUntilAppCloses: Bool = false
+    private var consentDeclinedObserver: NSObjectProtocol?
+    private var appTerminationObserver: NSObjectProtocol?
 
     func startMonitoring() {
         listenToMicrophoneState()
         startAppPolling()
+        observeConsentDeclined()
+        observeAppTermination()
     }
 
     func stopMonitoring() {
@@ -28,6 +33,14 @@ final class MeetingDetectorService: ObservableObject {
         pollTimer = nil
         debounceTask?.cancel()
         debounceTask = nil
+        if let observer = consentDeclinedObserver {
+            NotificationCenter.default.removeObserver(observer)
+            consentDeclinedObserver = nil
+        }
+        if let observer = appTerminationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            appTerminationObserver = nil
+        }
     }
 
     private func listenToMicrophoneState() {
@@ -145,13 +158,44 @@ final class MeetingDetectorService: ObservableObject {
     }
 
     private func debounceMeetingCheck() {
+        guard !suppressedUntilAppCloses else { return }
         debounceTask?.cancel()
         debounceTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
             guard let self else { return }
+            guard !self.suppressedUntilAppCloses else { return }
             if self.micActiveSince != nil && self.detectedApp != nil {
                 self.isMeetingDetected = true
+            }
+        }
+    }
+
+    private func observeConsentDeclined() {
+        consentDeclinedObserver = NotificationCenter.default.addObserver(
+            forName: .meetingConsentDeclined,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.suppressedUntilAppCloses = true
+            }
+        }
+    }
+
+    private func observeAppTermination() {
+        appTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                guard let self, self.suppressedUntilAppCloses else { return }
+                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+                let meetingBundleIds = ["us.zoom.xos", "com.google.Chrome"]
+                if let bundleId = app.bundleIdentifier, meetingBundleIds.contains(bundleId) {
+                    self.suppressedUntilAppCloses = false
+                }
             }
         }
     }

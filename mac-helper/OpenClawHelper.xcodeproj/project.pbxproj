@@ -60,6 +60,7 @@
 		A10000180000000000000011 /* MeetingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000011 /* MeetingStatusView.swift */; };
 		A10000180000000000000012 /* NotificationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000012 /* NotificationCardView.swift */; };
 		A10000190000000000000001 /* HealthDetailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000001 /* HealthDetailCard.swift */; };
+		A10000200000000000000001 /* MeetingHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000001 /* MeetingHistory.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -130,6 +131,7 @@
 		A20000180000000000000011 /* MeetingStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingStatusView.swift; sourceTree = "<group>"; };
 		A20000180000000000000012 /* NotificationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCardView.swift; sourceTree = "<group>"; };
 		A20000190000000000000001 /* HealthDetailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDetailCard.swift; sourceTree = "<group>"; };
+		A20000200000000000000001 /* MeetingHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingHistory.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -215,6 +217,7 @@
 				A20000090000000000000001 /* HandoffDraft.swift */,
 				A20000150000000000000001 /* JCQuestion.swift */,
 				A20000180000000000000002 /* MeetingNotification.swift */,
+				A20000200000000000000001 /* MeetingHistory.swift */,
 				A20000180000000000000003 /* MeetingState.swift */,
 				A20000050000000000000002 /* PermissionStatus.swift */,
 			);
@@ -440,6 +443,7 @@
 				A10000180000000000000011 /* MeetingStatusView.swift in Sources */,
 				A10000180000000000000012 /* NotificationCardView.swift in Sources */,
 				A10000190000000000000001 /* HealthDetailCard.swift in Sources */,
+				A10000200000000000000001 /* MeetingHistory.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

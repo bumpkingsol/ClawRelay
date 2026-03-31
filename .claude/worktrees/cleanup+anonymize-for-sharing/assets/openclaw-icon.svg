@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="400" height="400">
+  <!-- Open grip v2 — three talon blades with sharper tips, balanced spacing, slight outward rake -->
+  <g id="mark" fill="#1D1D1F">
+    <!-- Left talon -->
+    <path d="M34 80 C26 60, 16 36, 20 14 L26 16 C28 22, 29 30, 28 42 C28 54, 32 66, 40 76 Z"/>
+    <!-- Center talon -->
+    <path d="M45 84 C44 64, 44 42, 50 10 L56 10 C56 14, 56 18, 56 24 C56 44, 56 66, 55 84 Z"/>
+    <!-- Right talon -->
+    <path d="M66 80 C74 60, 84 36, 80 14 L74 16 C72 22, 71 30, 72 42 C72 54, 68 66, 60 76 Z"/>
+  </g>
+</svg>

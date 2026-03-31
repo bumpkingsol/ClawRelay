@@ -24,32 +24,32 @@ from db_utils import get_db, DB_PATH
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s %(levelname)s [meeting-processor] %(message)s',
+    format="%(asctime)s %(levelname)s [meeting-processor] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-MEETING_FRAMES_DIR = Path(os.environ.get(
-    'MEETING_FRAMES_DIR',
-    str(Path(DB_PATH).parent / 'meeting-frames')
-))
+MEETING_FRAMES_DIR = Path(
+    os.environ.get("MEETING_FRAMES_DIR", str(Path(DB_PATH).parent / "meeting-frames"))
+)
 
 EXPRESSION_CONFIDENCE_THRESHOLD = 0.6
 
 # Claude model for vision analysis
-VISION_MODEL = os.environ.get('MEETING_VISION_MODEL', 'claude-sonnet-4-20250514')
+VISION_MODEL = os.environ.get("MEETING_VISION_MODEL", "claude-sonnet-4-20250514")
 # Claude model for summary + pattern detection
-SUMMARY_MODEL = os.environ.get('MEETING_SUMMARY_MODEL', 'claude-sonnet-4-20250514')
+SUMMARY_MODEL = os.environ.get("MEETING_SUMMARY_MODEL", "claude-sonnet-4-20250514")
 
 
 def get_anthropic_client():
     """Get Anthropic client. Returns None if API key not set."""
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         logger.warning("ANTHROPIC_API_KEY not set -- skipping Claude analysis")
         return None
 
     try:
         import anthropic
+
         return anthropic.Anthropic(api_key=api_key)
     except ImportError:
         logger.warning("anthropic package not installed -- skipping Claude analysis")
@@ -72,7 +72,7 @@ def load_frames(meeting_id):
     if not session_dir.exists():
         return []
 
-    frames = sorted(session_dir.glob('*.png'))
+    frames = sorted(session_dir.glob("*.png"))
     return frames
 
 
@@ -85,46 +85,48 @@ def analyze_frame_expression(client, frame_path):
         return []
 
     try:
-        with open(frame_path, 'rb') as f:
-            image_data = base64.standard_b64encode(f.read()).decode('utf-8')
+        with open(frame_path, "rb") as f:
+            image_data = base64.standard_b64encode(f.read()).decode("utf-8")
 
         response = client.messages.create(
             model=VISION_MODEL,
             max_tokens=1024,
-            messages=[{
-                'role': 'user',
-                'content': [
-                    {
-                        'type': 'image',
-                        'source': {
-                            'type': 'base64',
-                            'media_type': 'image/png',
-                            'data': image_data,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": image_data,
+                            },
                         },
-                    },
-                    {
-                        'type': 'text',
-                        'text': (
-                            'Analyze the people visible in this meeting screenshot. '
-                            'For each person, classify their expression as one of: '
-                            'neutral, concerned, interested, skeptical, confident, '
-                            'uncomfortable, surprised, disengaged. '
-                            'Also describe their body language briefly. '
-                            'Return JSON array with objects containing: '
-                            'position (e.g. "top-left"), expression, confidence (0-1), '
-                            'body_language (string). '
-                            'Only return the JSON array, no other text.'
-                        ),
-                    },
-                ],
-            }],
+                        {
+                            "type": "text",
+                            "text": (
+                                "Analyze the people visible in this meeting screenshot. "
+                                "For each person, classify their expression as one of: "
+                                "neutral, concerned, interested, skeptical, confident, "
+                                "uncomfortable, surprised, disengaged. "
+                                "Also describe their body language briefly. "
+                                "Return JSON array with objects containing: "
+                                'position (e.g. "top-left"), expression, confidence (0-1), '
+                                "body_language (string). "
+                                "Only return the JSON array, no other text."
+                            ),
+                        },
+                    ],
+                }
+            ],
         )
 
         result_text = response.content[0].text.strip()
 
         # Parse JSON, handling potential markdown code fences
-        if result_text.startswith('```'):
-            result_text = result_text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+        if result_text.startswith("```"):
+            result_text = result_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
         observations = json.loads(result_text)
         return observations if isinstance(observations, list) else []
@@ -134,10 +136,27 @@ def analyze_frame_expression(client, frame_path):
         return []
 
 
+def analyze_frames_streaming(client, meeting_id):
+    """Run expression analysis on frames incrementally (streaming).
+
+    Yields dict mapping frame filename to list of observations.
+    Processes one frame at a time to keep memory usage constant.
+    """
+    session_dir = MEETING_FRAMES_DIR / meeting_id
+    if not session_dir.exists():
+        return
+
+    for frame_path in sorted(session_dir.glob("*.png")):
+        logger.info(f"Analyzing frame: {frame_path.name}")
+        observations = analyze_frame_expression(client, frame_path)
+        yield {frame_path.name: observations}
+
+
 def batch_analyze_frames(client, frames):
     """Run expression analysis on a batch of frames.
 
     Returns dict mapping frame filename to list of observations.
+    DEPRECATED: Use analyze_frames_streaming for large meetings.
     """
     results = {}
     for frame_path in frames:
@@ -156,41 +175,52 @@ def merge_timeline(transcript_json, visual_events_json, expression_results):
 
     # Add transcript segments
     if transcript_json:
-        segments = json.loads(transcript_json) if isinstance(transcript_json, str) else transcript_json
+        segments = (
+            json.loads(transcript_json)
+            if isinstance(transcript_json, str)
+            else transcript_json
+        )
         for seg in segments:
-            timeline.append({
-                'type': 'transcript',
-                'timestamp': seg.get('timestamp', 0),
-                'speaker': seg.get('speaker', 'unknown'),
-                'text': seg.get('text', ''),
-                'confidence': seg.get('confidence', 1.0),
-            })
+            timeline.append(
+                {
+                    "type": "transcript",
+                    "timestamp": seg.get("timestamp", 0),
+                    "speaker": seg.get("speaker", "unknown"),
+                    "text": seg.get("text", ""),
+                    "confidence": seg.get("confidence", 1.0),
+                }
+            )
 
     # Add visual events with expression analysis overlay
     if visual_events_json:
-        events = json.loads(visual_events_json) if isinstance(visual_events_json, str) else visual_events_json
+        events = (
+            json.loads(visual_events_json)
+            if isinstance(visual_events_json, str)
+            else visual_events_json
+        )
         for evt in events:
             entry = {
-                'type': 'visual',
-                'timestamp': evt.get('timestamp', 0),
-                'trigger': evt.get('trigger', ''),
-                'participants': evt.get('participants', []),
+                "type": "visual",
+                "timestamp": evt.get("timestamp", 0),
+                "trigger": evt.get("trigger", ""),
+                "participants": evt.get("participants", []),
             }
 
             # Overlay expression results if available for this frame
-            frame_key = evt.get('frame_filename')
+            frame_key = evt.get("frame_filename")
             if frame_key and frame_key in expression_results:
                 observations = expression_results[frame_key]
                 # Filter by confidence threshold
-                entry['expression_analysis'] = [
-                    obs for obs in observations
-                    if obs.get('confidence', 0) >= EXPRESSION_CONFIDENCE_THRESHOLD
+                entry["expression_analysis"] = [
+                    obs
+                    for obs in observations
+                    if obs.get("confidence", 0) >= EXPRESSION_CONFIDENCE_THRESHOLD
                 ]
 
             timeline.append(entry)
 
     # Sort by timestamp
-    timeline.sort(key=lambda x: x.get('timestamp', 0))
+    timeline.sort(key=lambda x: x.get("timestamp", 0))
 
     return timeline
 
@@ -205,15 +235,16 @@ def generate_summary(client, meeting, timeline):
 
     transcript_parts = [
         f"[{e['timestamp']}s] {e.get('speaker', '?')}: {e.get('text', '')}"
-        for e in timeline if e['type'] == 'transcript'
+        for e in timeline
+        if e["type"] == "transcript"
     ]
-    transcript_text = '\n'.join(transcript_parts[:500])  # Cap at 500 segments
+    transcript_text = "\n".join(transcript_parts[:500])  # Cap at 500 segments
 
     expression_notes = []
     for e in timeline:
-        if e['type'] == 'visual' and e.get('expression_analysis'):
-            for obs in e['expression_analysis']:
-                ts = e.get('timestamp', 0)
+        if e["type"] == "visual" and e.get("expression_analysis"):
+            for obs in e["expression_analysis"]:
+                ts = e.get("timestamp", 0)
                 minutes = int(ts // 60)
                 seconds = int(ts % 60)
                 expression_notes.append(
@@ -221,13 +252,17 @@ def generate_summary(client, meeting, timeline):
                     f"{obs.get('expression', '?')} ({obs.get('confidence', 0):.2f}), "
                     f"{obs.get('body_language', '')}"
                 )
-    expression_text = '\n'.join(expression_notes) if expression_notes else 'No visual analysis available.'
+    expression_text = (
+        "\n".join(expression_notes)
+        if expression_notes
+        else "No visual analysis available."
+    )
 
-    participants_str = meeting.get('participants', 'Unknown')
-    app_name = meeting.get('app', 'Unknown')
-    started_at = meeting.get('started_at', '')
-    ended_at = meeting.get('ended_at', '')
-    duration = meeting.get('duration_seconds', 0)
+    participants_str = meeting.get("participants", "Unknown")
+    app_name = meeting.get("app", "Unknown")
+    started_at = meeting.get("started_at", "")
+    ended_at = meeting.get("ended_at", "")
+    duration = meeting.get("duration_seconds", 0)
     duration_min = duration // 60 if duration else 0
 
     prompt = f"""Analyze this meeting and generate a structured intelligence summary.
@@ -260,7 +295,7 @@ Return only the markdown content for these sections (no title header -- I will a
         response = client.messages.create(
             model=SUMMARY_MODEL,
             max_tokens=4096,
-            messages=[{'role': 'user', 'content': prompt}],
+            messages=[{"role": "user", "content": prompt}],
         )
         body = response.content[0].text.strip()
     except Exception:
@@ -268,8 +303,8 @@ Return only the markdown content for these sections (no title header -- I will a
         body = _generate_basic_summary_body(meeting, timeline)
 
     # Build full summary with header
-    header = f"""# Meeting: {meeting.get('id', 'Unknown')}
-**Date:** {started_at[:10] if started_at else 'Unknown'} {started_at[11:16] if len(started_at) > 16 else ''}-{ended_at[11:16] if len(ended_at) > 16 else ''} | **Duration:** {duration_min} min
+    header = f"""# Meeting: {meeting.get("id", "Unknown")}
+**Date:** {started_at[:10] if started_at else "Unknown"} {started_at[11:16] if len(started_at) > 16 else ""}-{ended_at[11:16] if len(ended_at) > 16 else ""} | **Duration:** {duration_min} min
 **Participants:** {participants_str}
 **App:** {app_name}
 
@@ -280,15 +315,15 @@ Return only the markdown content for these sections (no title header -- I will a
 def _generate_basic_summary(meeting, timeline):
     """Generate a minimal summary without Claude API."""
     body = _generate_basic_summary_body(meeting, timeline)
-    started_at = meeting.get('started_at', '')
-    ended_at = meeting.get('ended_at', '')
-    duration = meeting.get('duration_seconds', 0)
+    started_at = meeting.get("started_at", "")
+    ended_at = meeting.get("ended_at", "")
+    duration = meeting.get("duration_seconds", 0)
     duration_min = duration // 60 if duration else 0
 
-    header = f"""# Meeting: {meeting.get('id', 'Unknown')}
-**Date:** {started_at[:10] if started_at else 'Unknown'} | **Duration:** {duration_min} min
-**Participants:** {meeting.get('participants', 'Unknown')}
-**App:** {meeting.get('app', 'Unknown')}
+    header = f"""# Meeting: {meeting.get("id", "Unknown")}
+**Date:** {started_at[:10] if started_at else "Unknown"} | **Duration:** {duration_min} min
+**Participants:** {meeting.get("participants", "Unknown")}
+**App:** {meeting.get("app", "Unknown")}
 
 """
     return header + body
@@ -296,8 +331,8 @@ def _generate_basic_summary(meeting, timeline):
 
 def _generate_basic_summary_body(meeting, timeline):
     """Generate basic summary body from timeline data."""
-    transcript_count = sum(1 for e in timeline if e['type'] == 'transcript')
-    visual_count = sum(1 for e in timeline if e['type'] == 'visual')
+    transcript_count = sum(1 for e in timeline if e["type"] == "transcript")
+    visual_count = sum(1 for e in timeline if e["type"] == "visual")
 
     lines = [
         "## Key Decisions",
@@ -310,7 +345,7 @@ def _generate_basic_summary_body(meeting, timeline):
         f"- Transcript segments: {transcript_count}",
         f"- Visual events: {visual_count}",
     ]
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def match_face_embeddings(meeting_id, visual_events_json):
@@ -322,24 +357,30 @@ def match_face_embeddings(meeting_id, visual_events_json):
     if not visual_events_json:
         return {}
 
-    events = json.loads(visual_events_json) if isinstance(visual_events_json, str) else visual_events_json
+    events = (
+        json.loads(visual_events_json)
+        if isinstance(visual_events_json, str)
+        else visual_events_json
+    )
 
     db = get_db()
-    profiles = db.execute("SELECT id, face_embedding FROM participant_profiles").fetchall()
+    profiles = db.execute(
+        "SELECT id, face_embedding FROM participant_profiles"
+    ).fetchall()
 
     # Build a map of known embeddings
     known = {}
     for p in profiles:
-        if p['face_embedding']:
-            known[p['id']] = p['face_embedding']
+        if p["face_embedding"]:
+            known[p["id"]] = p["face_embedding"]
 
     matches = {}
     new_faces = set()
 
     for evt in events:
-        for participant in evt.get('participants', []):
-            face_id = participant.get('face_id')
-            embedding_hash = participant.get('face_embedding_hash')
+        for participant in evt.get("participants", []):
+            face_id = participant.get("face_id")
+            embedding_hash = participant.get("face_embedding_hash")
             if face_id and embedding_hash:
                 if embedding_hash in known:
                     matches[face_id] = known[embedding_hash]
@@ -350,11 +391,14 @@ def match_face_embeddings(meeting_id, visual_events_json):
     for face_id, emb_hash in new_faces:
         profile_id = f"face_{emb_hash[:12]}"
         try:
-            db.execute("""
+            db.execute(
+                """
                 INSERT OR IGNORE INTO participant_profiles
                 (id, display_name, face_embedding, meetings_observed, profile_json, last_updated)
                 VALUES (?, ?, NULL, 1, '{}', ?)
-            """, (profile_id, face_id, datetime.now(timezone.utc).isoformat()))
+            """,
+                (profile_id, face_id, datetime.now(timezone.utc).isoformat()),
+            )
             matches[face_id] = profile_id
         except Exception:
             logger.exception(f"Failed to create profile for {face_id}")
@@ -371,7 +415,11 @@ def update_participant_profiles(meeting_id, participants_str):
 
     # Parse participants
     try:
-        participants = json.loads(participants_str) if isinstance(participants_str, str) else participants_str
+        participants = (
+            json.loads(participants_str)
+            if isinstance(participants_str, str)
+            else participants_str
+        )
     except (json.JSONDecodeError, TypeError):
         participants = []
 
@@ -383,7 +431,11 @@ def update_participant_profiles(meeting_id, participants_str):
     meeting_row = db.execute(
         "SELECT ended_at FROM meeting_sessions WHERE id = ?", (meeting_id,)
     ).fetchone()
-    ended_at = meeting_row['ended_at'] if meeting_row else datetime.now(timezone.utc).isoformat()
+    ended_at = (
+        meeting_row["ended_at"]
+        if meeting_row
+        else datetime.now(timezone.utc).isoformat()
+    )
 
     for name in participants:
         if not name:
@@ -391,26 +443,33 @@ def update_participant_profiles(meeting_id, participants_str):
         # Try to find by display_name
         row = db.execute(
             "SELECT id, meetings_observed FROM participant_profiles WHERE display_name = ?",
-            (name,)
+            (name,),
         ).fetchone()
 
         if row:
-            db.execute("""
+            db.execute(
+                """
                 UPDATE participant_profiles
                 SET meetings_observed = meetings_observed + 1,
                     last_updated = ?,
                     last_seen = ?
                 WHERE id = ?
-            """, (datetime.now(timezone.utc).isoformat(), ended_at, row['id']))
+            """,
+                (datetime.now(timezone.utc).isoformat(), ended_at, row["id"]),
+            )
         else:
             # Create new profile
             import hashlib
+
             profile_id = f"name_{hashlib.sha256(name.encode()).hexdigest()[:12]}"
-            db.execute("""
+            db.execute(
+                """
                 INSERT OR IGNORE INTO participant_profiles
                 (id, display_name, meetings_observed, profile_json, last_updated, last_seen)
                 VALUES (?, ?, 1, '{}', ?, ?)
-            """, (profile_id, name, datetime.now(timezone.utc).isoformat(), ended_at))
+            """,
+                (profile_id, name, datetime.now(timezone.utc).isoformat(), ended_at),
+            )
 
     db.commit()
     db.close()
@@ -424,32 +483,36 @@ def detect_patterns(client, participant_name):
     """
     db = get_db()
     profile = db.execute(
-        "SELECT * FROM participant_profiles WHERE display_name = ?",
-        (participant_name,)
+        "SELECT * FROM participant_profiles WHERE display_name = ?", (participant_name,)
     ).fetchone()
 
-    if not profile or profile['meetings_observed'] < 3:
+    if not profile or profile["meetings_observed"] < 3:
         db.close()
         return None
 
     # Find all meetings with this participant
-    meetings = db.execute("""
+    meetings = db.execute(
+        """
         SELECT id, started_at, summary_md, participants
         FROM meeting_sessions
         WHERE participants LIKE ?
         AND summary_md IS NOT NULL
         ORDER BY started_at DESC
         LIMIT 10
-    """, (f'%{participant_name}%',)).fetchall()
+    """,
+        (f"%{participant_name}%",),
+    ).fetchall()
     db.close()
 
     if len(meetings) < 3 or not client:
         return None
 
-    summaries_text = '\n\n---\n\n'.join([
-        f"Meeting: {m['id']} ({m['started_at']})\n{m['summary_md'][:2000]}"
-        for m in meetings
-    ])
+    summaries_text = "\n\n---\n\n".join(
+        [
+            f"Meeting: {m['id']} ({m['started_at']})\n{m['summary_md'][:2000]}"
+            for m in meetings
+        ]
+    )
 
     prompt = f"""Analyze these {len(meetings)} meeting summaries involving {participant_name}.
 
@@ -479,25 +542,27 @@ Return only the JSON object, no other text."""
         response = client.messages.create(
             model=SUMMARY_MODEL,
             max_tokens=2048,
-            messages=[{'role': 'user', 'content': prompt}],
+            messages=[{"role": "user", "content": prompt}],
         )
         result_text = response.content[0].text.strip()
-        if result_text.startswith('```'):
-            result_text = result_text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+        if result_text.startswith("```"):
+            result_text = result_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
         patterns = json.loads(result_text)
 
         # Update profile
         db = get_db()
-        profile_json = json.dumps({
-            'participant': participant_name,
-            'meetings_observed': profile['meetings_observed'],
-            'patterns': patterns,
-            'last_updated': datetime.now(timezone.utc).isoformat(),
-        })
+        profile_json = json.dumps(
+            {
+                "participant": participant_name,
+                "meetings_observed": profile["meetings_observed"],
+                "patterns": patterns,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         db.execute(
             "UPDATE participant_profiles SET profile_json = ?, last_updated = ? WHERE display_name = ?",
-            (profile_json, datetime.now(timezone.utc).isoformat(), participant_name)
+            (profile_json, datetime.now(timezone.utc).isoformat(), participant_name),
         )
         db.commit()
         db.close()
@@ -535,8 +600,8 @@ def process_meeting(meeting_id):
 
     # 5. Merge into unified timeline
     timeline = merge_timeline(
-        meeting.get('transcript_json'),
-        meeting.get('visual_events_json'),
+        meeting.get("transcript_json"),
+        meeting.get("visual_events_json"),
         expression_results,
     )
     logger.info(f"Unified timeline: {len(timeline)} events")
@@ -549,20 +614,24 @@ def process_meeting(meeting_id):
     db = get_db()
     db.execute(
         "UPDATE meeting_sessions SET summary_md = ? WHERE id = ?",
-        (summary_md, meeting_id)
+        (summary_md, meeting_id),
     )
     db.commit()
     db.close()
 
     # 8. Match face embeddings
-    match_face_embeddings(meeting_id, meeting.get('visual_events_json'))
+    match_face_embeddings(meeting_id, meeting.get("visual_events_json"))
 
     # 9. Update participant profiles
-    update_participant_profiles(meeting_id, meeting.get('participants'))
+    update_participant_profiles(meeting_id, meeting.get("participants"))
 
     # 10. Detect patterns (for participants with 3+ meetings)
     try:
-        participants = json.loads(meeting['participants']) if isinstance(meeting['participants'], str) else (meeting['participants'] or [])
+        participants = (
+            json.loads(meeting["participants"])
+            if isinstance(meeting["participants"], str)
+            else (meeting["participants"] or [])
+        )
         if isinstance(participants, list):
             for name in participants:
                 detect_patterns(client, name)
@@ -574,9 +643,13 @@ def process_meeting(meeting_id):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Meeting Processor')
-    parser.add_argument('--meeting-id', required=True, help='Meeting session ID to process')
-    parser.add_argument('--dry-run', action='store_true', help='Print summary without saving')
+    parser = argparse.ArgumentParser(description="Meeting Processor")
+    parser.add_argument(
+        "--meeting-id", required=True, help="Meeting session ID to process"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print summary without saving"
+    )
     args = parser.parse_args()
 
     success = process_meeting(args.meeting_id)
@@ -584,5 +657,5 @@ def main():
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

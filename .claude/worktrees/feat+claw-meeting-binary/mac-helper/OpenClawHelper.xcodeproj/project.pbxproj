@@ -1,0 +1,644 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000010000000000000001 /* OpenClawHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* OpenClawHelperApp.swift */; };
+		A10000010000000000000002 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* AppModel.swift */; };
+		A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* OpenClawHelperTests.swift */; };
+		A10000050000000000000001 /* BridgeSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000001 /* BridgeSnapshot.swift */; };
+		A10000050000000000000002 /* PermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000002 /* PermissionStatus.swift */; };
+		A10000050000000000000003 /* BridgeCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000003 /* BridgeCommandRunner.swift */; };
+		A10000050000000000000004 /* RefreshTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000004 /* RefreshTimer.swift */; };
+		A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000005 /* BridgeCommandRunnerTests.swift */; };
+		A10000050000000000000006 /* bridge-status.active.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000006 /* bridge-status.active.json */; };
+		A10000050000000000000007 /* bridge-status.paused.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000007 /* bridge-status.paused.json */; };
+		A10000050000000000000008 /* bridge-status.needs-attention.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000008 /* bridge-status.needs-attention.json */; };
+		A10000060000000000000001 /* MenuBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000001 /* MenuBarViewModel.swift */; };
+		A10000060000000000000002 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000002 /* MenuBarPopoverView.swift */; };
+		A10000060000000000000003 /* StatusHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000003 /* StatusHeaderView.swift */; };
+		A10000060000000000000004 /* QuickActionsGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000004 /* QuickActionsGrid.swift */; };
+		A10000060000000000000005 /* HealthStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000005 /* HealthStripView.swift */; };
+		A10000060000000000000006 /* MenuBarViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000006 /* MenuBarViewModelTests.swift */; };
+		A10000070000000000000001 /* ControlCenterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000001 /* ControlCenterViewModel.swift */; };
+		A10000070000000000000002 /* ControlCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000002 /* ControlCenterView.swift */; };
+		A10000070000000000000003 /* OverviewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000003 /* OverviewTabView.swift */; };
+		A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000004 /* DiagnosticsTabView.swift */; };
+		A10000080000000000000001 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000001 /* PermissionService.swift */; };
+		A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000002 /* SettingsDeepLinkService.swift */; };
+		A10000080000000000000003 /* PermissionsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000003 /* PermissionsTabView.swift */; };
+		A10000080000000000000004 /* PermissionStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000004 /* PermissionStatusTests.swift */; };
+		A10000090000000000000001 /* HandoffDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000001 /* HandoffDraft.swift */; };
+		A10000090000000000000003 /* PrivacyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000003 /* PrivacyTabView.swift */; };
+		A10000100000000000000001 /* DarkUtilityGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000100000000000000001 /* DarkUtilityGlass.swift */; };
+		A10000110000000000000001 /* Handoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000001 /* Handoff.swift */; };
+		A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000002 /* HandoffsTabViewModel.swift */; };
+		A10000110000000000000003 /* HandoffsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000003 /* HandoffsTabView.swift */; };
+		A10000120000000000000001 /* DashboardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000120000000000000001 /* DashboardData.swift */; };
+		A10000130000000000000001 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000130000000000000001 /* DashboardViewModel.swift */; };
+		A10000140000000000000001 /* DashboardTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000140000000000000001 /* DashboardTabView.swift */; };
+		A10000150000000000000001 /* JCQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000001 /* JCQuestion.swift */; };
+		A10000150000000000000002 /* DailyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000002 /* DailyEntry.swift */; };
+		A10000150000000000000003 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000150000000000000003 /* NotificationService.swift */; };
+		A10000160000000000000001 /* AppSwitchTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000160000000000000001 /* AppSwitchTracker.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A30000010000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A50000010000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A40000010000000000000001;
+			remoteInfo = OpenClawHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A20000010000000000000001 /* OpenClawHelperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawHelperApp.swift; sourceTree = "<group>"; };
+		A20000010000000000000002 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A20000010000000000000003 /* OpenClawHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawHelperTests.swift; sourceTree = "<group>"; };
+		A20000010000000000000004 /* OpenClawHelper-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "OpenClawHelper-Info.plist"; sourceTree = "<group>"; };
+		A20000010000000000000005 /* OpenClawHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OpenClawHelper.entitlements; sourceTree = "<group>"; };
+		A20000010000000000000006 /* OpenClawHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenClawHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000010000000000000007 /* OpenClawHelperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenClawHelperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000050000000000000001 /* BridgeSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeSnapshot.swift; sourceTree = "<group>"; };
+		A20000050000000000000002 /* PermissionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatus.swift; sourceTree = "<group>"; };
+		A20000050000000000000003 /* BridgeCommandRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeCommandRunner.swift; sourceTree = "<group>"; };
+		A20000050000000000000004 /* RefreshTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshTimer.swift; sourceTree = "<group>"; };
+		A20000050000000000000005 /* BridgeCommandRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeCommandRunnerTests.swift; sourceTree = "<group>"; };
+		A20000050000000000000006 /* bridge-status.active.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.active.json"; sourceTree = "<group>"; };
+		A20000050000000000000007 /* bridge-status.paused.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.paused.json"; sourceTree = "<group>"; };
+		A20000050000000000000008 /* bridge-status.needs-attention.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bridge-status.needs-attention.json"; sourceTree = "<group>"; };
+		A20000060000000000000001 /* MenuBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarViewModel.swift; sourceTree = "<group>"; };
+		A20000060000000000000002 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
+		A20000060000000000000003 /* StatusHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusHeaderView.swift; sourceTree = "<group>"; };
+		A20000060000000000000004 /* QuickActionsGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsGrid.swift; sourceTree = "<group>"; };
+		A20000060000000000000005 /* HealthStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthStripView.swift; sourceTree = "<group>"; };
+		A20000060000000000000006 /* MenuBarViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarViewModelTests.swift; sourceTree = "<group>"; };
+		A20000070000000000000001 /* ControlCenterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterViewModel.swift; sourceTree = "<group>"; };
+		A20000070000000000000002 /* ControlCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterView.swift; sourceTree = "<group>"; };
+		A20000070000000000000003 /* OverviewTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTabView.swift; sourceTree = "<group>"; };
+		A20000070000000000000004 /* DiagnosticsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTabView.swift; sourceTree = "<group>"; };
+		A20000080000000000000001 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		A20000080000000000000002 /* SettingsDeepLinkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDeepLinkService.swift; sourceTree = "<group>"; };
+		A20000080000000000000003 /* PermissionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsTabView.swift; sourceTree = "<group>"; };
+		A20000080000000000000004 /* PermissionStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatusTests.swift; sourceTree = "<group>"; };
+		A20000090000000000000001 /* HandoffDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffDraft.swift; sourceTree = "<group>"; };
+		A20000090000000000000003 /* PrivacyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyTabView.swift; sourceTree = "<group>"; };
+		A20000100000000000000001 /* DarkUtilityGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkUtilityGlass.swift; sourceTree = "<group>"; };
+		A20000110000000000000001 /* Handoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Handoff.swift; sourceTree = "<group>"; };
+		A20000110000000000000002 /* HandoffsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabViewModel.swift; sourceTree = "<group>"; };
+		A20000110000000000000003 /* HandoffsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffsTabView.swift; sourceTree = "<group>"; };
+		A20000120000000000000001 /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
+		A20000130000000000000001 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		A20000140000000000000001 /* DashboardTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTabView.swift; sourceTree = "<group>"; };
+		A20000150000000000000001 /* JCQuestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JCQuestion.swift; sourceTree = "<group>"; };
+		A20000150000000000000002 /* DailyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyEntry.swift; sourceTree = "<group>"; };
+		A20000150000000000000003 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		A20000160000000000000001 /* AppSwitchTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSwitchTracker.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A60000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000010000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A70000010000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A70000010000000000000002 /* OpenClawHelper */,
+				A70000010000000000000003 /* OpenClawHelperTests */,
+				A70000010000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A70000010000000000000002 /* OpenClawHelper */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000001 /* OpenClawHelperApp.swift */,
+				A20000010000000000000002 /* AppModel.swift */,
+				A20000010000000000000005 /* OpenClawHelper.entitlements */,
+				A70000050000000000000001 /* Models */,
+				A70000060000000000000001 /* ViewModels */,
+				A70000060000000000000002 /* Views */,
+				A70000050000000000000002 /* Services */,
+				A70000100000000000000001 /* Theme */,
+				A70000010000000000000005 /* Support */,
+			);
+			path = OpenClawHelper;
+			sourceTree = "<group>";
+		};
+		A70000010000000000000003 /* OpenClawHelperTests */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000003 /* OpenClawHelperTests.swift */,
+				A20000050000000000000005 /* BridgeCommandRunnerTests.swift */,
+				A20000060000000000000006 /* MenuBarViewModelTests.swift */,
+				A20000080000000000000004 /* PermissionStatusTests.swift */,
+				A70000050000000000000003 /* Fixtures */,
+			);
+			path = OpenClawHelperTests;
+			sourceTree = "<group>";
+		};
+		A70000010000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000006 /* OpenClawHelper.app */,
+				A20000010000000000000007 /* OpenClawHelperTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A70000010000000000000005 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000004 /* OpenClawHelper-Info.plist */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000001 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000050000000000000001 /* BridgeSnapshot.swift */,
+				A20000150000000000000002 /* DailyEntry.swift */,
+				A20000120000000000000001 /* DashboardData.swift */,
+				A20000110000000000000001 /* Handoff.swift */,
+				A20000090000000000000001 /* HandoffDraft.swift */,
+				A20000150000000000000001 /* JCQuestion.swift */,
+				A20000050000000000000002 /* PermissionStatus.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000002 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20000160000000000000001 /* AppSwitchTracker.swift */,
+				A20000050000000000000003 /* BridgeCommandRunner.swift */,
+				A20000150000000000000003 /* NotificationService.swift */,
+				A20000080000000000000001 /* PermissionService.swift */,
+				A20000050000000000000004 /* RefreshTimer.swift */,
+				A20000080000000000000002 /* SettingsDeepLinkService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A70000050000000000000003 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				A20000050000000000000006 /* bridge-status.active.json */,
+				A20000050000000000000007 /* bridge-status.paused.json */,
+				A20000050000000000000008 /* bridge-status.needs-attention.json */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		A70000060000000000000001 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				A20000070000000000000001 /* ControlCenterViewModel.swift */,
+				A20000130000000000000001 /* DashboardViewModel.swift */,
+				A20000110000000000000002 /* HandoffsTabViewModel.swift */,
+				A20000060000000000000001 /* MenuBarViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		A70000060000000000000002 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A20000060000000000000002 /* MenuBarPopoverView.swift */,
+				A20000060000000000000003 /* StatusHeaderView.swift */,
+				A20000060000000000000004 /* QuickActionsGrid.swift */,
+				A20000060000000000000005 /* HealthStripView.swift */,
+				A20000070000000000000002 /* ControlCenterView.swift */,
+				A70000070000000000000001 /* Tabs */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A70000070000000000000001 /* Tabs */ = {
+			isa = PBXGroup;
+			children = (
+				A20000140000000000000001 /* DashboardTabView.swift */,
+				A20000070000000000000004 /* DiagnosticsTabView.swift */,
+				A20000110000000000000003 /* HandoffsTabView.swift */,
+				A20000070000000000000003 /* OverviewTabView.swift */,
+				A20000080000000000000003 /* PermissionsTabView.swift */,
+				A20000090000000000000003 /* PrivacyTabView.swift */,
+			);
+			path = Tabs;
+			sourceTree = "<group>";
+		};
+		A70000100000000000000001 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A20000100000000000000001 /* DarkUtilityGlass.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A40000010000000000000001 /* OpenClawHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000010000000000000001 /* Build configuration list for PBXNativeTarget "OpenClawHelper" */;
+			buildPhases = (
+				A90000010000000000000001 /* Sources */,
+				A60000010000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenClawHelper;
+			productName = OpenClawHelper;
+			productReference = A20000010000000000000006 /* OpenClawHelper.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A40000010000000000000002 /* OpenClawHelperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000010000000000000002 /* Build configuration list for PBXNativeTarget "OpenClawHelperTests" */;
+			buildPhases = (
+				A90000010000000000000002 /* Sources */,
+				A60000010000000000000002 /* Frameworks */,
+				A90000050000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A30000010000000000000002 /* PBXTargetDependency */,
+			);
+			name = OpenClawHelperTests;
+			productName = OpenClawHelperTests;
+			productReference = A20000010000000000000007 /* OpenClawHelperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A50000010000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					A40000010000000000000001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					A40000010000000000000002 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = A40000010000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = A80000010000000000000003 /* Build configuration list for PBXProject "OpenClawHelper" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A70000010000000000000001;
+			productRefGroup = A70000010000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A40000010000000000000001 /* OpenClawHelper */,
+				A40000010000000000000002 /* OpenClawHelperTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A90000050000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000050000000000000006 /* bridge-status.active.json in Resources */,
+				A10000050000000000000007 /* bridge-status.paused.json in Resources */,
+				A10000050000000000000008 /* bridge-status.needs-attention.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A90000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000010000000000000001 /* OpenClawHelperApp.swift in Sources */,
+				A10000010000000000000002 /* AppModel.swift in Sources */,
+				A10000050000000000000001 /* BridgeSnapshot.swift in Sources */,
+				A10000050000000000000002 /* PermissionStatus.swift in Sources */,
+				A10000050000000000000003 /* BridgeCommandRunner.swift in Sources */,
+				A10000050000000000000004 /* RefreshTimer.swift in Sources */,
+				A10000060000000000000001 /* MenuBarViewModel.swift in Sources */,
+				A10000060000000000000002 /* MenuBarPopoverView.swift in Sources */,
+				A10000060000000000000003 /* StatusHeaderView.swift in Sources */,
+				A10000060000000000000004 /* QuickActionsGrid.swift in Sources */,
+				A10000060000000000000005 /* HealthStripView.swift in Sources */,
+				A10000070000000000000001 /* ControlCenterViewModel.swift in Sources */,
+				A10000070000000000000002 /* ControlCenterView.swift in Sources */,
+				A10000070000000000000003 /* OverviewTabView.swift in Sources */,
+				A10000070000000000000004 /* DiagnosticsTabView.swift in Sources */,
+				A10000080000000000000001 /* PermissionService.swift in Sources */,
+				A10000080000000000000002 /* SettingsDeepLinkService.swift in Sources */,
+				A10000080000000000000003 /* PermissionsTabView.swift in Sources */,
+				A10000090000000000000001 /* HandoffDraft.swift in Sources */,
+				A10000090000000000000003 /* PrivacyTabView.swift in Sources */,
+				A10000100000000000000001 /* DarkUtilityGlass.swift in Sources */,
+				A10000110000000000000001 /* Handoff.swift in Sources */,
+				A10000110000000000000002 /* HandoffsTabViewModel.swift in Sources */,
+				A10000110000000000000003 /* HandoffsTabView.swift in Sources */,
+				A10000120000000000000001 /* DashboardData.swift in Sources */,
+				A10000130000000000000001 /* DashboardViewModel.swift in Sources */,
+				A10000140000000000000001 /* DashboardTabView.swift in Sources */,
+				A10000150000000000000001 /* JCQuestion.swift in Sources */,
+				A10000150000000000000002 /* DailyEntry.swift in Sources */,
+				A10000150000000000000003 /* NotificationService.swift in Sources */,
+				A10000160000000000000001 /* AppSwitchTracker.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A90000010000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */,
+				A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */,
+				A10000060000000000000006 /* MenuBarViewModelTests.swift in Sources */,
+				A10000080000000000000004 /* PermissionStatusTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A30000010000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A40000010000000000000001 /* OpenClawHelper */;
+			targetProxy = A30000010000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B10000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B10000010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		B10000010000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OpenClawHelper/OpenClawHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OpenClawHelper/Support/OpenClawHelper-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ClawRelay;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainNibFile = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_NAME = ClawRelay;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B10000010000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OpenClawHelper/OpenClawHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OpenClawHelper/Support/OpenClawHelper-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ClawRelay;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainNibFile = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_NAME = ClawRelay;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B10000010000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
+				PRODUCT_NAME = ClawRelay;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";
+			};
+			name = Debug;
+		};
+		B10000010000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
+				PRODUCT_NAME = ClawRelay;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A80000010000000000000001 /* Build configuration list for PBXNativeTarget "OpenClawHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000010000000000000003 /* Debug */,
+				B10000010000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000010000000000000002 /* Build configuration list for PBXNativeTarget "OpenClawHelperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000010000000000000005 /* Debug */,
+				B10000010000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000010000000000000003 /* Build configuration list for PBXProject "OpenClawHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000010000000000000001 /* Debug */,
+				B10000010000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = A50000010000000000000001 /* Project object */;
+}

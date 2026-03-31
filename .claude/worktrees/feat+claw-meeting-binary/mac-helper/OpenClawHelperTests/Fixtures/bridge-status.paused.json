@@ -1,0 +1,8 @@
+{
+  "trackingState": "paused",
+  "pauseUntil": "indefinite",
+  "sensitiveMode": false,
+  "queueDepth": 3,
+  "daemonLaunchdState": "loaded",
+  "watcherLaunchdState": "loaded"
+}

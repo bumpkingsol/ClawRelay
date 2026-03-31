@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.openclaw.context-bridge</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__CONTEXT_BRIDGE_BIN_DIR__/context-bridge-daemon.sh</string>
+    </array>
+    
+    <!-- Run every 120 seconds (2 minutes) -->
+    <key>StartInterval</key>
+    <integer>120</integer>
+    
+    <!-- Also run on load -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Keep alive - restart if crashes -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/tmp/context-bridge.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/context-bridge-error.log</string>
+    
+    <!-- Environment -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,20 @@
+*.db
+*.log
+__pycache__/
+*.pyc
+.env
+*.pem
+*.key
+.DS_Store
+
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Superpowers
+.superpowers/
+
+# Build artifacts
+OpenClawHelper-*.zip
+mac-helper/build/

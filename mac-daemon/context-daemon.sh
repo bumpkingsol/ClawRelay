@@ -8,7 +8,9 @@ set -euo pipefail
 umask 077
 
 # --- Config ---
-CB_DIR="$HOME/.context-bridge"
+CB_DIR="${CONTEXT_BRIDGE_DIR:-$HOME/.context-bridge}"
+export CONTEXT_BRIDGE_DIR="$CB_DIR"
+
 SERVER_URL_FILE="$CB_DIR/server-url"
 SERVER_URL="${CONTEXT_BRIDGE_URL:-}"
 if [ -z "$SERVER_URL" ] && [ -f "$SERVER_URL_FILE" ]; then
@@ -16,7 +18,7 @@ if [ -z "$SERVER_URL" ] && [ -f "$SERVER_URL_FILE" ]; then
 fi
 SERVER_URL="${SERVER_URL:-https://localhost:7890/context/push}"
 AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
-CMD_LOG="$HOME/.context-bridge-cmds.log"
+CMD_LOG="$CB_DIR/cmds.log"
 LOCAL_DB="$CB_DIR/local.db"
 CLIPBOARD_HASH_FILE="$CB_DIR/last-clipboard-hash"
 FSWATCH_LOG="$CB_DIR/fswatch-changes.log"
@@ -37,6 +39,10 @@ if [ ! -f "$LOCAL_DB" ]; then
 fi
 chmod 600 "$LOCAL_DB" 2>/dev/null || true
 
+logger() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >&2
+}
+
 # --- Source shared helpers and check pause state ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/context-common.sh"
@@ -54,6 +60,12 @@ if [ -z "$AUTH_TOKEN" ]; then
   fi
 fi
 
+# Pre-compute TLS args once per daemon cycle (optimization)
+CURL_TLS_ARGS=()
+if [[ "$SERVER_URL" == https://* ]] && [ -f "$SERVER_CA_CERT_FILE" ]; then
+  CURL_TLS_ARGS=("--cacert" "$SERVER_CA_CERT_FILE")
+fi
+
 # Flush handoff outbox on every exit (including early exits for idle/paused/sensitive)
 trap 'flush_handoff_outbox' EXIT
 
@@ -63,20 +75,16 @@ flush_handoff_outbox() {
   local handoff_url="$(echo "$SERVER_URL" | sed 's|/context/push|/context/handoff|')"
   for hf in "$outbox"/*.json; do
     [ -f "$hf" ] || continue
-    local hf_curl_args=()
-    while IFS= read -r arg; do
-      hf_curl_args+=("$arg")
-    done < <(curl_tls_args)
 
     local hf_code
-    if [ ${#hf_curl_args[@]} -gt 0 ]; then
+    if [ ${#CURL_TLS_ARGS[@]} -gt 0 ]; then
       hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
         -X POST "$handoff_url" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
         -H "Content-Type: application/json" \
         -d @"$hf" \
         --connect-timeout 5 --max-time 10 \
-        "${hf_curl_args[@]}" \
+        "${CURL_TLS_ARGS[@]}" \
         2>/dev/null || echo "000")
     else
       hf_code=$(curl -sf -o /dev/null -w "%{http_code}" \
@@ -113,21 +121,26 @@ flush_queue() {
     return
   fi
 
-  sqlite3 "$LOCAL_DB" "SELECT payload FROM queue ORDER BY id ASC LIMIT 50;" 2>/dev/null | while read -r queued_payload; do
-    local curl_args=()
-    while IFS= read -r arg; do
-      curl_args+=("$arg")
-    done < <(curl_tls_args)
+  # Use flock to prevent concurrent daemon instances from interfering
+  exec 200>"$CB_DIR/.queue.lock"
+  if ! flock -n 200; then
+    logger "Another instance is flushing queue, skipping"
+    return
+  fi
 
-    if [ ${#curl_args[@]} -gt 0 ]; then
+  sqlite3 "$LOCAL_DB" "SELECT id, payload FROM queue ORDER BY id ASC LIMIT 50;" 2>/dev/null | while IFS='|' read -r queued_id queued_payload; do
+    [ -z "$queued_id" ] && continue
+    
+    local success=0
+    if [ ${#CURL_TLS_ARGS[@]} -gt 0 ]; then
       curl -sf -o /dev/null \
         -X POST "$SERVER_URL" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$queued_payload" \
         --connect-timeout 5 --max-time 10 \
-        "${curl_args[@]}" \
-        2>/dev/null
+        "${CURL_TLS_ARGS[@]}" \
+        2>/dev/null && success=1
     else
       curl -sf -o /dev/null \
         -X POST "$SERVER_URL" \
@@ -135,22 +148,22 @@ flush_queue() {
         -H "Content-Type: application/json" \
         -d "$queued_payload" \
         --connect-timeout 5 --max-time 10 \
-        2>/dev/null
-    fi && \
-      sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE payload = '$(echo "$queued_payload" | sed "s/'/''/g")';" 2>/dev/null
-  done || true
+        2>/dev/null && success=1
+    fi
+    
+    if [ "$success" -eq 1 ]; then
+      sqlite3 "$LOCAL_DB" "DELETE FROM queue WHERE id = $queued_id;" 2>/dev/null
+    fi
+  done
+  
+  flock -u 200
 }
 
 send_payload() {
   local payload="$1"
   local http_code
-  local curl_args=()
 
-  while IFS= read -r arg; do
-    curl_args+=("$arg")
-  done < <(curl_tls_args)
-
-  if [ ${#curl_args[@]} -gt 0 ]; then
+  if [ ${#CURL_TLS_ARGS[@]} -gt 0 ]; then
     http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
       -X POST "$SERVER_URL" \
       -H "Authorization: Bearer $AUTH_TOKEN" \
@@ -158,7 +171,7 @@ send_payload() {
       -d "$payload" \
       --connect-timeout 5 \
       --max-time 10 \
-      "${curl_args[@]}" \
+      "${CURL_TLS_ARGS[@]}" \
       2>/dev/null || echo "000")
   else
     http_code=$(curl -sf -o /dev/null -w "%{http_code}" \

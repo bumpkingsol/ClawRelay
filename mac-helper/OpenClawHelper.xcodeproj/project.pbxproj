@@ -61,6 +61,9 @@
 		A10000180000000000000012 /* NotificationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000012 /* NotificationCardView.swift */; };
 		A10000190000000000000001 /* HealthDetailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000001 /* HealthDetailCard.swift */; };
 		A10000200000000000000001 /* MeetingHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000001 /* MeetingHistory.swift */; };
+		A10000200000000000000002 /* MeetingsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000002 /* MeetingsTabView.swift */; };
+		A10000200000000000000003 /* MeetingRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000003 /* MeetingRowView.swift */; };
+		A10000200000000000000004 /* ParticipantRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000004 /* ParticipantRowView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -132,6 +135,9 @@
 		A20000180000000000000012 /* NotificationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCardView.swift; sourceTree = "<group>"; };
 		A20000190000000000000001 /* HealthDetailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDetailCard.swift; sourceTree = "<group>"; };
 		A20000200000000000000001 /* MeetingHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingHistory.swift; sourceTree = "<group>"; };
+		A20000200000000000000002 /* MeetingsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingsTabView.swift; sourceTree = "<group>"; };
+		A20000200000000000000003 /* MeetingRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingRowView.swift; sourceTree = "<group>"; };
+		A20000200000000000000004 /* ParticipantRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipantRowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -289,7 +295,10 @@
 				A20000140000000000000001 /* DashboardTabView.swift */,
 				A20000070000000000000004 /* DiagnosticsTabView.swift */,
 				A20000110000000000000003 /* HandoffsTabView.swift */,
+				A20000200000000000000003 /* MeetingRowView.swift */,
+				A20000200000000000000002 /* MeetingsTabView.swift */,
 				A20000070000000000000003 /* OverviewTabView.swift */,
+				A20000200000000000000004 /* ParticipantRowView.swift */,
 				A20000080000000000000003 /* PermissionsTabView.swift */,
 				A20000090000000000000003 /* PrivacyTabView.swift */,
 			);
@@ -444,6 +453,9 @@
 				A10000180000000000000012 /* NotificationCardView.swift in Sources */,
 				A10000190000000000000001 /* HealthDetailCard.swift in Sources */,
 				A10000200000000000000001 /* MeetingHistory.swift in Sources */,
+				A10000200000000000000002 /* MeetingsTabView.swift in Sources */,
+				A10000200000000000000003 /* MeetingRowView.swift in Sources */,
+				A10000200000000000000004 /* ParticipantRowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

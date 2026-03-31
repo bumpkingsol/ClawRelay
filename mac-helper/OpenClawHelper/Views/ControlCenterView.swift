@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ControlCenterView: View {
     @ObservedObject var viewModel: ControlCenterViewModel
+    @ObservedObject var meetingViewModel: MeetingViewModel
 
     var body: some View {
         HStack(spacing: 0) {
@@ -34,6 +35,8 @@ struct ControlCenterView: View {
                 switch viewModel.selectedTab {
                 case .dashboard:
                     DashboardTabView(viewModel: DashboardViewModel(runner: viewModel.runner))
+                case .meetings:
+                    MeetingsTabView(meetingVM: meetingViewModel)
                 case .overview:
                     OverviewTabView(viewModel: viewModel)
                 case .diagnostics:
@@ -62,6 +65,7 @@ struct ControlCenterView: View {
     private func tabIcon(_ tab: ControlCenterTab) -> String {
         switch tab {
         case .dashboard: return "chart.bar.xaxis"
+        case .meetings: return "mic.and.signal.meter"
         case .overview: return "gauge.with.dots.needle.33percent"
         case .permissions: return "lock.shield"
         case .privacy: return "hand.raised"

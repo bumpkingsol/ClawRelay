@@ -11,7 +11,7 @@ struct OpenClawHelperApp: App {
         .menuBarExtraStyle(.window)
 
         Window("ClawRelay", id: "control-center") {
-            ControlCenterView(viewModel: appModel.controlCenterViewModel)
+            ControlCenterView(viewModel: appModel.controlCenterViewModel, meetingViewModel: appModel.meetingViewModel)
         }
     }
 }

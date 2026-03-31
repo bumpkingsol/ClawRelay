@@ -598,6 +598,51 @@ def get_projects():
         return jsonify({"error": "Internal error"}), 500
 
 
+@app.route("/context/meetings", methods=["GET"])
+def get_meetings():
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    days = min(int(request.args.get('days', 7)), 30)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    try:
+        db = get_db()
+        rows = db.execute("""
+            SELECT id, started_at, ended_at, duration_seconds, app,
+                   participants, summary_md, transcript_json
+            FROM meeting_sessions
+            WHERE started_at >= ?
+            ORDER BY started_at DESC
+        """, (cutoff,)).fetchall()
+        db.close()
+
+        meetings = []
+        for r in rows:
+            participants = []
+            try:
+                participants = json.loads(r['participants']) if r['participants'] else []
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            meetings.append({
+                'id': r['id'],
+                'started_at': r['started_at'],
+                'ended_at': r['ended_at'],
+                'duration_seconds': r['duration_seconds'],
+                'app': r['app'],
+                'participants': participants,
+                'summary_md': r['summary_md'],
+                'has_transcript': r['transcript_json'] is not None,
+                'purge_status': 'live' if r['transcript_json'] is not None else 'summary_only',
+            })
+
+        return jsonify({'meetings': meetings})
+    except Exception:
+        logger.exception("Failed to get meetings")
+        return jsonify({'error': 'Internal error'}), 500
+
+
 @app.route('/context/jc-work-log', methods=['GET'])
 def jc_work_log():
     """Agent work log - readable by ClawRelay app."""

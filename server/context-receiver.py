@@ -155,6 +155,11 @@ def init_db():
         db.execute("ALTER TABLE activity_stream ADD COLUMN whatsapp_messages TEXT")
     except Exception:
         pass  # Column already exists
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS portfolio_projects (
+            name TEXT PRIMARY KEY
+        )
+    """)
     db.commit()
     db.execute("UPDATE activity_stream SET clipboard = NULL WHERE clipboard IS NOT NULL")
     scrub_raw_payloads(db)
@@ -571,6 +576,23 @@ def health():
     except Exception:
         logger.exception("Health check failed")
         return jsonify({'status': 'error'}), 500
+
+
+@app.route("/context/projects", methods=["GET"])
+def get_projects():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    expected = os.environ.get("CONTEXT_BRIDGE_TOKEN", "").strip()
+    if not expected or token != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        rows = db.execute(
+            "SELECT name FROM portfolio_projects ORDER BY name ASC"
+        ).fetchall()
+        return jsonify({"projects": [r["name"] for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/context/jc-work-log', methods=['GET'])

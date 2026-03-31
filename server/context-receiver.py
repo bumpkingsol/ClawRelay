@@ -580,19 +580,18 @@ def health():
 
 @app.route("/context/projects", methods=["GET"])
 def get_projects():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-    expected = os.environ.get("CONTEXT_BRIDGE_TOKEN", "").strip()
-    if not expected or token != expected:
-        return jsonify({"error": "Unauthorized"}), 401
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
 
     try:
         db = get_db()
         rows = db.execute(
             "SELECT name FROM portfolio_projects ORDER BY name ASC"
         ).fetchall()
+        db.close()
         return jsonify({"projects": [r["name"] for r in rows]})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Internal error"}), 500
 
 
 @app.route('/context/jc-work-log', methods=['GET'])

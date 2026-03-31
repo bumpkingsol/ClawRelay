@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ControlCenterTab: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, overview, permissions, privacy, handoffs, diagnostics
+    case dashboard, meetings, overview, permissions, privacy, handoffs, diagnostics
     var id: String { rawValue }
 }
 

@@ -5,6 +5,7 @@ Accepts activity pushes from Mac daemon, stores in SQLite.
 """
 
 import os
+import sys
 import json
 import sqlite3
 import logging
@@ -22,8 +23,13 @@ logger = logging.getLogger(__name__)
 AUTH_TOKEN = os.environ.get('CONTEXT_BRIDGE_TOKEN', '').strip()
 MAX_CONTENT_LENGTH = int(os.environ.get('CONTEXT_BRIDGE_MAX_CONTENT_LENGTH', '262144'))
 PURGE_HOURS = 48
+MEETING_FRAMES_DIR = Path(os.environ.get(
+    'MEETING_FRAMES_DIR',
+    str(Path(DB_PATH).parent / 'meeting-frames')
+))
+MEETING_MAX_CONTENT_LENGTH = int(os.environ.get('MEETING_MAX_CONTENT_LENGTH', '52428800'))  # 50MB
 
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+app.config['MAX_CONTENT_LENGTH'] = max(MAX_CONTENT_LENGTH, MEETING_MAX_CONTENT_LENGTH)
 
 def get_db():
     """Get SQLite connection with WAL mode and optional encryption."""
@@ -109,6 +115,42 @@ def init_db():
             seen INTEGER DEFAULT 0
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS participant_profiles (
+            id TEXT PRIMARY KEY,
+            display_name TEXT,
+            face_embedding BLOB,
+            meetings_observed INTEGER DEFAULT 0,
+            profile_json TEXT,
+            last_updated TEXT
+        )
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_participant_display_name
+        ON participant_profiles(display_name)
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS meeting_sessions (
+            id TEXT PRIMARY KEY,
+            started_at TEXT,
+            ended_at TEXT,
+            duration_seconds INTEGER,
+            app TEXT,
+            participants TEXT,
+            transcript_json TEXT,
+            visual_events_json TEXT,
+            summary_md TEXT,
+            raw_data_purge_at TEXT
+        )
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meeting_started
+        ON meeting_sessions(started_at)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meeting_purge
+        ON meeting_sessions(raw_data_purge_at)
+    """)
     try:
         db.execute("ALTER TABLE activity_stream ADD COLUMN whatsapp_messages TEXT")
     except Exception:
@@ -151,6 +193,37 @@ def purge_old_data():
     deleted_commits = db.execute(
         "DELETE FROM commits WHERE created_at < ?", (cutoff,)
     ).rowcount
+
+    # Purge raw meeting data (transcript_json, visual_events_json) after 48h
+    # Keep summary_md permanently
+    purged_meetings = db.execute("""
+        UPDATE meeting_sessions
+        SET transcript_json = NULL, visual_events_json = NULL
+        WHERE raw_data_purge_at IS NOT NULL
+          AND raw_data_purge_at < ?
+          AND transcript_json IS NOT NULL
+    """, (cutoff,)).rowcount
+
+    if purged_meetings:
+        logger.info(f"Purged raw data from {purged_meetings} meeting sessions")
+
+    # Purge screenshot files for expired meetings
+    try:
+        expired_sessions = db.execute("""
+            SELECT id FROM meeting_sessions
+            WHERE raw_data_purge_at IS NOT NULL
+              AND raw_data_purge_at < ?
+        """, (cutoff,)).fetchall()
+
+        for session in expired_sessions:
+            session_dir = MEETING_FRAMES_DIR / session['id']
+            if session_dir.exists():
+                import shutil
+                shutil.rmtree(session_dir)
+                logger.info(f"Purged screenshots for meeting {session['id']}")
+    except Exception:
+        logger.exception("Failed to purge meeting screenshots")
+
     db.commit()
     db.close()
     if deleted_activity or deleted_commits:
@@ -541,6 +614,234 @@ def mark_jc_question(qid):
     db.commit()
     db.close()
     return jsonify({'status': 'ok'})
+
+
+@app.route('/context/meeting/session', methods=['POST'])
+def push_meeting_session():
+    """Receive final transcript + metadata for a completed meeting."""
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    data, error = parse_json_request()
+    if error:
+        return error
+
+    meeting_id = data.get('meeting_id')
+    if not meeting_id:
+        return jsonify({'error': 'missing meeting_id'}), 400
+
+    started_at = data.get('started_at')
+    ended_at = data.get('ended_at')
+    if not started_at or not ended_at:
+        return jsonify({'error': 'missing started_at or ended_at'}), 400
+
+    duration_seconds = data.get('duration_seconds', 0)
+    app_name = data.get('app', '')
+    participants = data.get('participants', '')
+    transcript_json = data.get('transcript_json')
+    visual_events_json = data.get('visual_events_json')
+
+    # Calculate purge time: 48h from now
+    purge_at = (datetime.now(timezone.utc) + timedelta(hours=PURGE_HOURS)).isoformat()
+
+    db = get_db()
+    db.execute("""
+        INSERT INTO meeting_sessions
+        (id, started_at, ended_at, duration_seconds, app, participants,
+         transcript_json, visual_events_json, summary_md, raw_data_purge_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            started_at = excluded.started_at,
+            ended_at = excluded.ended_at,
+            duration_seconds = excluded.duration_seconds,
+            app = excluded.app,
+            participants = excluded.participants,
+            transcript_json = excluded.transcript_json,
+            visual_events_json = excluded.visual_events_json,
+            raw_data_purge_at = excluded.raw_data_purge_at
+    """, (
+        meeting_id,
+        started_at,
+        ended_at,
+        duration_seconds,
+        app_name,
+        json.dumps(participants) if isinstance(participants, list) else participants,
+        json.dumps(transcript_json) if transcript_json else None,
+        json.dumps(visual_events_json) if visual_events_json else None,
+        purge_at,
+    ))
+    db.commit()
+    db.close()
+
+    # Trigger async processing (meeting_processor.py)
+    try:
+        import subprocess
+        processor_path = Path(__file__).parent / 'meeting_processor.py'
+        if processor_path.exists():
+            subprocess.Popen(
+                [sys.executable, str(processor_path), '--meeting-id', meeting_id],
+                stdout=open('/tmp/meeting-processor.log', 'a'),
+                stderr=subprocess.STDOUT,
+            )
+            logger.info(f"Triggered meeting processor for {meeting_id}")
+    except Exception:
+        logger.exception(f"Failed to trigger meeting processor for {meeting_id}")
+
+    return jsonify({
+        'status': 'ok',
+        'meeting_id': meeting_id,
+        'purge_at': purge_at,
+    }), 201
+
+
+@app.route('/context/meeting/frames', methods=['POST'])
+def push_meeting_frames():
+    """Receive screenshot PNGs for a meeting session.
+
+    Expects multipart/form-data with:
+    - meeting_id (form field)
+    - frames: up to 10 PNG files, max 50MB total
+    """
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    meeting_id = request.form.get('meeting_id')
+    if not meeting_id:
+        return jsonify({'error': 'missing meeting_id'}), 400
+
+    files = request.files.getlist('frames')
+    if not files:
+        return jsonify({'error': 'no files uploaded'}), 400
+
+    if len(files) > 10:
+        return jsonify({'error': 'max 10 files per request'}), 400
+
+    # Create session directory
+    session_dir = MEETING_FRAMES_DIR / meeting_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    saved = []
+    for f in files:
+        if not f.filename:
+            continue
+        # Sanitize filename: only allow alphanumeric, hyphens, underscores, dots
+        import re
+        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', f.filename)
+        if not safe_name.lower().endswith('.png'):
+            safe_name += '.png'
+        dest = session_dir / safe_name
+        f.save(str(dest))
+        saved.append(safe_name)
+
+    logger.info(f"Saved {len(saved)} frames for meeting {meeting_id}")
+
+    return jsonify({
+        'status': 'ok',
+        'meeting_id': meeting_id,
+        'frames_saved': len(saved),
+        'filenames': saved,
+    }), 201
+
+
+@app.route('/meeting/context-request', methods=['POST'])
+def meeting_context_request():
+    """Handle live fallback card requests from ClawRelay during meetings.
+
+    ClawRelay sends transcript context when no local briefing card matches.
+    Server generates a contextual card and returns it.
+
+    Rate limited: max 5 per meeting, min 60s between requests.
+    """
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    data, error = parse_json_request()
+    if error:
+        return error
+
+    meeting_id = data.get('meeting_id')
+    if not meeting_id:
+        return jsonify({'error': 'missing meeting_id'}), 400
+
+    transcript_context = data.get('transcript_context', '')
+    if not transcript_context:
+        return jsonify({'error': 'missing transcript_context'}), 400
+
+    topic = data.get('topic', '')
+    participants = data.get('participants', [])
+
+    # Rate limiting: check recent requests for this meeting
+    db = get_db()
+
+    # Ensure context_requests table exists
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS meeting_context_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meeting_id TEXT NOT NULL,
+            transcript_context TEXT,
+            response_card TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
+    recent_requests = db.execute("""
+        SELECT COUNT(*) as cnt, MAX(created_at) as last_at
+        FROM meeting_context_requests
+        WHERE meeting_id = ?
+    """, (meeting_id,)).fetchone()
+
+    request_count = recent_requests['cnt']
+    last_request_at = recent_requests['last_at']
+
+    # Rate limit: max 5 per meeting
+    if request_count >= 5:
+        db.close()
+        return jsonify({
+            'error': 'rate_limited',
+            'message': 'Maximum 5 context requests per meeting',
+        }), 429
+
+    # Rate limit: min 60s between requests
+    if last_request_at:
+        try:
+            last_dt = datetime.fromisoformat(last_request_at)
+            elapsed = (datetime.now() - last_dt).total_seconds()
+            if elapsed < 60:
+                db.close()
+                return jsonify({
+                    'error': 'rate_limited',
+                    'message': f'Minimum 60s between requests. Wait {int(60 - elapsed)}s.',
+                    'retry_after': int(60 - elapsed),
+                }), 429
+        except (ValueError, TypeError):
+            pass
+
+    # Generate a placeholder card.
+    # In production, this calls JC's memory search + Claude to generate a card.
+    # For now, return an acknowledgement that the request was received.
+    card = {
+        'title': f'Context: {topic[:50]}' if topic else 'Analyzing...',
+        'body': 'JC is searching memory for relevant context. Card will be updated.',
+        'priority': 'medium',
+        'category': 'fallback',
+        'source': 'jc_generated',
+    }
+
+    db.execute("""
+        INSERT INTO meeting_context_requests
+        (meeting_id, transcript_context, response_card)
+        VALUES (?, ?, ?)
+    """, (meeting_id, transcript_context[:5000], json.dumps(card)))
+    db.commit()
+    db.close()
+
+    logger.info(f"Context request for meeting {meeting_id} (request #{request_count + 1})")
+
+    return jsonify({
+        'status': 'ok',
+        'card': card,
+        'requests_remaining': 4 - request_count,
+    }), 200
 
 
 @app.route('/context/dashboard', methods=['GET'])

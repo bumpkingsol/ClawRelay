@@ -188,6 +188,23 @@ def get_git_diffs(repo_name, since_hours=8):
     return diffs
 
 
+def get_recent_meetings(since_ts):
+    """Get meeting sessions within the digest window."""
+    db = get_db()
+    try:
+        meetings = db.execute("""
+            SELECT id, started_at, ended_at, duration_seconds, app, participants, summary_md
+            FROM meeting_sessions
+            WHERE started_at >= ?
+            ORDER BY started_at
+        """, (since_ts,)).fetchall()
+    except Exception:
+        # meeting_sessions table may not exist yet
+        meetings = []
+    db.close()
+    return meetings
+
+
 def build_digest(hours_back=8):
     """Build a structured digest from recent activity."""
     db = get_db()
@@ -485,6 +502,51 @@ def build_digest(hours_back=8):
         for fp in focus_periods:
             lines.append(fp)
         lines.append("")
+
+    # --- Meetings ---
+    try:
+        meetings = get_recent_meetings(since)
+        if meetings:
+            lines.append("## Meetings")
+            lines.append("")
+            for m in meetings:
+                duration_min = (m['duration_seconds'] or 0) // 60
+                start_time = m['started_at'][11:16] if m['started_at'] and len(m['started_at']) > 16 else '??:??'
+                end_time = m['ended_at'][11:16] if m['ended_at'] and len(m['ended_at']) > 16 else '??:??'
+                app_name = m['app'] or 'Unknown'
+
+                # Parse participants for display
+                try:
+                    participants = json.loads(m['participants']) if isinstance(m['participants'], str) else (m['participants'] or [])
+                    if isinstance(participants, list):
+                        others = [p for p in participants if p.lower() != 'jonas']
+                        participant_str = ', '.join(others) if others else 'Solo'
+                    else:
+                        participant_str = str(participants)
+                except (json.JSONDecodeError, TypeError):
+                    participant_str = m['participants'] or 'Unknown'
+
+                meeting_title = m['id'].replace('-', ' ').title() if m['id'] else 'Unknown'
+                lines.append(f"- **{start_time}-{end_time}** {meeting_title} ({app_name}, {participant_str})")
+
+                # Include summary excerpt if available
+                if m['summary_md']:
+                    summary_lines = m['summary_md'].split('\n')
+                    excerpt_parts = []
+                    for sl in summary_lines:
+                        sl = sl.strip()
+                        if sl and not sl.startswith('#') and not sl.startswith('**') and not sl.startswith('*'):
+                            excerpt_parts.append(sl)
+                            if len(excerpt_parts) >= 2:
+                                break
+                    if excerpt_parts:
+                        lines.append(f"  {' '.join(excerpt_parts)[:200]}")
+
+                lines.append(f"  Full summary: meeting_sessions/{m['id']}")
+
+            lines.append("")
+    except Exception:
+        pass
 
     # Time allocation summary
     if project_captures:

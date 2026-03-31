@@ -4,20 +4,57 @@ struct StatusHeaderView: View {
     let snapshot: BridgeSnapshot
 
     var body: some View {
-        HStack {
-            Image(systemName: snapshot.trackingState.menuBarSymbol)
-                .font(.title2)
-                .foregroundStyle(stateColor)
-            VStack(alignment: .leading) {
-                Text(stateLabel)
-                    .font(.headline)
-                if let detail = stateDetail {
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        HStack(alignment: .center) {
+            // Icon container
+            RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
+                .fill(stateColor.opacity(0.12))
+                .frame(width: 34, height: 34)
+                .overlay {
+                    stateIcon
                 }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(stateLabel)
+                    .font(.system(size: 14, weight: .semibold))
+                    .tracking(-0.2)
+
+                Text(stateSubtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(stateColor)
             }
+
             Spacer()
+
+            Text("Queue: \(snapshot.queueDepth)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(snapshot.queueDepth > 10 ? DarkUtilityGlass.warningAmber : DarkUtilityGlass.mutedGray)
+        }
+        .padding(.bottom, 16)
+        .overlay(alignment: .bottom) {
+            DarkUtilityGlass.divider.frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var stateIcon: some View {
+        switch snapshot.trackingState {
+        case .active:
+            Circle()
+                .fill(DarkUtilityGlass.activeGreen)
+                .frame(width: 10, height: 10)
+                .shadow(color: DarkUtilityGlass.activeGreen.opacity(0.27), radius: 4)
+        case .paused:
+            Image(systemName: "pause.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(DarkUtilityGlass.warningAmber)
+        case .sensitive:
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 14))
+                .foregroundStyle(DarkUtilityGlass.sensitivePurple)
+        case .needsAttention:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(DarkUtilityGlass.warningAmber)
         }
     }
 
@@ -30,38 +67,43 @@ struct StatusHeaderView: View {
         }
     }
 
-    private var stateColor: Color {
+    private var stateSubtitle: String {
         switch snapshot.trackingState {
-        case .active: return .green
-        case .paused: return .orange
-        case .sensitive: return .purple
-        case .needsAttention: return .red
-        }
-    }
-
-    private var stateDetail: String? {
-        switch snapshot.trackingState {
+        case .active:
+            return snapshot.healthSummary
         case .paused:
-            if let until = snapshot.pauseUntil, until != "indefinite" {
-                if let epoch = TimeInterval(until) {
-                    let date = Date(timeIntervalSince1970: epoch)
-                    let fmt = DateFormatter()
-                    fmt.doesRelativeDateFormatting = true
-                    fmt.dateStyle = .short
-                    fmt.timeStyle = .short
-                    return "Until \(fmt.string(from: date))"
-                }
-                return "Until \(until)"
-            }
-            return "Indefinitely"
+            return pauseSubtitle
         case .sensitive:
             return "Reduced capture active"
         case .needsAttention:
-            if snapshot.daemonLaunchdState == "missing" { return "Daemon not running" }
-            if snapshot.watcherLaunchdState == "missing" { return "File watcher stopped" }
-            return nil
-        default:
-            return nil
+            let down = snapshot.totalServiceCount - snapshot.healthyServiceCount
+            return "\(down) service\(down == 1 ? "" : "s") down"
+        }
+    }
+
+    private var pauseSubtitle: String {
+        guard let until = snapshot.pauseUntil, until != "indefinite" else {
+            return "Paused indefinitely"
+        }
+        if let epoch = TimeInterval(until) {
+            let remaining = epoch - Date().timeIntervalSince1970
+            if remaining <= 0 { return "Resuming..." }
+            let minutes = Int(ceil(remaining / 60))
+            if minutes >= 60 {
+                let hours = minutes / 60
+                return "Resumes in \(hours)h \(minutes % 60)m"
+            }
+            return "Resumes in \(minutes)m"
+        }
+        return "Until \(until)"
+    }
+
+    private var stateColor: Color {
+        switch snapshot.trackingState {
+        case .active: return DarkUtilityGlass.activeGreen
+        case .paused: return DarkUtilityGlass.warningAmber
+        case .sensitive: return DarkUtilityGlass.sensitivePurple
+        case .needsAttention: return DarkUtilityGlass.warningAmber
         }
     }
 }

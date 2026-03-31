@@ -12,6 +12,16 @@ final class MeetingSessionManager: ObservableObject {
     let workerManager: MeetingWorkerManager
     let briefingCache: BriefingCacheService
 
+    private static let appBundleIds: [String: String] = [
+        "zoom": "us.zoom.xos",
+        "google-meet": "com.google.Chrome",
+    ]
+
+    var detectedMeetingAppBundleId: String? {
+        guard let app = detector.detectedApp else { return nil }
+        return Self.appBundleIds[app]
+    }
+
     private var cancellables = Set<AnyCancellable>()
     private var elapsedTimer: Timer?
     private var manuallyStarted: Bool = false

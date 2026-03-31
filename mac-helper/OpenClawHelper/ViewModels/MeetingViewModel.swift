@@ -58,21 +58,31 @@ final class MeetingViewModel: ObservableObject {
                 panel.showWithContent(OverlayNotificationsView(viewModel: self))
                 overlayPanel = panel
             }
-            if showSidebar && sidebarPanel == nil {
-                let panel = MeetingSidebarPanel()
-                panel.showWithContent(MeetingSidebarView(viewModel: self))
-                sidebarPanel = panel
-            } else if !showSidebar {
-                sidebarPanel?.dismiss()
-                sidebarPanel = nil
+            if showSidebar {
+                showSidebarPanel()
+            } else {
+                dismissSidebarPanel()
             }
 
         default:
             overlayPanel?.dismiss()
             overlayPanel = nil
-            sidebarPanel?.dismiss()
-            sidebarPanel = nil
+            dismissSidebarPanel()
         }
+    }
+
+    private func showSidebarPanel() {
+        guard sidebarPanel == nil else { return }
+        let bundleId = sessionManager.detectedMeetingAppBundleId
+        let panel = MeetingSidebarPanel(meetingAppBundleId: bundleId)
+        panel.showWithContent(MeetingSidebarView(viewModel: self))
+        panel.startTracking()
+        sidebarPanel = panel
+    }
+
+    private func dismissSidebarPanel() {
+        sidebarPanel?.dismiss()
+        sidebarPanel = nil
     }
 
     var state: MeetingLifecycleState { sessionManager.state }

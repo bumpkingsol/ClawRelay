@@ -26,6 +26,26 @@ struct BridgeSnapshot: Decodable, Equatable {
     var meetingElapsedSeconds: Int?
     var meetingWorkerPid: Int?
 
+    var totalServiceCount: Int {
+        whatsappLaunchdState != nil ? 3 : 2
+    }
+
+    var healthyServiceCount: Int {
+        var count = 0
+        if daemonLaunchdState == "loaded" { count += 1 }
+        if watcherLaunchdState == "loaded" { count += 1 }
+        if let wa = whatsappLaunchdState, wa == "loaded" { count += 1 }
+        return count
+    }
+
+    var healthSummary: String {
+        "\(healthyServiceCount)/\(totalServiceCount) services healthy"
+    }
+
+    var isFullyHealthy: Bool {
+        healthyServiceCount == totalServiceCount && queueDepth <= 10
+    }
+
     static let placeholder = BridgeSnapshot(
         trackingState: .active,
         pauseUntil: nil,

@@ -22,9 +22,9 @@
 - [x] Daemon watchdog script
 - [x] fswatch file watcher as separate launchd service
 - [x] Installer handles all components + permissions guidance
-- [ ] **Server-side setup and running**
-- [ ] **Mac-side installation and testing**
-- [ ] **First real data flowing**
+- [x] **Server-side setup and running**
+- [x] **Mac-side installation and testing**
+- [x] **First real data flowing**
 
 ## Phase 2: Integration ✅ (enhancement work complete)
 **Goal:** The agent makes better autonomous decisions using the data.

@@ -8,7 +8,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERSION=$(grep 'MARKETING_VERSION' "$ROOT_DIR/mac-helper/OpenClawHelper.xcodeproj/project.pbxproj" | head -1 | sed 's/.*= //' | tr -d ';[:space:]')
 ZIP_NAME="OpenClawHelper-v${VERSION}.zip"
 BUILD_DIR="$ROOT_DIR/mac-helper/build"
-APP_PATH="$BUILD_DIR/Build/Products/Release/OpenClawHelper.app"
+APP_PATH="$BUILD_DIR/Build/Products/Release/ClawRelay.app"
 
 echo "=== Building OpenClawHelper v${VERSION} ==="
 
@@ -26,7 +26,7 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 
 echo "Build succeeded: $APP_PATH"
-echo "Binary: $(file "$APP_PATH/Contents/MacOS/OpenClawHelper" | cut -d: -f2)"
+echo "Binary: $(file "$APP_PATH/Contents/MacOS/ClawRelay" | cut -d: -f2)"
 
 # Zip
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ROOT_DIR/$ZIP_NAME"

@@ -12,7 +12,7 @@ final class AppModel: ObservableObject {
         let runner = BridgeCommandRunner()
         self.menuBarViewModel = MenuBarViewModel(runner: runner)
         self.controlCenterViewModel = ControlCenterViewModel(runner: runner)
-        self.meetingViewModel = MeetingViewModel()
+        self.meetingViewModel = MeetingViewModel(runner: runner)
 
         NotificationService.shared.requestPermission()
         AppSwitchTracker.shared.start()

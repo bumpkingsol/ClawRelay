@@ -5,16 +5,26 @@ import Combine
 final class MeetingViewModel: ObservableObject {
     @Published var showSidebar: Bool = false
     @Published var showOverlay: Bool = true
+    @Published var meetingHistory: [MeetingRecord] = []
+    @Published var participantProfiles: [ParticipantRecord] = []
+    @Published var selectedMeetingTranscript: TranscriptResponse?
+    @Published var meetingsSubTab: MeetingsSubTab = .meetings
+
+    enum MeetingsSubTab {
+        case meetings, people
+    }
 
     let sessionManager: MeetingSessionManager
+    private let runner: BridgeCommandRunner
 
     private var overlayPanel: MeetingOverlayPanel?
     private var sidebarPanel: MeetingSidebarPanel?
     private var cancellables = Set<AnyCancellable>()
 
-    init(sessionManager: MeetingSessionManager? = nil) {
+    init(runner: BridgeCommandRunner = BridgeCommandRunner(), sessionManager: MeetingSessionManager? = nil) {
         let sessionManager = sessionManager ?? MeetingSessionManager()
 
+        self.runner = runner
         self.sessionManager = sessionManager
 
         sessionManager.objectWillChange.sink { [weak self] _ in
@@ -96,6 +106,36 @@ final class MeetingViewModel: ObservableObject {
 
     func dismissNotification(_ id: UUID) {
         sessionManager.briefingCache.dismissNotification(id)
+    }
+
+    func fetchMeetingHistory(days: Int = 7) {
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                let raw = try capturedRunner.runActionWithOutput("meetings", "\(days)")
+                let decoded = try JSONDecoder().decode(MeetingsResponse.self, from: raw)
+                await MainActor.run { [weak self] in
+                    self?.meetingHistory = decoded.meetings
+                }
+            } catch {
+                // Silently fail — keep current list
+            }
+        }
+    }
+
+    func fetchParticipants() {
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                let raw = try capturedRunner.runActionWithOutput("participants")
+                let decoded = try JSONDecoder().decode(ParticipantsResponse.self, from: raw)
+                await MainActor.run { [weak self] in
+                    self?.participantProfiles = decoded.participants
+                }
+            } catch {
+                // Silently fail
+            }
+        }
     }
 
     func shutdown() {

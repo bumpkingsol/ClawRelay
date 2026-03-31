@@ -136,11 +136,15 @@ final class MeetingDetectorService: ObservableObject {
             [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
         ) as? [[String: Any]] else { return false }
 
+        // Zoom window titles vary by version and locale ("Zoom Meeting", "Zoom Workplace",
+        // meeting topic, etc). Just check for any zoom.us window at normal layer — if Zoom
+        // is running and the mic is active, the user is in a meeting.
         return windowList.contains { info in
             guard let owner = info[kCGWindowOwnerName as String] as? String,
                   owner == "zoom.us",
-                  let title = info[kCGWindowName as String] as? String else { return false }
-            return title.contains("Zoom Meeting")
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0 else { return false }
+            return true
         }
     }
 

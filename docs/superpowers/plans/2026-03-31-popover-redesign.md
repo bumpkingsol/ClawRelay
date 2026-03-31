@@ -423,22 +423,6 @@ struct QuickActionsGrid: View {
         }
         .buttonStyle(SegmentButtonStyle())
     }
-}
-
-private struct SegmentButtonStyle: ButtonStyle {
-    @State private var isHovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(isHovering || configuration.isPressed ? .primary : .secondary)
-            .background(
-                RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverSegmentRadius)
-                    .fill(configuration.isPressed
-                          ? Color.white.opacity(0.08)
-                          : isHovering ? Color.white.opacity(0.05) : Color.clear)
-            )
-            .onHover { isHovering = $0 }
-    }
 
     private var sensitiveToggle: some View {
         HStack {
@@ -467,6 +451,22 @@ private struct SegmentButtonStyle: ButtonStyle {
                       ? DarkUtilityGlass.sensitivePurple.opacity(0.06)
                       : DarkUtilityGlass.subtleBackground)
         )
+    }
+}
+
+private struct SegmentButtonStyle: ButtonStyle {
+    @State private var isHovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isHovering || configuration.isPressed ? .primary : .secondary)
+            .background(
+                RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverSegmentRadius)
+                    .fill(configuration.isPressed
+                          ? Color.white.opacity(0.08)
+                          : isHovering ? Color.white.opacity(0.05) : Color.clear)
+            )
+            .onHover { isHovering = $0 }
     }
 }
 ```

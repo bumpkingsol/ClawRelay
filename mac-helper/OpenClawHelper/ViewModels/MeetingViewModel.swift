@@ -12,7 +12,9 @@ final class MeetingViewModel: ObservableObject {
     private var sidebarPanel: MeetingSidebarPanel?
     private var cancellables = Set<AnyCancellable>()
 
-    init(sessionManager: MeetingSessionManager = MeetingSessionManager()) {
+    init(sessionManager: MeetingSessionManager? = nil) {
+        let sessionManager = sessionManager ?? MeetingSessionManager()
+
         self.sessionManager = sessionManager
 
         sessionManager.objectWillChange.sink { [weak self] _ in

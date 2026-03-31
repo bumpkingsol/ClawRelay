@@ -16,13 +16,13 @@ final class MeetingSessionManager: ObservableObject {
     private var manuallyStarted: Bool = false
 
     init(
-        detector: MeetingDetectorService = MeetingDetectorService(),
-        workerManager: MeetingWorkerManager = MeetingWorkerManager(),
-        briefingCache: BriefingCacheService = BriefingCacheService()
+        detector: MeetingDetectorService? = nil,
+        workerManager: MeetingWorkerManager? = nil,
+        briefingCache: BriefingCacheService? = nil
     ) {
-        self.detector = detector
-        self.workerManager = workerManager
-        self.briefingCache = briefingCache
+        self.detector = detector ?? MeetingDetectorService()
+        self.workerManager = workerManager ?? MeetingWorkerManager()
+        self.briefingCache = briefingCache ?? BriefingCacheService()
 
         setupAutoDetection()
     }

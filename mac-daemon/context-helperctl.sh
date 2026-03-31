@@ -512,6 +512,99 @@ do_fetch_projects() {
 }
 
 # ---------------------------------------------------------------------------
+# meetings [days]  – fetch meeting history from the server
+# ---------------------------------------------------------------------------
+do_fetch_meetings() {
+  local days="${1:-7}"
+  local server_url=""
+  if [ -f "$(cb_dir)/server-url" ]; then
+    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
+  fi
+  if [ -z "$server_url" ]; then
+    echo '{}'
+    exit 0
+  fi
+
+  local meetings_url
+  meetings_url="$(echo "$server_url" | sed "s|/context/push|/context/meetings|")?days=$days"
+
+  local auth_token=""
+  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  if [ -z "$auth_token" ]; then
+    echo '{}'
+    exit 0
+  fi
+
+  local curl_args=()
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  if [[ "$meetings_url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+
+  local response
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      "$meetings_url" 2>/dev/null || echo '{}')
+  else
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "$meetings_url" 2>/dev/null || echo '{}')
+  fi
+
+  echo "$response"
+}
+
+# ---------------------------------------------------------------------------
+# participants  – fetch participant profiles from the server
+# ---------------------------------------------------------------------------
+do_fetch_participants() {
+  local server_url=""
+  if [ -f "$(cb_dir)/server-url" ]; then
+    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
+  fi
+  if [ -z "$server_url" ]; then
+    echo '{}'
+    exit 0
+  fi
+
+  local participants_url
+  participants_url=$(echo "$server_url" | sed 's|/context/push|/context/participants|')
+
+  local auth_token=""
+  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  if [ -z "$auth_token" ]; then
+    echo '{}'
+    exit 0
+  fi
+
+  local curl_args=()
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  if [[ "$participants_url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+
+  local response
+  if [ ${#curl_args[@]} -gt 0 ]; then
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "${curl_args[@]}" \
+      "$participants_url" 2>/dev/null || echo '{}')
+  else
+    response=$(curl -sf \
+      -H "Authorization: Bearer $auth_token" \
+      --connect-timeout 5 --max-time 10 \
+      "$participants_url" 2>/dev/null || echo '{}')
+  fi
+
+  echo "$response"
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 cmd="${1:-}"
@@ -534,8 +627,10 @@ case "$cmd" in
   meeting-status)       do_meeting_status ;;
   meeting-start)        do_meeting_start "$@" ;;
   meeting-stop)         do_meeting_stop ;;
+  meetings)             do_fetch_meetings "$@" ;;
+  participants)         do_fetch_participants ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|projects|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|projects|meetings|participants|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
     exit 1
     ;;
 esac

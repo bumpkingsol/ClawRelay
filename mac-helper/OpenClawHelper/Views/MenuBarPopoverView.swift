@@ -7,104 +7,132 @@ struct MenuBarPopoverView: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            // Zone 1: Status Header
             StatusHeaderView(snapshot: viewModel.snapshot)
 
-            // Dashboard summary
-            if let dash = viewModel.dashboard {
-                HStack(spacing: 8) {
-                    let hours = dash.timeAllocation.first(where: { $0.project == dash.status.currentProject })?.hours ?? 0
-                    Text("\(dash.status.currentProject.capitalized) \(hours, specifier: "%.1f")h")
-                        .font(.caption)
-                        .foregroundStyle(.primary)
-
-                    Text("|")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-
-                    if let active = dash.jcActivity.first(where: { $0.status == "in-progress" }) {
-                        Text("JC: \(active.project)")
-                            .font(.caption)
-                            .foregroundStyle(.blue)
-                    } else {
-                        Text("JC: idle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text(dash.status.focusLevel.capitalized)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(focusColor(dash.status.focusLevel).opacity(0.2), in: Capsule())
-                        .foregroundStyle(focusColor(dash.status.focusLevel))
-                }
-                .padding(.horizontal, 4)
+            // Zone 2: Health Detail Card (conditional)
+            if !viewModel.snapshot.isFullyHealthy {
+                HealthDetailCard(snapshot: viewModel.snapshot)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            HealthStripView(snapshot: viewModel.snapshot)
-            MeetingStatusView(viewModel: meetingViewModel)
+            // Zone 6: Meeting Status (between health and pause when active)
+            if meetingViewModel.state != .idle {
+                MeetingStatusView(viewModel: meetingViewModel)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Zone 3 + 4: Pause Controls & Sensitive Toggle
             QuickActionsGrid(viewModel: viewModel)
-            Divider()
 
-            // Quick handoff
-            VStack(spacing: 8) {
-                HStack(spacing: 4) {
-                    TextField("Project", text: $viewModel.handoffProject)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: .infinity)
-                    Menu {
-                        ForEach(MenuBarViewModel.portfolioProjects, id: \.self) { p in
-                            Button(p.capitalized) { viewModel.handoffProject = p }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .foregroundStyle(.secondary)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 20)
-                }
-                HStack(spacing: 8) {
-                    TextField("What should JC do?", text: $viewModel.handoffTask)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit {
-                            if !viewModel.handoffTask.isEmpty {
-                                viewModel.sendQuickHandoff()
-                            }
-                        }
-                    if viewModel.handoffSent {
-                        Text("Sent")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                    }
-                    Button(action: { viewModel.sendQuickHandoff() }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.handoffTask.isEmpty)
-                }
+            // Divider before handoff
+            DarkUtilityGlass.divider.frame(height: 1)
+
+            // Zone 5: Handoff Section
+            handoffSection
+
+            // Zone 7: Footer
+            Button(action: openControlCenter) {
+                Text("Control Center \(Image(systemName: "arrow.up.right"))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
             }
-            Button("Open Control Center") {
-                openWindow(id: "control-center")
-                NSApp.activate(ignoringOtherApps: true)
-            }
+            .buttonStyle(.plain)
         }
-        .padding(18)
+        .padding(20)
         .frame(width: 340)
         .background(DarkUtilityGlass.background)
         .environment(\.colorScheme, .dark)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.trackingState)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.isFullyHealthy)
+        .animation(.easeInOut(duration: 0.25), value: meetingViewModel.state)
         .onAppear { viewModel.startPolling() }
         .onDisappear { viewModel.stopPolling() }
     }
 
-    private func focusColor(_ level: String) -> Color {
-        switch level {
-        case "focused": return .green
-        case "multitasking": return .orange
-        case "scattered": return .red
-        default: return .secondary
+    // MARK: - Handoff Section
+
+    private var handoffSection: some View {
+        VStack(spacing: 8) {
+            // Section label
+            HStack {
+                Text("HANDOFF TO JC")
+                    .font(DarkUtilityGlass.sectionLabel)
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+                    .tracking(0.8)
+                Spacer()
+            }
+
+            // Project picker
+            Menu {
+                ForEach(MenuBarViewModel.portfolioProjects, id: \.self) { project in
+                    Button(project.capitalized) {
+                        viewModel.handoffProject = project
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(viewModel.handoffProject.isEmpty ? "Select project" : viewModel.handoffProject)
+                        .font(.system(size: 11))
+                        .foregroundStyle(viewModel.handoffProject.isEmpty ? .secondary : .primary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(DarkUtilityGlass.cardBackground)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .menuStyle(.borderlessButton)
+
+            // Task input + send
+            HStack(spacing: 6) {
+                TextField("What should JC do?", text: $viewModel.handoffTask)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .padding(.vertical, 7)
+                    .padding(.horizontal, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(DarkUtilityGlass.cardBackground)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .onSubmit {
+                        if !viewModel.handoffTask.isEmpty {
+                            viewModel.sendQuickHandoff()
+                        }
+                    }
+
+                if viewModel.handoffSent {
+                    Text("Sent")
+                        .font(.system(size: 10))
+                        .foregroundStyle(DarkUtilityGlass.activeGreen)
+                        .transition(.opacity)
+                }
+
+                Button(action: { viewModel.sendQuickHandoff() }) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(DarkUtilityGlass.accentBlue)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(DarkUtilityGlass.accentBlue.opacity(0.10))
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.handoffTask.isEmpty)
+            }
         }
+    }
+
+    private func openControlCenter() {
+        openWindow(id: "control-center")
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

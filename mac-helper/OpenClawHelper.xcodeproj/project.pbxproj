@@ -47,6 +47,19 @@
 		A10000160000000000000001 /* AppSwitchTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000160000000000000001 /* AppSwitchTracker.swift */; };
 		A10000170000000000000001 /* WhatsAppStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000170000000000000001 /* WhatsAppStatusService.swift */; };
 		A10000170000000000000002 /* WhatsAppSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000170000000000000002 /* WhatsAppSectionView.swift */; };
+		A10000180000000000000001 /* BriefingPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000001 /* BriefingPackage.swift */; };
+		A10000180000000000000002 /* MeetingNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000002 /* MeetingNotification.swift */; };
+		A10000180000000000000003 /* MeetingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000003 /* MeetingState.swift */; };
+		A10000180000000000000004 /* BriefingCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000004 /* BriefingCacheService.swift */; };
+		A10000180000000000000005 /* MeetingDetectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000005 /* MeetingDetectorService.swift */; };
+		A10000180000000000000006 /* MeetingSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000006 /* MeetingSessionManager.swift */; };
+		A10000180000000000000007 /* MeetingWorkerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000007 /* MeetingWorkerManager.swift */; };
+		A10000180000000000000008 /* MeetingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000008 /* MeetingViewModel.swift */; };
+		A10000180000000000000009 /* MeetingOverlayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000009 /* MeetingOverlayPanel.swift */; };
+		A10000180000000000000010 /* MeetingSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000010 /* MeetingSidebarView.swift */; };
+		A10000180000000000000011 /* MeetingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000011 /* MeetingStatusView.swift */; };
+		A10000180000000000000012 /* NotificationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000012 /* NotificationCardView.swift */; };
+		A10000190000000000000001 /* HealthDetailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000001 /* HealthDetailCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -104,6 +117,19 @@
 		A20000160000000000000001 /* AppSwitchTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSwitchTracker.swift; sourceTree = "<group>"; };
 		A20000170000000000000001 /* WhatsAppStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsAppStatusService.swift; sourceTree = "<group>"; };
 		A20000170000000000000002 /* WhatsAppSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsAppSectionView.swift; sourceTree = "<group>"; };
+		A20000180000000000000001 /* BriefingPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriefingPackage.swift; sourceTree = "<group>"; };
+		A20000180000000000000002 /* MeetingNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingNotification.swift; sourceTree = "<group>"; };
+		A20000180000000000000003 /* MeetingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingState.swift; sourceTree = "<group>"; };
+		A20000180000000000000004 /* BriefingCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriefingCacheService.swift; sourceTree = "<group>"; };
+		A20000180000000000000005 /* MeetingDetectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetectorService.swift; sourceTree = "<group>"; };
+		A20000180000000000000006 /* MeetingSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingSessionManager.swift; sourceTree = "<group>"; };
+		A20000180000000000000007 /* MeetingWorkerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingWorkerManager.swift; sourceTree = "<group>"; };
+		A20000180000000000000008 /* MeetingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingViewModel.swift; sourceTree = "<group>"; };
+		A20000180000000000000009 /* MeetingOverlayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingOverlayPanel.swift; sourceTree = "<group>"; };
+		A20000180000000000000010 /* MeetingSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingSidebarView.swift; sourceTree = "<group>"; };
+		A20000180000000000000011 /* MeetingStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingStatusView.swift; sourceTree = "<group>"; };
+		A20000180000000000000012 /* NotificationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCardView.swift; sourceTree = "<group>"; };
+		A20000190000000000000001 /* HealthDetailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDetailCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,12 +207,15 @@
 		A70000050000000000000001 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A20000180000000000000001 /* BriefingPackage.swift */,
 				A20000050000000000000001 /* BridgeSnapshot.swift */,
 				A20000150000000000000002 /* DailyEntry.swift */,
 				A20000120000000000000001 /* DashboardData.swift */,
 				A20000110000000000000001 /* Handoff.swift */,
 				A20000090000000000000001 /* HandoffDraft.swift */,
 				A20000150000000000000001 /* JCQuestion.swift */,
+				A20000180000000000000002 /* MeetingNotification.swift */,
+				A20000180000000000000003 /* MeetingState.swift */,
 				A20000050000000000000002 /* PermissionStatus.swift */,
 			);
 			path = Models;
@@ -196,7 +225,11 @@
 			isa = PBXGroup;
 			children = (
 				A20000160000000000000001 /* AppSwitchTracker.swift */,
+				A20000180000000000000004 /* BriefingCacheService.swift */,
 				A20000050000000000000003 /* BridgeCommandRunner.swift */,
+				A20000180000000000000005 /* MeetingDetectorService.swift */,
+				A20000180000000000000006 /* MeetingSessionManager.swift */,
+				A20000180000000000000007 /* MeetingWorkerManager.swift */,
 				A20000150000000000000003 /* NotificationService.swift */,
 				A20000080000000000000001 /* PermissionService.swift */,
 				A20000050000000000000004 /* RefreshTimer.swift */,
@@ -222,6 +255,7 @@
 				A20000070000000000000001 /* ControlCenterViewModel.swift */,
 				A20000130000000000000001 /* DashboardViewModel.swift */,
 				A20000110000000000000002 /* HandoffsTabViewModel.swift */,
+				A20000180000000000000008 /* MeetingViewModel.swift */,
 				A20000060000000000000001 /* MenuBarViewModel.swift */,
 			);
 			path = ViewModels;
@@ -234,6 +268,11 @@
 				A20000060000000000000003 /* StatusHeaderView.swift */,
 				A20000060000000000000004 /* QuickActionsGrid.swift */,
 				A20000060000000000000005 /* HealthStripView.swift */,
+				A20000190000000000000001 /* HealthDetailCard.swift */,
+				A20000180000000000000009 /* MeetingOverlayPanel.swift */,
+				A20000180000000000000010 /* MeetingSidebarView.swift */,
+				A20000180000000000000011 /* MeetingStatusView.swift */,
+				A20000180000000000000012 /* NotificationCardView.swift */,
 				A20000170000000000000002 /* WhatsAppSectionView.swift */,
 				A20000070000000000000002 /* ControlCenterView.swift */,
 				A70000070000000000000001 /* Tabs */,
@@ -388,6 +427,19 @@
 				A10000160000000000000001 /* AppSwitchTracker.swift in Sources */,
 				A10000170000000000000001 /* WhatsAppStatusService.swift in Sources */,
 				A10000170000000000000002 /* WhatsAppSectionView.swift in Sources */,
+				A10000180000000000000001 /* BriefingPackage.swift in Sources */,
+				A10000180000000000000002 /* MeetingNotification.swift in Sources */,
+				A10000180000000000000003 /* MeetingState.swift in Sources */,
+				A10000180000000000000004 /* BriefingCacheService.swift in Sources */,
+				A10000180000000000000005 /* MeetingDetectorService.swift in Sources */,
+				A10000180000000000000006 /* MeetingSessionManager.swift in Sources */,
+				A10000180000000000000007 /* MeetingWorkerManager.swift in Sources */,
+				A10000180000000000000008 /* MeetingViewModel.swift in Sources */,
+				A10000180000000000000009 /* MeetingOverlayPanel.swift in Sources */,
+				A10000180000000000000010 /* MeetingSidebarView.swift in Sources */,
+				A10000180000000000000011 /* MeetingStatusView.swift in Sources */,
+				A10000180000000000000012 /* NotificationCardView.swift in Sources */,
+				A10000190000000000000001 /* HealthDetailCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

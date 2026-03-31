@@ -21,6 +21,10 @@ struct BridgeSnapshot: Decodable, Equatable {
     var daemonLaunchdState: String
     var watcherLaunchdState: String
     var whatsappLaunchdState: String?
+    var meetingState: String?
+    var meetingId: String?
+    var meetingElapsedSeconds: Int?
+    var meetingWorkerPid: Int?
 
     static let placeholder = BridgeSnapshot(
         trackingState: .active,
@@ -29,7 +33,11 @@ struct BridgeSnapshot: Decodable, Equatable {
         queueDepth: 0,
         daemonLaunchdState: "unknown",
         watcherLaunchdState: "unknown",
-        whatsappLaunchdState: nil
+        whatsappLaunchdState: nil,
+        meetingState: nil,
+        meetingId: nil,
+        meetingElapsedSeconds: nil,
+        meetingWorkerPid: nil
     )
 
     static let needsAttentionPlaceholder = BridgeSnapshot(
@@ -39,6 +47,15 @@ struct BridgeSnapshot: Decodable, Equatable {
         queueDepth: 0,
         daemonLaunchdState: "unknown",
         watcherLaunchdState: "unknown",
-        whatsappLaunchdState: nil
+        whatsappLaunchdState: nil,
+        meetingState: nil,
+        meetingId: nil,
+        meetingElapsedSeconds: nil,
+        meetingWorkerPid: nil
     )
+
+    var parsedMeetingState: MeetingLifecycleState {
+        guard let raw = meetingState else { return .idle }
+        return MeetingLifecycleState(rawValue: raw) ?? .idle
+    }
 }

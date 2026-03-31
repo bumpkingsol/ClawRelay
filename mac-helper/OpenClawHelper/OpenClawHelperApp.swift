@@ -6,7 +6,7 @@ struct OpenClawHelperApp: App {
 
     var body: some Scene {
         MenuBarExtra("ClawRelay", systemImage: appModel.menuBarSymbol) {
-            MenuBarPopoverView(viewModel: appModel.menuBarViewModel)
+            MenuBarPopoverView(viewModel: appModel.menuBarViewModel, meetingViewModel: appModel.meetingViewModel)
         }
         .menuBarExtraStyle(.window)
 

@@ -18,6 +18,8 @@ home = os.path.expanduser("~/.context-bridge")
 pause_path = os.path.join(home, "pause-until")
 sensitive_path = os.path.join(home, "sensitive-mode")
 db_path = os.path.join(home, "local.db")
+meeting_pid_path = os.path.join(home, "meeting-worker.pid")
+meeting_state_path = os.path.join(home, "meeting-state.json")
 
 queue_depth = 0
 if os.path.exists(db_path):
@@ -47,6 +49,30 @@ if os.path.exists(pause_path):
             paused = False
             pause_until = None
 
+meeting_worker_pid = None
+if os.path.exists(meeting_pid_path):
+    try:
+        pid = int(open(meeting_pid_path).read().strip())
+        os.kill(pid, 0)
+        meeting_worker_pid = pid
+    except (ValueError, ProcessLookupError, PermissionError):
+        pass
+
+meeting_state = "idle"
+meeting_id = None
+meeting_elapsed_seconds = 0
+if os.path.exists(meeting_state_path):
+    try:
+        ms = json.load(open(meeting_state_path))
+        meeting_state = ms.get("state", "idle")
+        meeting_id = ms.get("meeting_id", None)
+        meeting_elapsed_seconds = ms.get("elapsed_seconds", 0)
+    except (json.JSONDecodeError, IOError):
+        pass
+
+if meeting_worker_pid and meeting_state == "idle":
+    meeting_state = "preparing"
+
 snapshot = {
     "trackingState": "paused" if paused else (
         "sensitive" if os.path.exists(sensitive_path) else "active"),
@@ -55,7 +81,10 @@ snapshot = {
     "queueDepth": queue_depth,
     "daemonLaunchdState": launchd_state("com.openclaw.context-bridge"),
     "watcherLaunchdState": launchd_state("com.openclaw.context-bridge-fswatch"),
-    "whatsappLaunchdState": launchd_state("com.openclaw.context-bridge-whatsapp"),
+    "meetingState": meeting_state,
+    "meetingId": meeting_id,
+    "meetingElapsedSeconds": meeting_elapsed_seconds,
+    "meetingWorkerPid": meeting_worker_pid,
 }
 print(json.dumps(snapshot))
 PY
@@ -367,6 +396,76 @@ do_mark_question_seen() {
 }
 
 # ---------------------------------------------------------------------------
+# meeting-status  – JSON snapshot of current meeting state
+# ---------------------------------------------------------------------------
+do_meeting_status() {
+  python3 - <<'PY'
+import json, os
+
+home = os.path.expanduser("~/.context-bridge")
+pid_path = os.path.join(home, "meeting-worker.pid")
+state_path = os.path.join(home, "meeting-state.json")
+
+result = {
+    "state": "idle",
+    "meeting_id": None,
+    "elapsed_seconds": 0,
+    "worker_pid": None,
+    "transcript_segments": 0,
+    "screenshots_taken": 0,
+    "briefing_loaded": False,
+    "cards_surfaced": 0
+}
+
+if os.path.exists(pid_path):
+    try:
+        pid = int(open(pid_path).read().strip())
+        os.kill(pid, 0)
+        result["worker_pid"] = pid
+    except (ValueError, ProcessLookupError, PermissionError):
+        pass
+
+if os.path.exists(state_path):
+    try:
+        state = json.load(open(state_path))
+        result.update(state)
+    except (json.JSONDecodeError, IOError):
+        pass
+
+if result["worker_pid"] and result["state"] == "idle":
+    result["state"] = "preparing"
+
+print(json.dumps({"meeting": result}))
+PY
+}
+
+# ---------------------------------------------------------------------------
+# meeting-start [meeting-id]  – trigger meeting start
+# ---------------------------------------------------------------------------
+do_meeting_start() {
+  local meeting_id="${1:-}"
+  local trigger_file
+  trigger_file="$(cb_dir)/meeting-start-trigger"
+
+  if [ -n "$meeting_id" ]; then
+    echo "$meeting_id" > "$trigger_file"
+  else
+    echo "auto-$(date +%Y%m%d-%H%M%S)" > "$trigger_file"
+  fi
+  echo '{"status":"triggered"}'
+}
+
+# ---------------------------------------------------------------------------
+# meeting-stop  – trigger meeting stop
+# ---------------------------------------------------------------------------
+do_meeting_stop() {
+  local trigger_file
+  trigger_file="$(cb_dir)/meeting-stop-trigger"
+  touch "$trigger_file"
+  echo '{"status":"triggered"}'
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 cmd="${1:-}"
@@ -377,25 +476,19 @@ case "$cmd" in
   pause)           do_pause "$@" ;;
   resume)          do_resume ;;
   sensitive)       do_sensitive "$@" ;;
-  restart-daemon)    restart_launchd "com.openclaw.context-bridge" ;;
-  restart-watcher)   restart_launchd "com.openclaw.context-bridge-fswatch" ;;
-  restart-whatsapp)  restart_launchd "com.openclaw.context-bridge-whatsapp" ;;
-  whatsapp-status)
-    HEALTH_FILE="$HOME/.context-bridge/whatsapp-health.json"
-    if [ -f "$HEALTH_FILE" ]; then
-      cat "$HEALTH_FILE"
-    else
-      echo '{"status": "not running"}'
-    fi
-    ;;
+  restart-daemon)  restart_launchd "com.openclaw.context-bridge" ;;
+  restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
   list-handoffs)   do_list_handoffs ;;
   dashboard)            do_fetch_dashboard "$@" ;;
   mark-question-seen)   do_mark_question_seen "$@" ;;
   privacy-rules)        do_privacy_rules "$@" ;;
+  meeting-status)       do_meeting_status ;;
+  meeting-start)        do_meeting_start "$@" ;;
+  meeting-stop)         do_meeting_stop ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|restart-whatsapp|whatsapp-status|purge-local|queue-handoff|list-handoffs|dashboard|mark-question-seen|privacy-rules"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
     exit 1
     ;;
 esac

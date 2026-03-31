@@ -416,9 +416,41 @@ def handoff():
         priority,
     ))
     db.commit()
+    handoff_id = db.execute("SELECT last_insert_rowid()").fetchone()
+    hid = list(handoff_id.values())[0] if handoff_id else '?'
     db.close()
 
-    return jsonify({'status': 'ok', 'message': f"Handoff received: {data.get('project')} - {data.get('task')}"}), 201
+    # Webhook: immediately notify JC's active session via Telegram
+    _notify_handoff(hid, data.get('project', ''), data.get('task', ''), data.get('message', ''), priority)
+
+    return jsonify({'status': 'ok', 'id': hid, 'message': f"Handoff received: {data.get('project')} - {data.get('task')}"}), 201
+
+
+def _notify_handoff(hid, project, task, message, priority):
+    """Fire-and-forget notification to JC's Telegram session."""
+    import subprocess, threading
+
+    prio_flag = "🔴 URGENT: " if priority in ('urgent', 'high') else ""
+    text = f"📋 HANDOFF #{hid}: {prio_flag}[{project}] {task}"
+    if message:
+        text += f"\nContext: {message}"
+    text += "\n\nExecute this now."
+
+    def _send():
+        try:
+            subprocess.run(
+                ['/home/linuxbrew/.linuxbrew/bin/openclaw', 'message', 'send',
+                 '--channel', 'telegram',
+                 '--target', '-1003550009817',
+                 '--thread-id', '1',
+                 '-m', text],
+                capture_output=True, text=True, timeout=15
+            )
+        except Exception:
+            pass
+
+    # Run async so the API response isn't delayed
+    threading.Thread(target=_send, daemon=True).start()
 
 
 @app.route('/context/handoffs', methods=['GET'])

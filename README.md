@@ -82,7 +82,7 @@ cp -R ~/Library/Developer/Xcode/DerivedData/OpenClawHelper-*/Build/Products/Rele
 ## Mac Daemon (`mac-daemon/`)
 
 - `context-daemon.sh` - Main capture script (runs every 2 min via launchd)
-- `context-helperctl.sh` - Control CLI (status, pause, resume, sensitive, restart, queue-handoff, list-handoffs, dashboard, mark-question-seen)
+- `context-helperctl.sh` - Control CLI (status, pause, resume, sensitive, restart, queue-handoff, list-handoffs, dashboard, mark-question-seen, meeting-status, meeting-start, meeting-stop)
 - `context-common.sh` - Shared path helpers and state readers
 - `context-shell-hook.zsh` - Shell command logger
 - `fswatch-projects.sh` - File change watcher
@@ -94,13 +94,14 @@ bash mac-daemon/install.sh http://TAILSCALE_IP:7890/context/push
 
 **Calendar CLI** (`mac-helper/claw-calendar/`): Native Swift binary using EventKit. Queries calendar silently without launching Calendar.app.
 
-**Meeting Recorder** (`mac-helper/claw-meeting/`): Swift package for detecting and recording active meetings/calls (camera + mic state, call app identification).
+**Meeting Recorder** (`mac-helper/claw-meeting/`): Swift package for real-time meeting capture — system + mic audio with 16 kHz mixing, live transcription via FluidAudio, screen capture with face analysis (Vision framework), speaker diarisation, and session management via Unix domain socket. Pushes frames and session data to the server for processing.
 
 ## Server (`server/`)
 
-- `context-receiver.py` - Flask endpoint accepting pushes, handoffs, questions, and dashboard queries
-- `context-digest.py` - Processes raw stream into structured summaries (3x daily)
+- `context-receiver.py` - Flask endpoint accepting pushes, handoffs, questions, meeting data, and dashboard queries
+- `context-digest.py` - Processes raw stream into structured summaries (3x daily), includes meeting sections
 - `context-query.py` - CLI for querying state (`status`, `today`, `project`, `gaps`, `since`, `neglected`)
+- `meeting_processor.py` - Meeting intelligence: Claude Vision expression analysis, timeline merge, participant profiles, summary generation
 - `config.py` - Shared project list and constants
 - `db_utils.py` - Encrypted DB connections (SQLCipher when available, fallback to sqlite3)
 - `watchdog.py` - Daemon health checker
@@ -137,6 +138,9 @@ The digest processor runs 3x daily and produces structured markdown summaries:
 | GET | `/context/jc-work-log` | Agent's own work activity log |
 | POST | `/context/jc-question` | Agent posts a question for the user |
 | PATCH | `/context/jc-question/<id>` | Mark question as seen |
+| POST | `/context/meeting/session` | Push meeting session metadata (start/end, participants) |
+| POST | `/context/meeting/frames` | Upload meeting screen captures for expression analysis |
+| POST | `/meeting/context-request` | Agent requests real-time meeting context (rate-limited) |
 
 All endpoints require Bearer token auth.
 

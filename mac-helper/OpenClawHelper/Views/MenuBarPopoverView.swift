@@ -52,6 +52,25 @@ struct MenuBarPopoverView: View {
 
     // MARK: - Handoff Section
 
+    private var pickerLabel: some View {
+        HStack {
+            Text(viewModel.handoffProject.isEmpty ? "Select project" : viewModel.handoffProject)
+                .font(.system(size: 11))
+                .foregroundStyle(viewModel.handoffProject.isEmpty ? .secondary : .primary)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(DarkUtilityGlass.cardBackground)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     private var handoffSection: some View {
         VStack(spacing: 8) {
             // Section label
@@ -65,30 +84,15 @@ struct MenuBarPopoverView: View {
 
             // Project picker
             Menu {
-                ForEach(MenuBarViewModel.portfolioProjects, id: \.self) { project in
+                ForEach(viewModel.portfolioProjects, id: \.self) { project in
                     Button(project.capitalized) {
                         viewModel.handoffProject = project
                     }
                 }
             } label: {
-                HStack {
-                    Text(viewModel.handoffProject.isEmpty ? "Select project" : viewModel.handoffProject)
-                        .font(.system(size: 11))
-                        .foregroundStyle(viewModel.handoffProject.isEmpty ? .secondary : .primary)
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 7)
-                .padding(.horizontal, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(DarkUtilityGlass.cardBackground)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                )
+                pickerLabel
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
 
             // Task input + send
             HStack(spacing: 6) {

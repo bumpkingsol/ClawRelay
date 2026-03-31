@@ -6,6 +6,7 @@ final class MenuBarViewModel: ObservableObject {
     @Published var dashboard: DashboardData?
     @Published private(set) var whatsAppStatus: String = "Not installed"
     @Published private(set) var whatsAppContacts: [WhatsAppStatusService.WhitelistContact] = []
+    @Published var portfolioProjects: [String] = []
     private let runner: BridgeCommandRunner
     private let waService = WhatsAppStatusService()
     private var refreshTimer: RefreshTimer?
@@ -21,6 +22,7 @@ final class MenuBarViewModel: ObservableObject {
     func refresh() {
         snapshot = runner.fetchStatus()
         fetchDashboard()
+        fetchPortfolioProjects()
         refreshWhatsApp()
     }
 
@@ -54,6 +56,21 @@ final class MenuBarViewModel: ObservableObject {
                 }
             } catch {
                 // Silently fail — popover summary is best-effort
+            }
+        }
+    }
+
+    func fetchPortfolioProjects() {
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                let raw = try capturedRunner.runActionWithOutput("projects")
+                let decoded = try JSONDecoder().decode(ProjectsResponse.self, from: raw)
+                await MainActor.run { [weak self] in
+                    self?.portfolioProjects = decoded.projects.sorted()
+                }
+            } catch {
+                // Silently fail — keep current list
             }
         }
     }
@@ -97,8 +114,6 @@ final class MenuBarViewModel: ObservableObject {
     @Published var handoffTask: String = ""
     @Published var handoffSent: Bool = false
 
-    static let portfolioProjects = ["project-gamma", "project-alpha", "project-beta", "project-delta", "openclaw"]
-
     func sendQuickHandoff() {
         let project = handoffProject.isEmpty ? "general" : handoffProject
         do {
@@ -113,6 +128,10 @@ final class MenuBarViewModel: ObservableObject {
             // Silently fail for menu bar quick actions
         }
     }
+}
+
+private struct ProjectsResponse: Codable {
+    let projects: [String]
 }
 
 // MARK: - Preview / Test Support

@@ -31,7 +31,7 @@ def processor_db(tmp_path):
         CREATE TABLE IF NOT EXISTS participant_profiles (
             id TEXT PRIMARY KEY, display_name TEXT, face_embedding BLOB,
             meetings_observed INTEGER DEFAULT 0, profile_json TEXT,
-            last_updated TEXT
+            last_updated TEXT, last_seen TEXT
         )
     """)
     db.commit()

@@ -379,6 +379,12 @@ def update_participant_profiles(meeting_id, participants_str):
         db.close()
         return
 
+    # Load meeting's ended_at to record as last_seen
+    meeting_row = db.execute(
+        "SELECT ended_at FROM meeting_sessions WHERE id = ?", (meeting_id,)
+    ).fetchone()
+    ended_at = meeting_row['ended_at'] if meeting_row else datetime.now(timezone.utc).isoformat()
+
     for name in participants:
         if not name:
             continue
@@ -392,18 +398,19 @@ def update_participant_profiles(meeting_id, participants_str):
             db.execute("""
                 UPDATE participant_profiles
                 SET meetings_observed = meetings_observed + 1,
-                    last_updated = ?
+                    last_updated = ?,
+                    last_seen = ?
                 WHERE id = ?
-            """, (datetime.now(timezone.utc).isoformat(), row['id']))
+            """, (datetime.now(timezone.utc).isoformat(), ended_at, row['id']))
         else:
             # Create new profile
             import hashlib
             profile_id = f"name_{hashlib.sha256(name.encode()).hexdigest()[:12]}"
             db.execute("""
                 INSERT OR IGNORE INTO participant_profiles
-                (id, display_name, meetings_observed, profile_json, last_updated)
-                VALUES (?, ?, 1, '{}', ?)
-            """, (profile_id, name, datetime.now(timezone.utc).isoformat()))
+                (id, display_name, meetings_observed, profile_json, last_updated, last_seen)
+                VALUES (?, ?, 1, '{}', ?, ?)
+            """, (profile_id, name, datetime.now(timezone.utc).isoformat(), ended_at))
 
     db.commit()
     db.close()

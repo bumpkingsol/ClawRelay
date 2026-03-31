@@ -155,6 +155,10 @@ def init_db():
         db.execute("ALTER TABLE activity_stream ADD COLUMN whatsapp_messages TEXT")
     except Exception:
         pass  # Column already exists
+    try:
+        db.execute("ALTER TABLE participant_profiles ADD COLUMN last_seen TEXT")
+    except Exception:
+        pass  # Column already exists
     db.execute("""
         CREATE TABLE IF NOT EXISTS portfolio_projects (
             name TEXT PRIMARY KEY
@@ -941,9 +945,13 @@ def dashboard():
                     status['current_project'] = proj
                     break
 
-            # Staleness check
-            import os
-            status['daemon_stale'] = os.path.exists('/tmp/context-bridge-stale')
+            # Staleness check: stale if last activity is older than 5 minutes
+            try:
+                last_ts = datetime.fromisoformat(latest.get('ts', '').replace('Z', '+00:00'))
+                age_seconds = (datetime.now(timezone.utc) - last_ts).total_seconds()
+                status['daemon_stale'] = age_seconds > 300
+            except (ValueError, TypeError):
+                status['daemon_stale'] = True
 
             # Focus level (last 60 min)
             since_1h = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()

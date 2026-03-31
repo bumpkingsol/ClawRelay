@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 @MainActor
 final class MeetingSessionManager: ObservableObject {
@@ -14,6 +15,9 @@ final class MeetingSessionManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var elapsedTimer: Timer?
     private var manuallyStarted: Bool = false
+    private var consentTask: Task<Void, Never>?
+    private var pendingMeetingId: String?
+    private var pendingMeetingApp: String?
 
     init(
         detector: MeetingDetectorService? = nil,
@@ -27,11 +31,19 @@ final class MeetingSessionManager: ObservableObject {
         setupAutoDetection()
     }
 
-    func startMeeting(meetingId: String? = nil, app: String? = nil) {
+    func startMeeting(meetingId: String? = nil, app: String? = nil, manual: Bool = false) {
         guard state == .idle else { return }
-        manuallyStarted = true
         let id = meetingId ?? generateMeetingId(app: app)
-        beginPreparing(meetingId: id, app: app)
+        pendingMeetingId = id
+        pendingMeetingApp = app
+        state = .awaitingConsent
+
+        if manual {
+            manuallyStarted = true
+            beginPreparing(meetingId: id, app: app)
+        } else {
+            requestConsent()
+        }
     }
 
     func stopMeeting() {
@@ -53,6 +65,7 @@ final class MeetingSessionManager: ObservableObject {
     }
 
     private func beginPreparing(meetingId: String, app: String?) {
+        guard state == .awaitingConsent else { return }
         state = .preparing
         sessionInfo = MeetingSessionInfo(
             meetingId: meetingId,
@@ -113,10 +126,58 @@ final class MeetingSessionManager: ObservableObject {
         state = .idle
         elapsedTimer?.invalidate()
         elapsedTimer = nil
+        consentTask?.cancel()
+        consentTask = nil
+        pendingMeetingId = nil
+        pendingMeetingApp = nil
         sessionInfo = nil
         elapsedSeconds = 0
         manuallyStarted = false
         briefingCache.reset()
+    }
+
+    private func requestConsent() {
+        consentTask?.cancel()
+        consentTask = Task { [weak self] in
+            guard let self else { return }
+
+            let accepted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "Meeting Detected"
+                    alert.informativeText = "A meeting was detected. Do you want to record it?"
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "Accept")
+                    alert.addButton(withTitle: "Decline")
+
+                    // 15-second auto-decline timer
+                    let timer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { _ in
+                        alert.window.orderOut(nil)
+                        NSApp.stopModal(withCode: .alertSecondButtonReturn)
+                    }
+
+                    let response = NSApp.runModal(for: alert.window)
+                    timer.invalidate()
+
+                    continuation.resume(returning: response == .alertFirstButtonReturn)
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            if accepted {
+                guard let id = self.pendingMeetingId else { return }
+                self.manuallyStarted = false
+                self.beginPreparing(meetingId: id, app: self.pendingMeetingApp)
+            } else {
+                self.transitionToIdle()
+                self.suppressDetectionUntilAppCloses()
+            }
+        }
+    }
+
+    private func suppressDetectionUntilAppCloses() {
+        NotificationCenter.default.post(name: .meetingConsentDeclined, object: nil)
     }
 
     private func setupAutoDetection() {
@@ -128,8 +189,7 @@ final class MeetingSessionManager: ObservableObject {
                 guard let self else { return }
                 if detected && self.state == .idle {
                     let app = self.detector.detectedApp
-                    let id = self.generateMeetingId(app: app)
-                    self.beginPreparing(meetingId: id, app: app)
+                    self.startMeeting(app: app, manual: false)
                 } else if !detected && self.state == .recording && !self.manuallyStarted {
                     self.beginFinalizing()
                 }
@@ -150,4 +210,8 @@ final class MeetingSessionManager: ObservableObject {
         let seconds = elapsedSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+}
+
+extension Notification.Name {
+    static let meetingConsentDeclined = Notification.Name("meetingConsentDeclined")
 }

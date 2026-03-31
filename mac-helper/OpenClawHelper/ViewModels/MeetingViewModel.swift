@@ -75,7 +75,7 @@ final class MeetingViewModel: ObservableObject {
 
     func startMeeting() {
         let app = sessionManager.detector.detectedApp
-        sessionManager.startMeeting(app: app)
+        sessionManager.startMeeting(app: app, manual: true)
     }
 
     func stopMeeting() {

@@ -18,10 +18,8 @@ final class MeetingWorkerManager: ObservableObject {
         pidPath: String = "\(NSHomeDirectory())/.context-bridge/meeting-worker.pid",
         socketPath: String = "\(NSHomeDirectory())/.context-bridge/meeting-worker.sock"
     ) {
-        self.binaryPath = binaryPath ?? Bundle.main.executableURL?
-            .deletingLastPathComponent()
-            .appendingPathComponent("claw-meeting").path
-            ?? "/usr/local/bin/claw-meeting"
+        self.binaryPath = binaryPath
+            ?? "\(NSHomeDirectory())/.context-bridge/bin/claw-meeting"
         self.pidPath = pidPath
         self.socketPath = socketPath
     }

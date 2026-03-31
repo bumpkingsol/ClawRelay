@@ -1,3 +1,4 @@
+import FluidAudio
 import Foundation
 
 // Entry point for claw-meeting binary.
@@ -89,6 +90,22 @@ func run(meetingId: String) async throws {
     try await recorder.run()
 }
 
+@available(macOS 14.2, *)
+func downloadModels() async throws {
+    fputs("Downloading ASR models (Parakeet TDT v3)...\n", stderr)
+    let asrModels = try await AsrModels.downloadAndLoad()
+    fputs("ASR models ready.\n", stderr)
+
+    fputs("Downloading diarisation models...\n", stderr)
+    let _ = try await DiarizerModels.download()
+    fputs("Diarisation models ready.\n", stderr)
+
+    // Clean up loaded models
+    _ = asrModels
+
+    fputs("All models downloaded and verified.\n", stderr)
+}
+
 // MARK: - CLI Dispatch
 
 let args = CommandLine.arguments
@@ -103,10 +120,17 @@ case "--run":
         fputs("Error: claw-meeting requires macOS 14.2 or later\n", stderr)
         exit(1)
     }
+case "--download-models":
+    if #available(macOS 14.2, *) {
+        try await downloadModels()
+    } else {
+        fputs("Error: claw-meeting requires macOS 14.2 or later\n", stderr)
+        exit(1)
+    }
 case "--status":
     printStatus()
 case "--stop":
     sendStop()
 default:
-    print("Usage: claw-meeting --run [meeting-id] | --status | --stop")
+    print("Usage: claw-meeting --run [meeting-id] | --download-models | --status | --stop")
 }

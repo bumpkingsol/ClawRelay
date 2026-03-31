@@ -676,17 +676,9 @@ if ioreg -c AppleHDAEngineInput 2>/dev/null | grep -q "IOAudioEngineState = 1" 2
   MIC_ACTIVE="true"
 fi
 
-# If mic or camera is active, we're in a call
+# Identify call app first — mic/camera alone doesn't mean a call
+# (many apps use mic/camera: voice memos, photo booth, Claude Code, etc.)
 if [ "$CAMERA_ACTIVE" = "true" ] || [ "$MIC_ACTIVE" = "true" ]; then
-  IN_CALL="true"
-
-  if [ "$CAMERA_ACTIVE" = "true" ]; then
-    CALL_TYPE="video"
-  else
-    CALL_TYPE="audio"
-  fi
-
-  # Identify the call app
   if pgrep -x "zoom.us" >/dev/null 2>&1; then
     CALL_APP="Zoom"
   elif pgrep -x "FaceTime" >/dev/null 2>&1; then
@@ -699,8 +691,16 @@ if [ "$CAMERA_ACTIVE" = "true" ] || [ "$MIC_ACTIVE" = "true" ]; then
     CALL_APP="Slack"
   elif [ -n "$CHROME_ALL_TABS" ] && echo "$CHROME_ALL_TABS" | grep -qi "meet.google.com" 2>/dev/null; then
     CALL_APP="Google Meet"
-  else
-    CALL_APP="unknown"
+  fi
+
+  # Only mark as in-call if a known call app is running
+  if [ -n "$CALL_APP" ]; then
+    IN_CALL="true"
+    if [ "$CAMERA_ACTIVE" = "true" ]; then
+      CALL_TYPE="video"
+    else
+      CALL_TYPE="audio"
+    fi
   fi
 fi
 
@@ -806,6 +806,125 @@ if send_payload "$PAYLOAD"; then
   # Clean up WhatsApp buffer files after successful send
   rm -f "$WA_PROCESSING" "$WA_JSON_TMP"
 fi
+
+# --- Meeting Auto-Start / Stop / Sync ---
+MEETING_BIN="$CB_DIR/bin/claw-meeting"
+MEETING_PID_FILE="$CB_DIR/meeting-worker.pid"
+MEETING_STATE_FILE="$CB_DIR/meeting-state.json"
+MEETING_START_TRIGGER="$CB_DIR/meeting-start-trigger"
+MEETING_STOP_TRIGGER="$CB_DIR/meeting-stop-trigger"
+MEETING_SESSION_DIR="$CB_DIR/meeting-session"
+MEETING_SYNC_SCRIPT="$CB_DIR/bin/meeting-sync.sh"
+
+is_meeting_running() {
+  if [ -f "$MEETING_PID_FILE" ]; then
+    local pid
+    pid=$(cat "$MEETING_PID_FILE" 2>/dev/null || echo "")
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    # Stale PID file
+    rm -f "$MEETING_PID_FILE"
+  fi
+  return 1
+}
+
+start_meeting() {
+  local meeting_id="${1:-$(date +%Y-%m-%d-%H%M%S)}"
+  if [ -x "$MEETING_BIN" ]; then
+    "$MEETING_BIN" --run "$meeting_id" >> /tmp/claw-meeting.log 2>&1 &
+    # Write state for helperctl
+    python3 -c "
+import json, os, time
+state = {
+    'state': 'recording',
+    'meeting_id': '$meeting_id',
+    'call_app': '$CALL_APP',
+    'started_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'elapsed_seconds': 0,
+}
+with open('$MEETING_STATE_FILE', 'w') as f:
+    json.dump(state, f)
+" 2>/dev/null || true
+  fi
+}
+
+stop_meeting() {
+  if [ -x "$MEETING_BIN" ]; then
+    "$MEETING_BIN" --stop 2>/dev/null || true
+  fi
+  # If still running after graceful stop, SIGTERM
+  if is_meeting_running; then
+    local pid
+    pid=$(cat "$MEETING_PID_FILE" 2>/dev/null || echo "")
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  fi
+}
+
+sync_completed_meetings() {
+  if [ -x "$MEETING_SYNC_SCRIPT" ] && [ -d "$MEETING_SESSION_DIR" ]; then
+    for session_dir in "$MEETING_SESSION_DIR"/*/; do
+      [ -d "$session_dir" ] || continue
+      [ -f "$session_dir/.synced" ] && continue
+      # Only sync if no PID file (meeting finished) or session has session-state.json with completed state
+      if ! is_meeting_running || [ -f "$session_dir/session-state.json" ]; then
+        "$MEETING_SYNC_SCRIPT" "$session_dir" >> /tmp/claw-meeting-sync.log 2>&1 &
+      fi
+    done
+  fi
+}
+
+# Handle explicit triggers only — recording requires user consent
+if [ -f "$MEETING_START_TRIGGER" ]; then
+  TRIGGER_ID=$(cat "$MEETING_START_TRIGGER" 2>/dev/null || echo "")
+  rm -f "$MEETING_START_TRIGGER"
+  if ! is_meeting_running; then
+    start_meeting "${TRIGGER_ID:-$(date +%Y-%m-%d-%H%M%S)}"
+  fi
+elif [ -f "$MEETING_STOP_TRIGGER" ]; then
+  rm -f "$MEETING_STOP_TRIGGER"
+  if is_meeting_running; then
+    stop_meeting
+  fi
+fi
+
+# Update state file for helperctl while meeting is active
+if is_meeting_running && [ -f "$MEETING_STATE_FILE" ]; then
+  python3 -c "
+import json, time, os
+try:
+    with open('$MEETING_STATE_FILE') as f:
+        state = json.load(f)
+    started = state.get('started_at', '')
+    if started:
+        from datetime import datetime, timezone
+        start_dt = datetime.fromisoformat(started.replace('Z', '+00:00'))
+        state['elapsed_seconds'] = int((datetime.now(timezone.utc) - start_dt).total_seconds())
+    state['state'] = 'recording'
+    with open('$MEETING_STATE_FILE', 'w') as f:
+        json.dump(state, f)
+except: pass
+" 2>/dev/null || true
+fi
+
+# Clean up state when meeting is done
+if ! is_meeting_running && [ -f "$MEETING_STATE_FILE" ]; then
+  python3 -c "
+import json
+try:
+    with open('$MEETING_STATE_FILE') as f:
+        state = json.load(f)
+    if state.get('state') not in ('idle', 'completed'):
+        state['state'] = 'completed'
+        state['ended_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+        with open('$MEETING_STATE_FILE', 'w') as f:
+            json.dump(state, f)
+except: pass
+" 2>/dev/null || true
+fi
+
+# Sync any completed meetings to server
+sync_completed_meetings
 
 # --- Flush handoff outbox ---
 flush_handoff_outbox

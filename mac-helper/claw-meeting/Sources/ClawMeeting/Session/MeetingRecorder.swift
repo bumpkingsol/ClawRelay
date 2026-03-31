@@ -375,7 +375,10 @@ final class MeetingRecorder {
             log("Final transcript written to \(transcriptPath)")
         }
 
-        // 5. Cleanup
+        // 5. Write session-state.json for the sync script
+        writeSessionState()
+
+        // 6. Cleanup
         try? sessionStore.cleanupOldSessions()
 
         session.transition(to: .completed)
@@ -389,6 +392,30 @@ final class MeetingRecorder {
         stopAudioCapture()
         stopScreenCapture()
         socketServer.stop()
+    }
+
+    // MARK: - Session State File
+
+    /// Write session-state.json so the daemon sync script knows timestamps and status.
+    private func writeSessionState() {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        let state: [String: Any] = [
+            "meeting_id": session.id,
+            "state": session.state.rawValue,
+            "started_at": formatter.string(from: session.startedAt),
+            "ended_at": formatter.string(from: Date()),
+            "elapsed_seconds": session.elapsedSeconds,
+            "transcript_segments": session.segmentCount,
+            "screenshots_taken": session.frameCount,
+        ]
+
+        let statePath = "\(session.paths.rootDir)/session-state.json"
+        if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: URL(fileURLWithPath: statePath))
+            log("Session state written to \(statePath)")
+        }
     }
 
     // MARK: - PID File

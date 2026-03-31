@@ -75,6 +75,26 @@ chmod 700 "$CB_DIR/bin/context-bridge-daemon.sh" \
 chmod 600 "$CB_DIR/bin/context-common.sh" \
           "$CB_DIR/context-shell-hook.zsh"
 
+# Build claw-meeting if Swift is available
+if command -v swift &>/dev/null; then
+    echo "  Building claw-meeting..."
+    MEETING_PKG_DIR="$SCRIPT_DIR/../mac-helper/claw-meeting"
+    if [ -d "$MEETING_PKG_DIR" ]; then
+        (cd "$MEETING_PKG_DIR" && swift build -c release -q 2>/dev/null && \
+         cp .build/release/ClawMeeting "$CB_DIR/bin/claw-meeting") || {
+            echo "  Warning: claw-meeting build failed. Meeting capture will not be available."
+        }
+    else
+        echo "  Skipping claw-meeting (source not found at $MEETING_PKG_DIR)"
+    fi
+else
+    echo "  Skipping claw-meeting (Swift not installed)"
+fi
+
+# Install meeting-sync script
+cp "$SCRIPT_DIR/meeting-sync.sh" "$CB_DIR/bin/meeting-sync.sh"
+chmod 700 "$CB_DIR/bin/meeting-sync.sh"
+
 # Build claw-whatsapp if Go is available
 if command -v go &>/dev/null; then
     echo "  Building claw-whatsapp..."

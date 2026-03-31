@@ -643,6 +643,42 @@ def get_meetings():
         return jsonify({'error': 'Internal error'}), 500
 
 
+@app.route("/context/participants", methods=["GET"])
+def get_participants():
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        db = get_db()
+        rows = db.execute("""
+            SELECT id, display_name, meetings_observed, profile_json, last_seen
+            FROM participant_profiles
+            ORDER BY meetings_observed DESC
+        """).fetchall()
+        db.close()
+
+        participants = []
+        for r in rows:
+            profile = {}
+            try:
+                profile = json.loads(r['profile_json']) if r['profile_json'] else {}
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            participants.append({
+                'id': r['id'],
+                'display_name': r['display_name'],
+                'meetings_observed': r['meetings_observed'],
+                'last_seen': r.get('last_seen'),
+                'profile': profile,
+            })
+
+        return jsonify({'participants': participants})
+    except Exception:
+        logger.exception("Failed to get participants")
+        return jsonify({'error': 'Internal error'}), 500
+
+
 @app.route('/context/jc-work-log', methods=['GET'])
 def jc_work_log():
     """Agent work log - readable by ClawRelay app."""

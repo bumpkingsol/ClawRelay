@@ -679,6 +679,55 @@ def get_participants():
         return jsonify({'error': 'Internal error'}), 500
 
 
+@app.route("/context/meetings/<meeting_id>/transcript", methods=["GET"])
+def get_meeting_transcript(meeting_id):
+    if not verify_auth(request):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT transcript_json, visual_events_json FROM meeting_sessions WHERE id = ?",
+            (meeting_id,)
+        ).fetchone()
+        db.close()
+
+        if not row:
+            return jsonify({'error': 'not found'}), 404
+
+        if row['transcript_json'] is None:
+            return jsonify({'error': 'purged'})
+
+        transcript = []
+        try:
+            transcript = json.loads(row['transcript_json']) if row['transcript_json'] else []
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        visual_events = []
+        expression_analysis = []
+        try:
+            raw_visual = json.loads(row['visual_events_json']) if row['visual_events_json'] else []
+            for event in raw_visual:
+                visual_events.append(event)
+                if 'expression_analysis' in event:
+                    for expr in event['expression_analysis']:
+                        expr_entry = {'ts': event.get('ts', '')}
+                        expr_entry.update(expr)
+                        expression_analysis.append(expr_entry)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return jsonify({
+            'transcript': transcript,
+            'visual_events': visual_events,
+            'expression_analysis': expression_analysis,
+        })
+    except Exception:
+        logger.exception("Failed to get meeting transcript")
+        return jsonify({'error': 'Internal error'}), 500
+
+
 @app.route('/context/jc-work-log', methods=['GET'])
 def jc_work_log():
     """Agent work log - readable by ClawRelay app."""

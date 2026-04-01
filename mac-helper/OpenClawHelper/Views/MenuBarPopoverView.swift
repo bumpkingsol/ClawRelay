@@ -33,12 +33,7 @@ struct MenuBarPopoverView: View {
                 handoffSection
 
                 // Zone 7: Footer
-                Button(action: openControlCenter) {
-                    Text("Control Center \(Image(systemName: "arrow.up.right"))")
-                        .font(.system(size: 11))
-                        .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
-                }
-                .buttonStyle(.plain)
+                footerActions
             }
             .padding(20)
             .frame(width: 340)
@@ -49,6 +44,67 @@ struct MenuBarPopoverView: View {
             .animation(.easeInOut(duration: 0.25), value: meetingViewModel.state)
             .onAppear { viewModel.startPolling() }
             .onDisappear { viewModel.stopPolling() }
+        }
+    }
+
+    private var footerActions: some View {
+        HStack(spacing: 12) {
+            Button(action: openControlCenter) {
+                Text("Control Center \(Image(systemName: "arrow.up.right"))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            Menu {
+                Button("About ClawRelay") {
+                    NSApp.orderFrontStandardAboutPanel(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+
+                Button("Show ClawRelay") {
+                    openControlCenter()
+                }
+
+                Divider()
+
+                Button(viewModel.productLifecycleActionTitle) {
+                    if viewModel.snapshot.isProductStopped {
+                        viewModel.startProduct()
+                        openControlCenter()
+                    } else {
+                        viewModel.shutdownProduct()
+                    }
+                }
+
+                Button("Relaunch Helper") {
+                    viewModel.relaunchApplication()
+                }
+
+                Divider()
+
+                Button("Quit ClawRelay") {
+                    viewModel.quitApplication()
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
         }
     }
 

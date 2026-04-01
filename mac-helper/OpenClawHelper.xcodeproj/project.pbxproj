@@ -18,6 +18,7 @@
 		A10000050000000000000006 /* bridge-status.active.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000006 /* bridge-status.active.json */; };
 		A10000050000000000000007 /* bridge-status.paused.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000007 /* bridge-status.paused.json */; };
 		A10000050000000000000008 /* bridge-status.needs-attention.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000008 /* bridge-status.needs-attention.json */; };
+		A10000210000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000210000000000000001 /* Assets.xcassets */; };
 		A10000060000000000000001 /* MenuBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000001 /* MenuBarViewModel.swift */; };
 		A10000060000000000000002 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000002 /* MenuBarPopoverView.swift */; };
 		A10000060000000000000003 /* StatusHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000003 /* StatusHeaderView.swift */; };
@@ -138,6 +139,7 @@
 		A20000200000000000000002 /* MeetingsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingsTabView.swift; sourceTree = "<group>"; };
 		A20000200000000000000003 /* MeetingRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingRowView.swift; sourceTree = "<group>"; };
 		A20000200000000000000004 /* ParticipantRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipantRowView.swift; sourceTree = "<group>"; };
+		A20000210000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +175,7 @@
 				A20000010000000000000001 /* OpenClawHelperApp.swift */,
 				A20000010000000000000002 /* AppModel.swift */,
 				A20000010000000000000005 /* OpenClawHelper.entitlements */,
+				A20000210000000000000001 /* Assets.xcassets */,
 				A70000050000000000000001 /* Models */,
 				A70000060000000000000001 /* ViewModels */,
 				A70000060000000000000002 /* Views */,
@@ -322,6 +325,7 @@
 			buildPhases = (
 				A90000010000000000000001 /* Sources */,
 				A60000010000000000000001 /* Frameworks */,
+				A90000210000000000000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -389,6 +393,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A90000210000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000210000000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A90000050000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;

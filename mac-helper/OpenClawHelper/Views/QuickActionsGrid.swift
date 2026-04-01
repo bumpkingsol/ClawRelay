@@ -5,9 +5,34 @@ struct QuickActionsGrid: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            pauseControl
-            sensitiveToggle
+            if viewModel.snapshot.isProductStopped {
+                startButton
+            } else {
+                pauseControl
+                sensitiveToggle
+            }
         }
+    }
+
+    private var startButton: some View {
+        Button(action: { viewModel.startProduct() }) {
+            HStack(spacing: 6) {
+                Image(systemName: "power.circle.fill")
+                    .font(.system(size: 12))
+                Text("Start ClawRelay")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(DarkUtilityGlass.activeGreen)
+        .popoverGlassSurface(
+            tint: DarkUtilityGlass.activeGreen.opacity(0.30),
+            fallbackFill: DarkUtilityGlass.activeGreen.opacity(0.10),
+            fallbackStroke: DarkUtilityGlass.activeGreen.opacity(0.20),
+            interactive: true
+        )
     }
 
     @ViewBuilder

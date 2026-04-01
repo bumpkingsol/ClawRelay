@@ -10,8 +10,9 @@ final class AppModel: ObservableObject {
 
     init() {
         let runner = BridgeCommandRunner()
-        self.menuBarViewModel = MenuBarViewModel(runner: runner)
-        self.controlCenterViewModel = ControlCenterViewModel(runner: runner)
+        let appLifecycle = AppLifecycleService()
+        self.menuBarViewModel = MenuBarViewModel(runner: runner, appLifecycle: appLifecycle)
+        self.controlCenterViewModel = ControlCenterViewModel(runner: runner, appLifecycle: appLifecycle)
         self.meetingViewModel = MeetingViewModel(runner: runner)
 
         NotificationService.shared.requestPermission()
@@ -34,6 +35,9 @@ final class AppModel: ObservableObject {
     var menuBarSymbol: String {
         if meetingViewModel.state == .recording {
             return "mic.fill"
+        }
+        if menuBarViewModel.snapshot.isProductStopped {
+            return "power.circle"
         }
         return menuBarViewModel.snapshot.trackingState.menuBarSymbol
     }

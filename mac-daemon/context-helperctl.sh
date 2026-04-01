@@ -7,6 +7,71 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/context-common.sh"
 
+helper_auth_token() {
+  cb_read_keychain_token "$(cb_keychain_service_helper)"
+}
+
+launchd_state() {
+  local label="$1"
+  if launchctl list "$label" >/dev/null 2>&1; then
+    printf 'loaded\n'
+  else
+    printf 'missing\n'
+  fi
+}
+
+product_state() {
+  local daemon_state watcher_state
+  daemon_state="$(launchd_state "com.openclaw.context-bridge")"
+  watcher_state="$(launchd_state "com.openclaw.context-bridge-fswatch")"
+  if [ "$daemon_state" = "missing" ] && [ "$watcher_state" = "missing" ]; then
+    printf 'stopped\n'
+  else
+    printf 'running\n'
+  fi
+}
+
+load_launch_agent() {
+  local label="$1"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
+  if [ ! -f "$plist" ]; then
+    echo "{\"error\":\"plist not found: $plist\"}" >&2
+    exit 1
+  fi
+  launchctl load "$plist"
+}
+
+unload_launch_agent() {
+  local label="$1"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
+  if [ ! -f "$plist" ]; then
+    return 0
+  fi
+  launchctl unload "$plist" 2>/dev/null || true
+}
+
+stop_active_meeting_worker() {
+  local cb
+  cb="$(cb_dir)"
+  local meeting_bin="$cb/bin/claw-meeting"
+  local meeting_pid_file="$cb/meeting-worker.pid"
+
+  if [ -x "$meeting_bin" ]; then
+    "$meeting_bin" --stop 2>/dev/null || true
+  fi
+
+  if [ -f "$meeting_pid_file" ]; then
+    local pid
+    pid=$(cat "$meeting_pid_file" 2>/dev/null || echo "")
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      sleep 1
+      if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+      fi
+    fi
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # status  – JSON snapshot of the bridge's current state
 # ---------------------------------------------------------------------------
@@ -76,6 +141,10 @@ if meeting_worker_pid and meeting_state == "idle":
 snapshot = {
     "trackingState": "paused" if paused else (
         "sensitive" if os.path.exists(sensitive_path) else "active"),
+    "productState": "running" if (
+        launchd_state("com.openclaw.context-bridge") == "loaded"
+        or launchd_state("com.openclaw.context-bridge-fswatch") == "loaded"
+    ) else "stopped",
     "pauseUntil": pause_until,
     "sensitiveMode": os.path.exists(sensitive_path),
     "queueDepth": queue_depth,
@@ -127,6 +196,22 @@ do_pause() {
 # ---------------------------------------------------------------------------
 do_resume() {
   rm -f "$(cb_pause_file)"
+  status_json
+}
+
+# ---------------------------------------------------------------------------
+# start-bridge / stop-bridge
+# ---------------------------------------------------------------------------
+do_start_bridge() {
+  load_launch_agent "com.openclaw.context-bridge"
+  load_launch_agent "com.openclaw.context-bridge-fswatch"
+  status_json
+}
+
+do_stop_bridge() {
+  stop_active_meeting_worker
+  unload_launch_agent "com.openclaw.context-bridge-fswatch"
+  unload_launch_agent "com.openclaw.context-bridge"
   status_json
 }
 
@@ -266,7 +351,7 @@ do_list_handoffs() {
   handoffs_url=$(echo "$server_url" | sed 's|/context/push|/context/handoffs|')
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo "[]"
     exit 0
@@ -313,7 +398,7 @@ do_fetch_dashboard() {
   dashboard_url="$(echo "$server_url" | sed 's|/context/push|/context/dashboard|')?history_days=$history_days"
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo "{}"
     exit 0
@@ -365,7 +450,7 @@ do_mark_question_seen() {
   question_url="$(echo "$server_url" | sed "s|/context/push|/context/jc-question/$qid|")"
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo "{}"
     exit 0
@@ -482,7 +567,7 @@ do_fetch_projects() {
   projects_url=$(echo "$server_url" | sed 's|/context/push|/context/projects|')
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo '{}'
     exit 0
@@ -529,7 +614,7 @@ do_fetch_meetings() {
   meetings_url="$(echo "$server_url" | sed "s|/context/push|/context/meetings|")?days=$days"
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo '{}'
     exit 0
@@ -575,7 +660,7 @@ do_fetch_participants() {
   participants_url=$(echo "$server_url" | sed 's|/context/push|/context/participants|')
 
   local auth_token=""
-  auth_token=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  auth_token=$(helper_auth_token)
   if [ -z "$auth_token" ]; then
     echo '{}'
     exit 0
@@ -615,6 +700,8 @@ case "$cmd" in
   pause)           do_pause "$@" ;;
   resume)          do_resume ;;
   sensitive)       do_sensitive "$@" ;;
+  start-bridge)    do_start_bridge ;;
+  stop-bridge)     do_stop_bridge ;;
   restart-daemon)  restart_launchd "com.openclaw.context-bridge" ;;
   restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
   purge-local)     do_purge_local ;;
@@ -630,7 +717,7 @@ case "$cmd" in
   meetings)             do_fetch_meetings "$@" ;;
   participants)         do_fetch_participants ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|projects|meetings|participants|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|start-bridge|stop-bridge|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|projects|meetings|participants|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
     exit 1
     ;;
 esac

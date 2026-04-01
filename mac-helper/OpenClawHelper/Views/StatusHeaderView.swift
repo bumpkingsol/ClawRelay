@@ -37,6 +37,11 @@ struct StatusHeaderView: View {
 
     @ViewBuilder
     private var stateIcon: some View {
+        if snapshot.isProductStopped {
+            Image(systemName: "power.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(DarkUtilityGlass.warningAmber)
+        } else {
         switch snapshot.trackingState {
         case .active:
             Circle()
@@ -56,9 +61,13 @@ struct StatusHeaderView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(DarkUtilityGlass.warningAmber)
         }
+        }
     }
 
     private var stateLabel: String {
+        if snapshot.isProductStopped {
+            return "Stopped"
+        }
         switch snapshot.trackingState {
         case .active: return "Active"
         case .paused: return "Paused"
@@ -68,6 +77,9 @@ struct StatusHeaderView: View {
     }
 
     private var stateSubtitle: String {
+        if snapshot.isProductStopped {
+            return "Background capture is off"
+        }
         switch snapshot.trackingState {
         case .active:
             return snapshot.healthSummary
@@ -99,6 +111,9 @@ struct StatusHeaderView: View {
     }
 
     private var stateColor: Color {
+        if snapshot.isProductStopped {
+            return DarkUtilityGlass.warningAmber
+        }
         switch snapshot.trackingState {
         case .active: return DarkUtilityGlass.activeGreen
         case .paused: return DarkUtilityGlass.warningAmber

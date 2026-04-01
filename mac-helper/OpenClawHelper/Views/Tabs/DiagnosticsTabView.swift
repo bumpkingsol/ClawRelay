@@ -82,6 +82,25 @@ struct DiagnosticsTabView: View {
                 }
                 .padding()
                 .glassCard()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Application")
+                        .font(.headline)
+                    HStack(spacing: 12) {
+                        Button(viewModel.productLifecycleActionTitle) {
+                            if viewModel.snapshot.isProductStopped {
+                                viewModel.startProduct()
+                            } else {
+                                viewModel.shutdownProduct()
+                            }
+                        }
+                        Button("Relaunch Helper App") { viewModel.relaunchApplication() }
+                        Button("Quit Helper App") { viewModel.quitApplication() }
+                            .foregroundStyle(.red)
+                    }
+                }
+                .padding()
+                .glassCard()
             }
             .padding()
         }

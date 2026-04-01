@@ -14,6 +14,11 @@ struct BridgeSnapshot: Decodable, Equatable {
         }
     }
 
+    enum ProductState: String, Decodable {
+        case running, stopped
+    }
+
+    var productState: ProductState
     var trackingState: TrackingState
     var pauseUntil: String?
     var sensitiveMode: Bool
@@ -46,7 +51,76 @@ struct BridgeSnapshot: Decodable, Equatable {
         healthyServiceCount == totalServiceCount && queueDepth <= 10
     }
 
+    var isProductRunning: Bool {
+        productState == .running
+    }
+
+    var isProductStopped: Bool {
+        productState == .stopped
+    }
+
+    init(
+        productState: ProductState = .running,
+        trackingState: TrackingState,
+        pauseUntil: String?,
+        sensitiveMode: Bool,
+        queueDepth: Int,
+        daemonLaunchdState: String,
+        watcherLaunchdState: String,
+        whatsappLaunchdState: String? = nil,
+        meetingState: String? = nil,
+        meetingId: String? = nil,
+        meetingElapsedSeconds: Int? = nil,
+        meetingWorkerPid: Int? = nil
+    ) {
+        self.productState = productState
+        self.trackingState = trackingState
+        self.pauseUntil = pauseUntil
+        self.sensitiveMode = sensitiveMode
+        self.queueDepth = queueDepth
+        self.daemonLaunchdState = daemonLaunchdState
+        self.watcherLaunchdState = watcherLaunchdState
+        self.whatsappLaunchdState = whatsappLaunchdState
+        self.meetingState = meetingState
+        self.meetingId = meetingId
+        self.meetingElapsedSeconds = meetingElapsedSeconds
+        self.meetingWorkerPid = meetingWorkerPid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case productState
+        case trackingState
+        case pauseUntil
+        case sensitiveMode
+        case queueDepth
+        case daemonLaunchdState
+        case watcherLaunchdState
+        case whatsappLaunchdState
+        case meetingState
+        case meetingId
+        case meetingElapsedSeconds
+        case meetingWorkerPid
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        trackingState = try container.decode(TrackingState.self, forKey: .trackingState)
+        pauseUntil = try container.decodeIfPresent(String.self, forKey: .pauseUntil)
+        sensitiveMode = try container.decode(Bool.self, forKey: .sensitiveMode)
+        queueDepth = try container.decode(Int.self, forKey: .queueDepth)
+        daemonLaunchdState = try container.decode(String.self, forKey: .daemonLaunchdState)
+        watcherLaunchdState = try container.decode(String.self, forKey: .watcherLaunchdState)
+        whatsappLaunchdState = try container.decodeIfPresent(String.self, forKey: .whatsappLaunchdState)
+        meetingState = try container.decodeIfPresent(String.self, forKey: .meetingState)
+        meetingId = try container.decodeIfPresent(String.self, forKey: .meetingId)
+        meetingElapsedSeconds = try container.decodeIfPresent(Int.self, forKey: .meetingElapsedSeconds)
+        meetingWorkerPid = try container.decodeIfPresent(Int.self, forKey: .meetingWorkerPid)
+        productState = try container.decodeIfPresent(ProductState.self, forKey: .productState)
+            ?? ((daemonLaunchdState == "missing" && watcherLaunchdState == "missing") ? .stopped : .running)
+    }
+
     static let placeholder = BridgeSnapshot(
+        productState: .running,
         trackingState: .active,
         pauseUntil: nil,
         sensitiveMode: false,
@@ -61,6 +135,7 @@ struct BridgeSnapshot: Decodable, Equatable {
     )
 
     static let needsAttentionPlaceholder = BridgeSnapshot(
+        productState: .running,
         trackingState: .needsAttention,
         pauseUntil: nil,
         sensitiveMode: false,

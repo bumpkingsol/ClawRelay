@@ -16,6 +16,7 @@ final class ControlCenterViewModel: ObservableObject {
     @Published var lastActionError: String?
 
     private let _runner: BridgeCommandRunner
+    private let appLifecycle: AppLifecycleControlling
     private let permissionService = PermissionService()
     private var refreshTimer: RefreshTimer?
 
@@ -25,8 +26,12 @@ final class ControlCenterViewModel: ObservableObject {
     /// Public access for child view models (e.g. HandoffViewModel)
     var runner: BridgeCommandRunner { _runner }
 
-    init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
+    init(
+        runner: BridgeCommandRunner = BridgeCommandRunner(),
+        appLifecycle: AppLifecycleControlling = AppLifecycleService()
+    ) {
         self._runner = runner
+        self.appLifecycle = appLifecycle
         self.dashboardViewModel = DashboardViewModel(runner: runner)
         self.handoffsViewModel = HandoffsTabViewModel(runner: runner)
         loadConfigPaths()
@@ -51,6 +56,10 @@ final class ControlCenterViewModel: ObservableObject {
         }
         refreshTimer?.start()
         refresh()
+    }
+
+    var productLifecycleActionTitle: String {
+        snapshot.isProductStopped ? "Start ClawRelay" : "Shut Down ClawRelay"
     }
 
     func stopPolling() {
@@ -108,6 +117,36 @@ final class ControlCenterViewModel: ObservableObject {
     func purgeLocal() {
         try? runner.runAction("purge-local")
         refresh()
+    }
+
+    func quitApplication() {
+        appLifecycle.quit()
+    }
+
+    func relaunchApplication() {
+        appLifecycle.relaunch()
+    }
+
+    func startProduct() {
+        lastActionError = nil
+        do {
+            snapshot = try runner.runSnapshotAction("start-bridge")
+        } catch {
+            lastActionError = "ClawRelay start failed: \(error.localizedDescription)"
+            refresh()
+        }
+    }
+
+    func shutdownProduct() {
+        lastActionError = nil
+        do {
+            snapshot = try runner.runSnapshotAction("stop-bridge")
+            stopPolling()
+            appLifecycle.quit()
+        } catch {
+            lastActionError = "ClawRelay shutdown failed: \(error.localizedDescription)"
+            refresh()
+        }
     }
 
     private func loadErrors() {

@@ -19,11 +19,16 @@ final class ControlCenterViewModel: ObservableObject {
     private let permissionService = PermissionService()
     private var refreshTimer: RefreshTimer?
 
+    let dashboardViewModel: DashboardViewModel
+    let handoffsViewModel: HandoffsTabViewModel
+
     /// Public access for child view models (e.g. HandoffViewModel)
     var runner: BridgeCommandRunner { _runner }
 
     init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
         self._runner = runner
+        self.dashboardViewModel = DashboardViewModel(runner: runner)
+        self.handoffsViewModel = HandoffsTabViewModel(runner: runner)
         loadConfigPaths()
         recheckPermissions()
     }

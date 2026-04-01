@@ -26,10 +26,11 @@ struct QuickActionsGrid: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(DarkUtilityGlass.activeGreen)
-            .background(
-                RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
-                    .fill(DarkUtilityGlass.activeGreen.opacity(0.10))
-                    .strokeBorder(DarkUtilityGlass.activeGreen.opacity(0.20), lineWidth: 1)
+            .popoverGlassSurface(
+                tint: DarkUtilityGlass.activeGreen.opacity(0.30),
+                fallbackFill: DarkUtilityGlass.activeGreen.opacity(0.10),
+                fallbackStroke: DarkUtilityGlass.activeGreen.opacity(0.20),
+                interactive: true
             )
         } else {
             // Segmented pause control
@@ -39,11 +40,7 @@ struct QuickActionsGrid: View {
                 pauseSegment("Until Tmrw") { viewModel.pauseUntilTomorrow() }
             }
             .padding(3)
-            .background(
-                RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
-                    .fill(DarkUtilityGlass.cardBackground)
-                    .strokeBorder(DarkUtilityGlass.cardBorder, lineWidth: 1)
-            )
+            .popoverGlassSurface(interactive: true)
         }
     }
 
@@ -83,11 +80,15 @@ struct QuickActionsGrid: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
-                .fill(viewModel.snapshot.sensitiveMode
-                      ? DarkUtilityGlass.sensitivePurple.opacity(0.06)
-                      : DarkUtilityGlass.subtleBackground)
+        .popoverGlassSurface(
+            tint: viewModel.snapshot.sensitiveMode ? DarkUtilityGlass.sensitivePurple.opacity(0.30) : nil,
+            fallbackFill: viewModel.snapshot.sensitiveMode
+                ? DarkUtilityGlass.sensitivePurple.opacity(0.06)
+                : DarkUtilityGlass.subtleBackground,
+            fallbackStroke: viewModel.snapshot.sensitiveMode
+                ? DarkUtilityGlass.sensitivePurple.opacity(0.18)
+                : DarkUtilityGlass.cardBorder,
+            interactive: true
         )
     }
 }

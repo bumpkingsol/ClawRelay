@@ -16,10 +16,10 @@ struct HealthDetailCard: View {
         }
         .padding(10)
         .padding(.horizontal, 2)
-        .background(
-            RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
-                .fill(DarkUtilityGlass.warningAmber.opacity(0.06))
-                .strokeBorder(DarkUtilityGlass.warningAmber.opacity(0.12), lineWidth: 1)
+        .popoverGlassSurface(
+            tint: DarkUtilityGlass.warningAmber.opacity(0.24),
+            fallbackFill: DarkUtilityGlass.warningAmber.opacity(0.06),
+            fallbackStroke: DarkUtilityGlass.warningAmber.opacity(0.12)
         )
     }
 

@@ -1,15 +1,17 @@
 import SwiftUI
 
 struct HandoffsTabView: View {
-    @StateObject var viewModel: HandoffsTabViewModel
+    @ObservedObject var viewModel: HandoffsTabViewModel
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                composeSection
-                historySection
+            UtilityGlassContainer(spacing: 20) {
+                VStack(alignment: .leading, spacing: 20) {
+                    composeSection
+                    historySection
+                }
+                .padding()
             }
-            .padding()
         }
         .onAppear { viewModel.startPolling() }
         .onDisappear { viewModel.stopPolling() }

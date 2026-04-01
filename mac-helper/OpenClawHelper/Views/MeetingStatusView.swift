@@ -46,11 +46,7 @@ struct MeetingStatusView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: DarkUtilityGlass.popoverCardRadius)
-                .fill(DarkUtilityGlass.cardBackground)
-                .strokeBorder(DarkUtilityGlass.cardBorder, lineWidth: 1)
-        )
+        .popoverGlassSurface()
     }
 
     @ViewBuilder

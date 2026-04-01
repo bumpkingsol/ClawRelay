@@ -34,7 +34,7 @@ struct ControlCenterView: View {
             Group {
                 switch viewModel.selectedTab {
                 case .dashboard:
-                    DashboardTabView(viewModel: DashboardViewModel(runner: viewModel.runner))
+                    DashboardTabView(viewModel: viewModel.dashboardViewModel)
                 case .meetings:
                     MeetingsTabView(meetingVM: meetingViewModel)
                 case .overview:
@@ -46,7 +46,7 @@ struct ControlCenterView: View {
                 case .privacy:
                     PrivacyTabView(viewModel: viewModel)
                 case .handoffs:
-                    HandoffsTabView(viewModel: HandoffsTabViewModel(runner: viewModel.runner))
+                    HandoffsTabView(viewModel: viewModel.handoffsViewModel)
                 case .none:
                     Text("Select a tab")
                         .foregroundStyle(.secondary)

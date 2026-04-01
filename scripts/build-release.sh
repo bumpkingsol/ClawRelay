@@ -1,16 +1,16 @@
 #!/bin/bash
-# Build and package OpenClawHelper for GitHub Release
+# Build and package ClawRelay for GitHub Release
 # Usage: bash scripts/build-release.sh [--publish]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERSION=$(grep 'MARKETING_VERSION' "$ROOT_DIR/mac-helper/OpenClawHelper.xcodeproj/project.pbxproj" | head -1 | sed 's/.*= //' | tr -d ';[:space:]')
-ZIP_NAME="OpenClawHelper-v${VERSION}.zip"
+ZIP_NAME="ClawRelay-v${VERSION}.zip"
 BUILD_DIR="$ROOT_DIR/mac-helper/build"
 APP_PATH="$BUILD_DIR/Build/Products/Release/ClawRelay.app"
 
-echo "=== Building OpenClawHelper v${VERSION} ==="
+echo "=== Building ClawRelay v${VERSION} ==="
 
 # Clean and build Release
 xcodebuild -project "$ROOT_DIR/mac-helper/OpenClawHelper.xcodeproj" \
@@ -36,11 +36,11 @@ echo "Packaged: $ZIP_NAME ($(du -h "$ROOT_DIR/$ZIP_NAME" | cut -f1 | xargs))"
 if [ "${1:-}" = "--publish" ]; then
   echo "Publishing to GitHub..."
   gh release create "v${VERSION}" "$ROOT_DIR/$ZIP_NAME" \
-    --title "OpenClaw Helper v${VERSION}" \
+    --title "ClawRelay v${VERSION}" \
     --notes "$(cat <<EOF
-## OpenClaw Helper v${VERSION}
+## ClawRelay v${VERSION}
 
-Native macOS menu bar app for controlling the Context Bridge capture pipeline.
+Native macOS helper app for controlling the Context Bridge capture pipeline.
 
 ### Features
 - Menu bar popover with live status, health strip, and quick actions
@@ -55,13 +55,13 @@ Native macOS menu bar app for controlling the Context Bridge capture pipeline.
 
 ### Install
 1. Download \`$ZIP_NAME\`
-2. Unzip and move \`OpenClawHelper.app\` to Applications
+2. Unzip and move \`ClawRelay.app\` to Applications
 3. On first launch: right-click > Open (unsigned app)
 EOF
 )"
-  echo "Release published: https://github.com/<your-org>/openclaw-computer-vision/releases/tag/v${VERSION}"
+  echo "Release published: https://github.com/bumpkingsol/ClawRelay/releases/tag/v${VERSION}"
 else
   echo ""
   echo "To publish: bash scripts/build-release.sh --publish"
-  echo "Or manually: gh release create v${VERSION} $ZIP_NAME --title 'OpenClaw Helper v${VERSION}'"
+  echo "Or manually: gh release create v${VERSION} $ZIP_NAME --title 'ClawRelay v${VERSION}'"
 fi

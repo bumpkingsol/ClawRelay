@@ -24,6 +24,22 @@ final class BridgeCommandRunnerTests: XCTestCase {
         let snapshot = try JSONDecoder().decode(BridgeSnapshot.self, from: data)
         XCTAssertEqual(snapshot.daemonLaunchdState, "missing")
         XCTAssertEqual(snapshot.queueDepth, 42)
+        XCTAssertEqual(snapshot.productState, .running)
+    }
+
+    func testStoppedStateFallsBackFromMissingServices() throws {
+        let data = """
+        {
+          "trackingState": "active",
+          "pauseUntil": null,
+          "sensitiveMode": false,
+          "queueDepth": 0,
+          "daemonLaunchdState": "missing",
+          "watcherLaunchdState": "missing"
+        }
+        """.data(using: .utf8)!
+        let snapshot = try JSONDecoder().decode(BridgeSnapshot.self, from: data)
+        XCTAssertEqual(snapshot.productState, .stopped)
     }
 
     private func fixtureData(_ name: String) throws -> Data {

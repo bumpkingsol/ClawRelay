@@ -19,5 +19,6 @@ final class OpenClawHelperTests: XCTestCase {
     func testPlaceholderSnapshot() {
         let snapshot = BridgeSnapshot.placeholder
         XCTAssertEqual(snapshot.trackingState, .active)
+        XCTAssertEqual(snapshot.productState, .running)
     }
 }

@@ -10,35 +10,80 @@ import json
 import sqlite3
 import logging
 import hmac
+import re
+from functools import wraps
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from flask import Flask, request, jsonify
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from db_utils import get_db as _get_db, DB_PATH, is_encrypted
+from flask import Flask, request, jsonify, g
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+except ImportError:  # pragma: no cover - exercised in tests/dev environments
+    class Limiter:  # type: ignore[override]
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def limit(self, *_args, **_kwargs):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    def get_remote_address():  # type: ignore[override]
+        return request.remote_addr or "unknown"
+
+from db_utils import get_db as _get_db, DB_PATH, is_encrypted, validate_db_configuration
+from security import (
+    CLIENT_TOKEN_ENVS,
+    MEETING_CONTEXT_RETENTION_HOURS,
+    MEETING_SUMMARY_RETENTION_DAYS,
+    PARTICIPANT_PROFILE_RETENTION_DAYS,
+    RAW_RETENTION_HOURS,
+    auth_tokens,
+    is_external_meeting_processing_allowed,
+    safe_meeting_dir,
+    utc_cutoff_days,
+    utc_cutoff_hours,
+    validate_meeting_id,
+)
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Rate limiting: 10 requests per minute per IP to prevent DoS
+def rate_limit_key():
+    auth = request.headers.get("Authorization", "")
+    scheme, _, provided = auth.partition(" ")
+    if scheme == "Bearer" and provided:
+        return provided.strip()
+    return get_remote_address()
+
+
+# Rate limiting: prefer authenticated token identity over IP
 limiter = Limiter(
     app=app,
-    key_func=get_remote_address,
+    key_func=rate_limit_key,
     default_limits=["20 per minute"],
     storage_uri="memory://",
 )
 
 # --- Config ---
-AUTH_TOKEN = os.environ.get("CONTEXT_BRIDGE_TOKEN", "").strip()
+AUTH_TOKENS = auth_tokens()
 MAX_CONTENT_LENGTH = int(os.environ.get("CONTEXT_BRIDGE_MAX_CONTENT_LENGTH", "262144"))
-PURGE_HOURS = 48
+PURGE_HOURS = RAW_RETENTION_HOURS
 MEETING_FRAMES_DIR = Path(
     os.environ.get("MEETING_FRAMES_DIR", str(Path(DB_PATH).parent / "meeting-frames"))
 )
 MEETING_MAX_CONTENT_LENGTH = int(
     os.environ.get("MEETING_MAX_CONTENT_LENGTH", "52428800")
 )  # 50MB
+MEETING_MAX_FILES_PER_REQUEST = int(
+    os.environ.get("MEETING_MAX_FILES_PER_REQUEST", "10")
+)
+MEETING_MAX_TOTAL_FRAMES = int(os.environ.get("MEETING_MAX_TOTAL_FRAMES", "50"))
+MEETING_MAX_TRANSCRIPT_CHARS = int(
+    os.environ.get("MEETING_MAX_TRANSCRIPT_CHARS", "50000")
+)
 
 app.config["MAX_CONTENT_LENGTH"] = max(MAX_CONTENT_LENGTH, MEETING_MAX_CONTENT_LENGTH)
 
@@ -55,6 +100,7 @@ def get_db():
 def init_db():
     """Create tables if they don't exist."""
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    MEETING_FRAMES_DIR.mkdir(parents=True, exist_ok=True)
     db = get_db()
     db.execute("""
         CREATE TABLE IF NOT EXISTS activity_stream (
@@ -155,7 +201,9 @@ def init_db():
             transcript_json TEXT,
             visual_events_json TEXT,
             summary_md TEXT,
-            raw_data_purge_at TEXT
+            raw_data_purge_at TEXT,
+            allow_external_processing INTEGER DEFAULT 0,
+            summary_purge_at TEXT
         )
     """)
     db.execute("""
@@ -174,19 +222,38 @@ def init_db():
         db.execute("ALTER TABLE participant_profiles ADD COLUMN last_seen TEXT")
     except Exception:
         pass  # Column already exists
+    try:
+        db.execute(
+            "ALTER TABLE meeting_sessions ADD COLUMN allow_external_processing INTEGER DEFAULT 0"
+        )
+    except Exception:
+        pass
+    try:
+        db.execute("ALTER TABLE meeting_sessions ADD COLUMN summary_purge_at TEXT")
+    except Exception:
+        pass
     db.execute("""
         CREATE TABLE IF NOT EXISTS portfolio_projects (
             name TEXT PRIMARY KEY
         )
     """)
-    db.commit()
-    db.close()
-    os.chmod(DB_PATH, 0o600)
-    logger.info(f"Database initialized at {DB_PATH}")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS meeting_context_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meeting_id TEXT NOT NULL,
+            transcript_context TEXT,
+            response_card TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
     scrub_raw_payloads(db)
     db.commit()
     db.close()
     os.chmod(DB_PATH, 0o600)
+    try:
+        os.chmod(MEETING_FRAMES_DIR, 0o700)
+    except OSError:
+        pass
     logger.info(f"Database initialized at {DB_PATH}")
 
 
@@ -213,16 +280,19 @@ def scrub_raw_payloads(db):
 def purge_old_data():
     """Delete records older than PURGE_HOURS."""
     db = get_db()
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=PURGE_HOURS)).isoformat()
+    cutoff = utc_cutoff_hours(PURGE_HOURS)
     deleted_activity = db.execute(
         "DELETE FROM activity_stream WHERE created_at < ?", (cutoff,)
     ).rowcount
     deleted_commits = db.execute(
         "DELETE FROM commits WHERE created_at < ?", (cutoff,)
     ).rowcount
+    deleted_context_requests = db.execute(
+        "DELETE FROM meeting_context_requests WHERE created_at < ?",
+        (utc_cutoff_hours(MEETING_CONTEXT_RETENTION_HOURS),),
+    ).rowcount
 
     # Purge raw meeting data (transcript_json, visual_events_json) after 48h
-    # Keep summary_md permanently
     purged_meetings = db.execute(
         """
         UPDATE meeting_sessions
@@ -236,6 +306,26 @@ def purge_old_data():
 
     if purged_meetings:
         logger.info(f"Purged raw data from {purged_meetings} meeting sessions")
+
+    purged_summaries = db.execute(
+        """
+        UPDATE meeting_sessions
+        SET summary_md = NULL
+        WHERE summary_purge_at IS NOT NULL
+          AND summary_purge_at < ?
+          AND summary_md IS NOT NULL
+    """,
+        (utc_cutoff_days(0),),
+    ).rowcount
+
+    expired_profiles = db.execute(
+        """
+        DELETE FROM participant_profiles
+        WHERE COALESCE(last_seen, last_updated) IS NOT NULL
+          AND COALESCE(last_seen, last_updated) < ?
+    """,
+        (utc_cutoff_days(PARTICIPANT_PROFILE_RETENTION_DAYS),),
+    ).rowcount
 
     # Purge screenshot files for expired meetings
     try:
@@ -260,19 +350,79 @@ def purge_old_data():
 
     db.commit()
     db.close()
-    if deleted_activity or deleted_commits:
+    if any((deleted_activity, deleted_commits, deleted_context_requests, purged_summaries, expired_profiles)):
         logger.info(
-            f"Purged {deleted_activity} activity rows, {deleted_commits} commit rows (older than {PURGE_HOURS}h)"
+            "Purged %s activity rows, %s commit rows, %s meeting context rows, "
+            "%s meeting summaries, %s participant profiles",
+            deleted_activity,
+            deleted_commits,
+            deleted_context_requests,
+            purged_summaries,
+            expired_profiles,
         )
 
 
-def verify_auth(req):
-    """Check Bearer token."""
+def retention_backlog(db):
+    return {
+        "meeting_context_requests": db.execute(
+            "SELECT COUNT(*) AS cnt FROM meeting_context_requests WHERE created_at < ?",
+            (utc_cutoff_hours(MEETING_CONTEXT_RETENTION_HOURS),),
+        ).fetchone()["cnt"],
+        "participant_profiles": db.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM participant_profiles
+            WHERE COALESCE(last_seen, last_updated) IS NOT NULL
+              AND COALESCE(last_seen, last_updated) < ?
+            """,
+            (utc_cutoff_days(PARTICIPANT_PROFILE_RETENTION_DAYS),),
+        ).fetchone()["cnt"],
+        "meeting_summaries": db.execute(
+            "SELECT COUNT(*) AS cnt FROM meeting_sessions WHERE summary_purge_at IS NOT NULL AND summary_purge_at < ? AND summary_md IS NOT NULL",
+            (utc_cutoff_days(0),),
+        ).fetchone()["cnt"],
+    }
+
+
+def authenticate_request(req):
+    """Resolve Bearer token to a client identity."""
     auth = req.headers.get("Authorization", "")
     scheme, _, provided = auth.partition(" ")
     if scheme != "Bearer" or not provided:
-        return False
-    return hmac.compare_digest(provided.strip(), AUTH_TOKEN)
+        return None
+    candidate = provided.strip()
+    for client, token in AUTH_TOKENS.items():
+        if hmac.compare_digest(candidate, token):
+            return client
+    return None
+
+
+def require_clients(*allowed_clients):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            client = authenticate_request(request)
+            if not client:
+                logger.warning(
+                    "auth denied endpoint=%s reason=unknown_client remote=%s",
+                    request.path,
+                    get_remote_address(),
+                )
+                return jsonify({"error": "unauthorized"}), 401
+            g.auth_client = client
+            if allowed_clients and client not in allowed_clients:
+                logger.warning(
+                    "auth denied endpoint=%s client=%s reason=forbidden",
+                    request.path,
+                    client,
+                )
+                return jsonify({"error": "forbidden", "client": client}), 403
+            logger.info("auth ok endpoint=%s client=%s", request.path, client)
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def parse_json_request():
@@ -332,11 +482,9 @@ def sanitize_activity_payload(data):
 
 @app.route("/context/push", methods=["POST"])
 @limiter.limit("10 per minute")
+@require_clients("daemon")
 def push_activity():
     """Receive activity data from Mac daemon."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -402,11 +550,9 @@ def push_activity():
 
 
 @app.route("/context/commit", methods=["POST"])
+@require_clients("daemon")
 def push_commit():
     """Receive git commit data from post-commit hooks."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -432,6 +578,7 @@ def push_commit():
 
 
 @app.route("/context/handoff", methods=["POST"])
+@require_clients("agent")
 def handoff():
     """Receive explicit task handoff from the operator.
 
@@ -439,9 +586,6 @@ def handoff():
     Telegram bot (or direct POST) converts to API call.
     The agent reads handoffs and picks up the task.
     """
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -535,11 +679,9 @@ def _notify_handoff(hid, project, task, message, priority):
 
 
 @app.route("/context/handoffs", methods=["GET"])
+@require_clients("agent", "helper")
 def list_handoffs():
     """List recent handoffs with status."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     db = get_db()
     db.execute("""
         CREATE TABLE IF NOT EXISTS handoffs (
@@ -574,11 +716,9 @@ def list_handoffs():
 
 
 @app.route("/context/handoffs/<int:handoff_id>", methods=["PATCH"])
+@require_clients("agent")
 def update_handoff(handoff_id):
     """The agent updates handoff status."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -614,11 +754,9 @@ def update_handoff(handoff_id):
 
 
 @app.route("/context/health", methods=["GET"])
+@require_clients("helper")
 def health():
     """Health check endpoint - also used for capture verification."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     try:
         db = get_db()
         count = db.execute("SELECT COUNT(*) as cnt FROM activity_stream").fetchone()[
@@ -650,6 +788,7 @@ def health():
         elif count == 0:
             capture_status = "no_data"
 
+        backlog = retention_backlog(db)
         db.close()
         return jsonify(
             {
@@ -662,6 +801,8 @@ def health():
                 if last_active
                 else None,
                 "db_encrypted": is_encrypted(),
+                "auth_mode": "scoped_tokens",
+                "retention_backlog": backlog,
             }
         )
     except Exception:
@@ -670,10 +811,8 @@ def health():
 
 
 @app.route("/context/projects", methods=["GET"])
+@require_clients("helper")
 def get_projects():
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     try:
         db = get_db()
         rows = db.execute(
@@ -686,10 +825,8 @@ def get_projects():
 
 
 @app.route("/context/meetings", methods=["GET"])
+@require_clients("helper")
 def get_meetings():
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     days = min(int(request.args.get("days", 7)), 30)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
@@ -740,10 +877,8 @@ def get_meetings():
 
 
 @app.route("/context/participants", methods=["GET"])
+@require_clients("helper")
 def get_participants():
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     try:
         db = get_db()
         rows = db.execute("""
@@ -778,9 +913,10 @@ def get_participants():
 
 
 @app.route("/context/meetings/<meeting_id>/transcript", methods=["GET"])
+@require_clients("helper")
 def get_meeting_transcript(meeting_id):
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
+    if not validate_meeting_id(meeting_id):
+        return jsonify({"error": "invalid meeting_id"}), 400
 
     try:
         db = get_db()
@@ -835,11 +971,9 @@ def get_meeting_transcript(meeting_id):
 
 
 @app.route("/context/jc-work-log", methods=["GET"])
+@require_clients("agent", "helper")
 def jc_work_log():
     """Agent work log - readable by ClawRelay app."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     try:
         db = get_db()
         # Check if table exists
@@ -887,10 +1021,9 @@ def jc_work_log():
 
 
 @app.route("/context/jc-question", methods=["POST"])
+@require_clients("agent")
 def post_jc_question():
     """The agent posts a question for the operator."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
     data, error = parse_json_request()
     if error:
         return error
@@ -908,10 +1041,9 @@ def post_jc_question():
 
 
 @app.route("/context/jc-question/<int:qid>", methods=["PATCH"])
+@require_clients("agent", "helper")
 def mark_jc_question(qid):
     """ClawRelay marks a question as seen by the operator."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
     db = get_db()
     db.execute("UPDATE jc_questions SET seen = 1 WHERE id = ?", (qid,))
     db.commit()
@@ -920,11 +1052,9 @@ def mark_jc_question(qid):
 
 
 @app.route("/context/meeting/session", methods=["POST"])
+@require_clients("daemon")
 def push_meeting_session():
     """Receive final transcript + metadata for a completed meeting."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -932,6 +1062,8 @@ def push_meeting_session():
     meeting_id = data.get("meeting_id")
     if not meeting_id:
         return jsonify({"error": "missing meeting_id"}), 400
+    if not validate_meeting_id(meeting_id):
+        return jsonify({"error": "invalid meeting_id"}), 400
 
     started_at = data.get("started_at")
     ended_at = data.get("ended_at")
@@ -943,17 +1075,35 @@ def push_meeting_session():
     participants = data.get("participants", "")
     transcript_json = data.get("transcript_json")
     visual_events_json = data.get("visual_events_json")
+    allow_external_processing = is_external_meeting_processing_allowed(
+        meeting_id, data.get("allow_external_processing")
+    )
+
+    if transcript_json:
+        serialized_transcript = json.dumps(transcript_json)
+        if len(serialized_transcript) > MEETING_MAX_TRANSCRIPT_CHARS:
+            return jsonify({"error": "transcript too large"}), 413
+    else:
+        serialized_transcript = None
+
+    serialized_visual_events = (
+        json.dumps(visual_events_json) if visual_events_json else None
+    )
 
     # Calculate purge time: 48h from now
     purge_at = (datetime.now(timezone.utc) + timedelta(hours=PURGE_HOURS)).isoformat()
+    summary_purge_at = (
+        datetime.now(timezone.utc) + timedelta(days=MEETING_SUMMARY_RETENTION_DAYS)
+    ).isoformat()
 
     db = get_db()
     db.execute(
         """
         INSERT INTO meeting_sessions
         (id, started_at, ended_at, duration_seconds, app, participants,
-         transcript_json, visual_events_json, summary_md, raw_data_purge_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+         transcript_json, visual_events_json, summary_md, raw_data_purge_at,
+         allow_external_processing, summary_purge_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             started_at = excluded.started_at,
             ended_at = excluded.ended_at,
@@ -962,7 +1112,9 @@ def push_meeting_session():
             participants = excluded.participants,
             transcript_json = excluded.transcript_json,
             visual_events_json = excluded.visual_events_json,
-            raw_data_purge_at = excluded.raw_data_purge_at
+            raw_data_purge_at = excluded.raw_data_purge_at,
+            allow_external_processing = excluded.allow_external_processing,
+            summary_purge_at = excluded.summary_purge_at
     """,
         (
             meeting_id,
@@ -973,9 +1125,11 @@ def push_meeting_session():
             json.dumps(participants)
             if isinstance(participants, list)
             else participants,
-            json.dumps(transcript_json) if transcript_json else None,
-            json.dumps(visual_events_json) if visual_events_json else None,
+            serialized_transcript,
+            serialized_visual_events,
             purge_at,
+            1 if allow_external_processing else 0,
+            summary_purge_at,
         ),
     )
     db.commit()
@@ -1006,6 +1160,7 @@ def push_meeting_session():
 
 
 @app.route("/context/meeting/frames", methods=["POST"])
+@require_clients("daemon")
 def push_meeting_frames():
     """Receive screenshot PNGs for a meeting session.
 
@@ -1013,23 +1168,29 @@ def push_meeting_frames():
     - meeting_id (form field)
     - frames: up to 10 PNG files, max 50MB total
     """
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     meeting_id = request.form.get("meeting_id")
     if not meeting_id:
         return jsonify({"error": "missing meeting_id"}), 400
+    if not validate_meeting_id(meeting_id):
+        return jsonify({"error": "invalid meeting_id"}), 400
 
     files = request.files.getlist("frames")
     if not files:
         return jsonify({"error": "no files uploaded"}), 400
 
-    if len(files) > 10:
-        return jsonify({"error": "max 10 files per request"}), 400
+    if len(files) > MEETING_MAX_FILES_PER_REQUEST:
+        return jsonify({"error": f"max {MEETING_MAX_FILES_PER_REQUEST} files per request"}), 400
 
     # Create session directory
-    session_dir = MEETING_FRAMES_DIR / meeting_id
+    try:
+        session_dir = safe_meeting_dir(MEETING_FRAMES_DIR, meeting_id)
+    except ValueError:
+        return jsonify({"error": "invalid meeting_id"}), 400
     session_dir.mkdir(parents=True, exist_ok=True)
+
+    existing_files = len(list(session_dir.glob("*.png")))
+    if existing_files + len(files) > MEETING_MAX_TOTAL_FRAMES:
+        return jsonify({"error": f"max {MEETING_MAX_TOTAL_FRAMES} frames per meeting"}), 400
 
     saved = []
     for f in files:
@@ -1058,6 +1219,7 @@ def push_meeting_frames():
 
 
 @app.route("/meeting/context-request", methods=["POST"])
+@require_clients("helper")
 def meeting_context_request():
     """Handle live fallback card requests from ClawRelay during meetings.
 
@@ -1066,9 +1228,6 @@ def meeting_context_request():
 
     Rate limited: max 5 per meeting, min 60s between requests.
     """
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data, error = parse_json_request()
     if error:
         return error
@@ -1076,6 +1235,8 @@ def meeting_context_request():
     meeting_id = data.get("meeting_id")
     if not meeting_id:
         return jsonify({"error": "missing meeting_id"}), 400
+    if not validate_meeting_id(meeting_id):
+        return jsonify({"error": "invalid meeting_id"}), 400
 
     transcript_context = data.get("transcript_context", "")
     if not transcript_context:
@@ -1173,11 +1334,9 @@ def meeting_context_request():
 
 
 @app.route("/context/dashboard", methods=["GET"])
+@require_clients("helper")
 def dashboard():
     """Combined dashboard data for ClawRelay app."""
-    if not verify_auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     try:
         db = get_db()
         from config import PORTFOLIO_PROJECTS, ALL_PROJECTS, NOISE_APPS
@@ -1521,11 +1680,19 @@ def before_request():
 
 def configure_app():
     """Validate runtime security configuration and initialize storage."""
-    if not AUTH_TOKEN:
+    missing = [env_name for env_name in CLIENT_TOKEN_ENVS.values() if not os.environ.get(env_name, "").strip()]
+    if missing:
         raise RuntimeError(
-            "CONTEXT_BRIDGE_TOKEN must be set; refusing to start without authenticated writes"
+            f"Missing required scoped auth env vars: {', '.join(missing)}"
         )
 
+    validate_db_configuration()
+    frames_root = MEETING_FRAMES_DIR.resolve(strict=False)
+    data_root = Path(DB_PATH).parent.resolve(strict=False)
+    if frames_root != data_root and data_root not in frames_root.parents:
+        raise RuntimeError(
+            f"MEETING_FRAMES_DIR must live under the DB data root ({data_root}); got {frames_root}"
+        )
     init_db()
 
 

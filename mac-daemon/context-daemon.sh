@@ -17,7 +17,7 @@ if [ -z "$SERVER_URL" ] && [ -f "$SERVER_URL_FILE" ]; then
   SERVER_URL=$(cat "$SERVER_URL_FILE" 2>/dev/null || echo "")
 fi
 SERVER_URL="${SERVER_URL:-https://localhost:7890/context/push}"
-AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
+AUTH_TOKEN="${CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN:-}"
 CMD_LOG="$CB_DIR/cmds.log"
 LOCAL_DB="$CB_DIR/local.db"
 CLIPBOARD_HASH_FILE="$CB_DIR/last-clipboard-hash"
@@ -53,9 +53,9 @@ fi
 
 # --- Auth check ---
 if [ -z "$AUTH_TOKEN" ]; then
-  AUTH_TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+  AUTH_TOKEN=$(cb_read_keychain_token "$(cb_keychain_service_daemon)")
   if [ -z "$AUTH_TOKEN" ]; then
-    echo "ERROR: No auth token found. Set CONTEXT_BRIDGE_TOKEN or add to Keychain." >&2
+    echo "ERROR: No daemon auth token found. Set CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN or add to Keychain." >&2
     exit 1
   fi
 fi

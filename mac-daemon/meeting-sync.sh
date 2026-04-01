@@ -7,6 +7,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/context-common.sh"
+
 SESSION_DIR="${1:-}"
 if [ -z "$SESSION_DIR" ] || [ ! -d "$SESSION_DIR" ]; then
   echo "Usage: meeting-sync.sh <session-dir>" >&2
@@ -34,9 +37,9 @@ fi
 BASE_URL=$(echo "$SERVER_URL" | sed 's|/context/push||')
 
 # Auth token from Keychain
-AUTH_TOKEN=$(security find-generic-password -s context-bridge -a token -w 2>/dev/null || echo "")
+AUTH_TOKEN=$(cb_read_keychain_token "$(cb_keychain_service_daemon)")
 if [ -z "$AUTH_TOKEN" ]; then
-  AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
+  AUTH_TOKEN="${CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN:-}"
 fi
 if [ -z "$AUTH_TOKEN" ]; then
   echo "ERROR: No auth token" >&2
@@ -59,12 +62,14 @@ STARTED_AT=""
 ENDED_AT=""
 DURATION_SECONDS=0
 CALL_APP=""
+ALLOW_EXTERNAL_PROCESSING="false"
 
 if [ -f "$STATE_FILE" ]; then
   STARTED_AT=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('started_at',''))" 2>/dev/null || echo "")
   ENDED_AT=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('ended_at',''))" 2>/dev/null || echo "")
   DURATION_SECONDS=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('elapsed_seconds',0))" 2>/dev/null || echo "0")
   CALL_APP=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('call_app',''))" 2>/dev/null || echo "")
+  ALLOW_EXTERNAL_PROCESSING=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print('true' if d.get('allow_external_processing') else 'false')" 2>/dev/null || echo "false")
 fi
 
 # Fallback: derive timestamps from directory creation/modification
@@ -131,6 +136,7 @@ data = {
     'ended_at': '$ENDED_AT',
     'duration_seconds': $DURATION_SECONDS,
     'app': '$CALL_APP',
+    'allow_external_processing': $ALLOW_EXTERNAL_PROCESSING,
     'participants': '',
     'transcript_json': $TRANSCRIPT_JSON,
     'visual_events_json': $VISUAL_EVENTS_JSON,

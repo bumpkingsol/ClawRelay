@@ -33,12 +33,7 @@ struct MenuBarPopoverView: View {
                 handoffSection
 
                 // Zone 7: Footer
-                Button(action: openControlCenter) {
-                    Text("Control Center \(Image(systemName: "arrow.up.right"))")
-                        .font(.system(size: 11))
-                        .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
-                }
-                .buttonStyle(.plain)
+                footerActions
             }
             .padding(20)
             .frame(width: 340)
@@ -49,6 +44,45 @@ struct MenuBarPopoverView: View {
             .animation(.easeInOut(duration: 0.25), value: meetingViewModel.state)
             .onAppear { viewModel.startPolling() }
             .onDisappear { viewModel.stopPolling() }
+        }
+    }
+
+    private var footerActions: some View {
+        HStack(spacing: 12) {
+            Button(action: openControlCenter) {
+                Text("Control Center \(Image(systemName: "arrow.up.right"))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            Button(viewModel.productLifecycleActionTitle) {
+                if viewModel.snapshot.isProductStopped {
+                    viewModel.startProduct()
+                    openControlCenter()
+                } else {
+                    viewModel.shutdownProduct()
+                }
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundStyle(viewModel.snapshot.isProductStopped ? DarkUtilityGlass.activeGreen : .orange)
+
+            Button("Relaunch Helper") {
+                viewModel.relaunchApplication()
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+
+            Button("Quit Helper") {
+                viewModel.quitApplication()
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.plain)
+            .foregroundStyle(.red.opacity(0.9))
         }
     }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # OpenClaw Context Bridge - Mac Installer
-# Run: bash install.sh <server-url> [auth-token] [tls-cert-file]
+# Run: bash install.sh <server-url> [daemon-token] [helper-token] [tls-cert-file]
 
 set -euo pipefail
 umask 077
@@ -8,33 +8,46 @@ umask 077
 SERVER_URL="${1:-}"
 ARG2="${2:-}"
 ARG3="${3:-}"
-AUTH_TOKEN="${CONTEXT_BRIDGE_TOKEN:-}"
+ARG4="${4:-}"
+DAEMON_AUTH_TOKEN="${CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN:-}"
+HELPER_AUTH_TOKEN="${CONTEXT_BRIDGE_HELPER_TOKEN:-}"
 TLS_CERT_FILE="${CONTEXT_BRIDGE_TLS_CERT_FILE:-}"
 
-if [ -n "$ARG3" ]; then
-  AUTH_TOKEN="${ARG2:-$AUTH_TOKEN}"
+if [ -n "$ARG4" ]; then
+  DAEMON_AUTH_TOKEN="${ARG2:-$DAEMON_AUTH_TOKEN}"
+  HELPER_AUTH_TOKEN="${ARG3:-$HELPER_AUTH_TOKEN}"
+  TLS_CERT_FILE="$ARG4"
+elif [ -n "$ARG3" ] && [ -f "$ARG3" ]; then
+  DAEMON_AUTH_TOKEN="${ARG2:-$DAEMON_AUTH_TOKEN}"
   TLS_CERT_FILE="$ARG3"
 elif [ -n "$ARG2" ] && [ -f "$ARG2" ]; then
   TLS_CERT_FILE="$ARG2"
 else
-  AUTH_TOKEN="${ARG2:-$AUTH_TOKEN}"
+  DAEMON_AUTH_TOKEN="${ARG2:-$DAEMON_AUTH_TOKEN}"
+  HELPER_AUTH_TOKEN="${ARG3:-$HELPER_AUTH_TOKEN}"
 fi
 
 if [ -z "$SERVER_URL" ]; then
-  echo "Usage: bash install.sh <server-url> [auth-token] [tls-cert-file]"
+  echo "Usage: bash install.sh <server-url> [daemon-token] [helper-token] [tls-cert-file]"
   echo "Example: bash install.sh https://your-server:7890/context/push"
-  echo "Example: bash install.sh https://your-server:7890/context/push ~/Downloads/context-bridge.pem"
+  echo "Example: bash install.sh https://your-server:7890/context/push <daemon-token> <helper-token> ~/Downloads/context-bridge.pem"
   exit 1
 fi
 
-if [ -z "$AUTH_TOKEN" ]; then
-  printf "Enter Context Bridge auth token: " >&2
-  read -r -s AUTH_TOKEN
+if [ -z "$DAEMON_AUTH_TOKEN" ]; then
+  printf "Enter Context Bridge daemon token: " >&2
+  read -r -s DAEMON_AUTH_TOKEN
   printf "\n" >&2
 fi
 
-if [ -z "$AUTH_TOKEN" ]; then
-  echo "ERROR: Auth token is required." >&2
+if [ -z "$HELPER_AUTH_TOKEN" ]; then
+  printf "Enter Context Bridge helper token: " >&2
+  read -r -s HELPER_AUTH_TOKEN
+  printf "\n" >&2
+fi
+
+if [ -z "$DAEMON_AUTH_TOKEN" ] || [ -z "$HELPER_AUTH_TOKEN" ]; then
+  echo "ERROR: Daemon and helper auth tokens are required." >&2
   exit 1
 fi
 
@@ -106,10 +119,12 @@ else
     echo "  Skipping claw-whatsapp (Go not installed). WhatsApp capture will not be available."
 fi
 
-# 3. Store auth token in macOS Keychain
-echo "[3/8] Storing auth token in Keychain..."
-security delete-generic-password -s "context-bridge" -a "token" 2>/dev/null || true
-security add-generic-password -s "context-bridge" -a "token" -w "$AUTH_TOKEN"
+# 3. Store auth tokens in macOS Keychain
+echo "[3/8] Storing auth tokens in Keychain..."
+security delete-generic-password -s "context-bridge-daemon" -a "token" 2>/dev/null || true
+security add-generic-password -s "context-bridge-daemon" -a "token" -w "$DAEMON_AUTH_TOKEN"
+security delete-generic-password -s "context-bridge-helper" -a "token" 2>/dev/null || true
+security add-generic-password -s "context-bridge-helper" -a "token" -w "$HELPER_AUTH_TOKEN"
 
 # 4. Configure server URL
 echo "[4/8] Configuring server URL..."

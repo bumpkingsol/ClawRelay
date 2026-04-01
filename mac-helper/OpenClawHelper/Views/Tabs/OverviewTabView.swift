@@ -10,10 +10,10 @@ struct OverviewTabView: View {
                 GroupBox("Current State") {
                     HStack(spacing: 20) {
                         stateCard(
-                            "Tracking",
-                            value: viewModel.snapshot.trackingState.rawValue.capitalized,
-                            icon: viewModel.snapshot.trackingState.menuBarSymbol,
-                            warn: viewModel.snapshot.trackingState == .needsAttention
+                            "ClawRelay",
+                            value: viewModel.snapshot.isProductStopped ? "Stopped" : "Running",
+                            icon: viewModel.snapshot.isProductStopped ? "power.circle" : viewModel.snapshot.trackingState.menuBarSymbol,
+                            warn: viewModel.snapshot.isProductStopped || viewModel.snapshot.trackingState == .needsAttention
                         )
                         stateCard(
                             "Queue",
@@ -27,12 +27,29 @@ struct OverviewTabView: View {
 
                 // Services section
                 GroupBox("Services") {
-                    HStack(spacing: 20) {
-                        serviceRow("Daemon", state: viewModel.snapshot.daemonLaunchdState) {
-                            viewModel.restartDaemon()
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 20) {
+                            serviceRow("Daemon", state: viewModel.snapshot.daemonLaunchdState) {
+                                viewModel.restartDaemon()
+                            }
+                            serviceRow("File Watcher", state: viewModel.snapshot.watcherLaunchdState) {
+                                viewModel.restartWatcher()
+                            }
                         }
-                        serviceRow("File Watcher", state: viewModel.snapshot.watcherLaunchdState) {
-                            viewModel.restartWatcher()
+
+                        HStack {
+                            Text(viewModel.snapshot.isProductStopped ? "Background capture is off." : "Background capture is running.")
+                                .font(DarkUtilityGlass.compactBody)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button(viewModel.productLifecycleActionTitle) {
+                                if viewModel.snapshot.isProductStopped {
+                                    viewModel.startProduct()
+                                } else {
+                                    viewModel.shutdownProduct()
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
                     }
                 }
@@ -51,6 +68,12 @@ struct OverviewTabView: View {
                             "Paused: \(pauseUntil == "indefinite" ? "indefinitely" : "until \(pauseUntil)")",
                             systemImage: "pause.circle.fill"
                         )
+                    }
+                }
+
+                if viewModel.snapshot.isProductStopped {
+                    GroupBox {
+                        Label("Background capture is off.", systemImage: "power.circle.fill")
                     }
                 }
             }

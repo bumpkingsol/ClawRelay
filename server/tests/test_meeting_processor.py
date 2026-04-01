@@ -12,7 +12,9 @@ def processor_db(tmp_path):
     """Set up a temp database with meeting tables."""
     db_path = str(tmp_path / 'test-processor.db')
     os.environ['CONTEXT_BRIDGE_DB'] = db_path
-    os.environ['CONTEXT_BRIDGE_TOKEN'] = 'test-token'
+    os.environ['CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN'] = 'test-daemon-token'
+    os.environ['CONTEXT_BRIDGE_HELPER_TOKEN'] = 'test-helper-token'
+    os.environ['CONTEXT_BRIDGE_AGENT_TOKEN'] = 'test-agent-token'
 
     import importlib
     import db_utils

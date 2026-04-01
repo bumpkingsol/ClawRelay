@@ -74,7 +74,7 @@ if [ -f "$SERVER_URL_FILE" ]; then
   fi
 fi
 
-AUTH_TOKEN=$(security find-generic-password -s "context-bridge" -a "token" -w 2>/dev/null || echo "")
+AUTH_TOKEN=$(security find-generic-password -s "context-bridge-daemon" -a "token" -w 2>/dev/null || echo "")
 if [ -z "$AUTH_TOKEN" ]; then
   exit 0
 fi

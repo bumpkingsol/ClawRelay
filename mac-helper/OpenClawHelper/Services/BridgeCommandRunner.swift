@@ -1,4 +1,24 @@
 import Foundation
+import AppKit
+
+protocol AppLifecycleControlling {
+    func quit()
+    func relaunch()
+}
+
+final class AppLifecycleService: AppLifecycleControlling {
+    func quit() {
+        NSApp.terminate(nil)
+    }
+
+    func relaunch() {
+        let appURL = Bundle.main.bundleURL
+        let configuration = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, _ in
+            NSApp.terminate(nil)
+        }
+    }
+}
 
 enum BridgeCommandError: Error {
     case actionFailed(action: String, exitCode: Int32)
@@ -60,5 +80,21 @@ final class BridgeCommandRunner {
             throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
         }
         return data
+    }
+
+    func runSnapshotAction(_ action: String, _ args: String...) throws -> BridgeSnapshot {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [executablePath, action] + args
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
+        }
+        return try JSONDecoder().decode(BridgeSnapshot.self, from: data)
     }
 }

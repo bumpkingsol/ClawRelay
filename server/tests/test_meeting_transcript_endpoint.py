@@ -3,7 +3,7 @@ import json
 
 
 class TestGetMeetingTranscript:
-    def test_returns_transcript_and_events(self, client, auth_headers):
+    def test_returns_transcript_and_events(self, client, helper_headers):
         from db_utils import get_db
         db = get_db()
         transcript = json.dumps([{"ts": "2026-03-31T09:01:00Z", "speaker": "Alice", "text": "Hello"}])
@@ -20,7 +20,7 @@ class TestGetMeetingTranscript:
         db.commit()
         db.close()
 
-        resp = client.get("/context/meetings/m1/transcript", headers=auth_headers)
+        resp = client.get("/context/meetings/m1/transcript", headers=helper_headers)
         assert resp.status_code == 200
         data = resp.get_json()
         assert len(data["transcript"]) == 1
@@ -29,11 +29,11 @@ class TestGetMeetingTranscript:
         assert len(data["expression_analysis"]) == 1
         assert data["expression_analysis"][0]["expression"] == "concerned"
 
-    def test_returns_404_for_nonexistent_meeting(self, client, auth_headers):
-        resp = client.get("/context/meetings/nonexistent/transcript", headers=auth_headers)
+    def test_returns_404_for_nonexistent_meeting(self, client, helper_headers):
+        resp = client.get("/context/meetings/nonexistent/transcript", headers=helper_headers)
         assert resp.status_code == 404
 
-    def test_returns_purged_error_when_transcript_null(self, client, auth_headers):
+    def test_returns_purged_error_when_transcript_null(self, client, helper_headers):
         from db_utils import get_db
         db = get_db()
         db.execute(
@@ -43,10 +43,14 @@ class TestGetMeetingTranscript:
         db.commit()
         db.close()
 
-        resp = client.get("/context/meetings/m2/transcript", headers=auth_headers)
+        resp = client.get("/context/meetings/m2/transcript", headers=helper_headers)
         assert resp.status_code == 200
         assert resp.get_json()["error"] == "purged"
 
     def test_unauthorized(self, client):
         resp = client.get("/context/meetings/m1/transcript")
         assert resp.status_code == 401
+
+    def test_rejects_daemon_scope(self, client, daemon_headers):
+        resp = client.get("/context/meetings/m1/transcript", headers=daemon_headers)
+        assert resp.status_code == 403

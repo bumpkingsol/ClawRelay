@@ -11,7 +11,7 @@ from pathlib import Path
 class TestMeetingSessionEndpoint:
     """Tests for POST /context/meeting/session."""
 
-    def test_push_session_success(self, client, auth_headers):
+    def test_push_session_success(self, client, daemon_headers):
         """Valid session data is stored."""
         payload = {
             'meeting_id': 'test-2026-03-31-zoom-david',
@@ -26,11 +26,12 @@ class TestMeetingSessionEndpoint:
             'visual_events_json': [
                 {'timestamp': 0, 'type': 'visual', 'participants': []}
             ],
+            'allow_external_processing': True,
         }
         resp = client.post(
             '/context/meeting/session',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=daemon_headers,
         )
         assert resp.status_code == 201
         data = resp.get_json()
@@ -38,7 +39,7 @@ class TestMeetingSessionEndpoint:
         assert data['meeting_id'] == 'test-2026-03-31-zoom-david'
         assert 'purge_at' in data
 
-    def test_push_session_missing_meeting_id(self, client, auth_headers):
+    def test_push_session_missing_meeting_id(self, client, daemon_headers):
         """Missing meeting_id returns 400."""
         payload = {
             'started_at': '2026-03-31T15:00:00Z',
@@ -47,12 +48,12 @@ class TestMeetingSessionEndpoint:
         resp = client.post(
             '/context/meeting/session',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=daemon_headers,
         )
         assert resp.status_code == 400
         assert 'meeting_id' in resp.get_json()['error']
 
-    def test_push_session_missing_timestamps(self, client, auth_headers):
+    def test_push_session_missing_timestamps(self, client, daemon_headers):
         """Missing started_at or ended_at returns 400."""
         payload = {
             'meeting_id': 'test-meeting',
@@ -62,11 +63,11 @@ class TestMeetingSessionEndpoint:
         resp = client.post(
             '/context/meeting/session',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=daemon_headers,
         )
         assert resp.status_code == 400
 
-    def test_push_session_upsert(self, client, auth_headers):
+    def test_push_session_upsert(self, client, daemon_headers):
         """Pushing same meeting_id twice updates the existing record."""
         payload = {
             'meeting_id': 'test-upsert',
@@ -80,7 +81,7 @@ class TestMeetingSessionEndpoint:
         resp1 = client.post(
             '/context/meeting/session',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=daemon_headers,
         )
         assert resp1.status_code == 201
 
@@ -88,9 +89,36 @@ class TestMeetingSessionEndpoint:
         resp2 = client.post(
             '/context/meeting/session',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=daemon_headers,
         )
         assert resp2.status_code == 201
+
+    def test_push_session_rejects_invalid_meeting_id(self, client, daemon_headers):
+        payload = {
+            'meeting_id': '../escape',
+            'started_at': '2026-03-31T15:00:00Z',
+            'ended_at': '2026-03-31T15:40:00Z',
+        }
+        resp = client.post(
+            '/context/meeting/session',
+            data=json.dumps(payload),
+            headers=daemon_headers,
+        )
+        assert resp.status_code == 400
+        assert 'meeting_id' in resp.get_json()['error']
+
+    def test_push_session_rejects_helper_scope(self, client, helper_headers):
+        payload = {
+            'meeting_id': 'test-meeting',
+            'started_at': '2026-03-31T15:00:00Z',
+            'ended_at': '2026-03-31T15:40:00Z',
+        }
+        resp = client.post(
+            '/context/meeting/session',
+            data=json.dumps(payload),
+            headers=helper_headers,
+        )
+        assert resp.status_code == 403
 
     def test_push_session_unauthorized(self, client):
         """No auth token returns 401."""
@@ -121,7 +149,7 @@ class TestMeetingFramesEndpoint:
                     for i in range(3)
                 ],
             },
-            headers={'Authorization': 'Bearer test-token-12345'},
+            headers={'Authorization': 'Bearer test-daemon-token'},
             content_type='multipart/form-data',
         )
         assert resp.status_code == 201
@@ -138,7 +166,7 @@ class TestMeetingFramesEndpoint:
         resp = client.post(
             '/context/meeting/frames',
             data={'frames': (io.BytesIO(b'fake'), 'test.png')},
-            headers={'Authorization': 'Bearer test-token-12345'},
+            headers={'Authorization': 'Bearer test-daemon-token'},
             content_type='multipart/form-data',
         )
         assert resp.status_code == 400
@@ -148,7 +176,7 @@ class TestMeetingFramesEndpoint:
         resp = client.post(
             '/context/meeting/frames',
             data={'meeting_id': 'test'},
-            headers={'Authorization': 'Bearer test-token-12345'},
+            headers={'Authorization': 'Bearer test-daemon-token'},
             content_type='multipart/form-data',
         )
         assert resp.status_code == 400
@@ -164,10 +192,35 @@ class TestMeetingFramesEndpoint:
                     for i in range(11)
                 ],
             },
-            headers={'Authorization': 'Bearer test-token-12345'},
+            headers={'Authorization': 'Bearer test-daemon-token'},
             content_type='multipart/form-data',
         )
         assert resp.status_code == 400
+
+    def test_upload_frames_rejects_invalid_meeting_id(self, client):
+        resp = client.post(
+            '/context/meeting/frames',
+            data={
+                'meeting_id': '../escape',
+                'frames': [(io.BytesIO(b'\x89PNG' + b'\x00' * 20), 'frame_001.png')],
+            },
+            headers={'Authorization': 'Bearer test-daemon-token'},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        assert 'meeting_id' in resp.get_json()['error']
+
+    def test_upload_frames_rejects_agent_scope(self, client):
+        resp = client.post(
+            '/context/meeting/frames',
+            data={
+                'meeting_id': 'test-meeting',
+                'frames': [(io.BytesIO(b'\x89PNG' + b'\x00' * 20), 'frame_001.png')],
+            },
+            headers={'Authorization': 'Bearer test-agent-token'},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 403
 
     def test_upload_frames_unauthorized(self, client):
         """No auth returns 401."""
@@ -182,7 +235,7 @@ class TestMeetingFramesEndpoint:
 class TestMeetingContextRequest:
     """Tests for POST /meeting/context-request."""
 
-    def test_context_request_success(self, client, auth_headers):
+    def test_context_request_success(self, client, helper_headers):
         """Valid context request returns a card."""
         payload = {
             'meeting_id': 'test-ctx-meeting',
@@ -193,7 +246,7 @@ class TestMeetingContextRequest:
         resp = client.post(
             '/meeting/context-request',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=helper_headers,
         )
         assert resp.status_code == 200
         data = resp.get_json()
@@ -202,27 +255,27 @@ class TestMeetingContextRequest:
         assert data['card']['category'] == 'fallback'
         assert 'requests_remaining' in data
 
-    def test_context_request_missing_meeting_id(self, client, auth_headers):
+    def test_context_request_missing_meeting_id(self, client, helper_headers):
         """Missing meeting_id returns 400."""
         payload = {'transcript_context': 'some context'}
         resp = client.post(
             '/meeting/context-request',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=helper_headers,
         )
         assert resp.status_code == 400
 
-    def test_context_request_missing_context(self, client, auth_headers):
+    def test_context_request_missing_context(self, client, helper_headers):
         """Missing transcript_context returns 400."""
         payload = {'meeting_id': 'test'}
         resp = client.post(
             '/meeting/context-request',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=helper_headers,
         )
         assert resp.status_code == 400
 
-    def test_context_request_rate_limit_count(self, client, auth_headers):
+    def test_context_request_rate_limit_count(self, client, helper_headers):
         """6th request to same meeting returns 429."""
         for i in range(5):
             payload = {
@@ -232,7 +285,7 @@ class TestMeetingContextRequest:
             resp = client.post(
                 '/meeting/context-request',
                 data=json.dumps(payload),
-                headers=auth_headers,
+                headers=helper_headers,
             )
             # First 5 should succeed (ignoring 60s rate limit in test
             # since they are in the same second -- we test the count limit here)
@@ -248,9 +301,21 @@ class TestMeetingContextRequest:
         resp = client.post(
             '/meeting/context-request',
             data=json.dumps(payload),
-            headers=auth_headers,
+            headers=helper_headers,
         )
         assert resp.status_code == 429
+
+    def test_context_request_rejects_agent_scope(self, client, agent_headers):
+        payload = {
+            'meeting_id': 'test-context',
+            'transcript_context': 'hello',
+        }
+        resp = client.post(
+            '/meeting/context-request',
+            data=json.dumps(payload),
+            headers=agent_headers,
+        )
+        assert resp.status_code == 403
 
     def test_context_request_unauthorized(self, client):
         """No auth returns 401."""

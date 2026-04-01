@@ -21,6 +21,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from db_utils import get_db, DB_PATH
+from security import (
+    MEETING_SUMMARY_RETENTION_DAYS,
+    is_external_meeting_processing_allowed,
+    redact_text,
+    safe_meeting_dir,
+    summarize_transcript_segments,
+    validate_meeting_id,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,7 +76,12 @@ def load_meeting(meeting_id):
 
 def load_frames(meeting_id):
     """Load screenshot file paths for a meeting."""
-    session_dir = MEETING_FRAMES_DIR / meeting_id
+    if not validate_meeting_id(meeting_id):
+        return []
+    try:
+        session_dir = safe_meeting_dir(MEETING_FRAMES_DIR, meeting_id)
+    except ValueError:
+        return []
     if not session_dir.exists():
         return []
 
@@ -142,7 +155,10 @@ def analyze_frames_streaming(client, meeting_id):
     Yields dict mapping frame filename to list of observations.
     Processes one frame at a time to keep memory usage constant.
     """
-    session_dir = MEETING_FRAMES_DIR / meeting_id
+    try:
+        session_dir = safe_meeting_dir(MEETING_FRAMES_DIR, meeting_id)
+    except ValueError:
+        return
     if not session_dir.exists():
         return
 
@@ -234,7 +250,7 @@ def generate_summary(client, meeting, timeline):
         return _generate_basic_summary(meeting, timeline)
 
     transcript_parts = [
-        f"[{e['timestamp']}s] {e.get('speaker', '?')}: {e.get('text', '')}"
+        f"[{e['timestamp']}s] {redact_text(str(e.get('speaker', '?')), 40)}: {redact_text(str(e.get('text', '')), 280)}"
         for e in timeline
         if e["type"] == "transcript"
     ]
@@ -258,7 +274,7 @@ def generate_summary(client, meeting, timeline):
         else "No visual analysis available."
     )
 
-    participants_str = meeting.get("participants", "Unknown")
+    participants_str = redact_text(str(meeting.get("participants", "Unknown")), 200)
     app_name = meeting.get("app", "Unknown")
     started_at = meeting.get("started_at", "")
     ended_at = meeting.get("ended_at", "")
@@ -310,6 +326,14 @@ Return only the markdown content for these sections (no title header -- I will a
 
 """
     return header + body
+
+
+def generate_policy_blocked_summary(meeting, timeline):
+    summary = _generate_basic_summary(meeting, timeline).replace(
+        "*(Claude API unavailable -- manual review needed)*",
+        "*(External analysis skipped by policy -- local-only summary)*",
+    )
+    return summary + "\n\n## External Analysis\nexternal analysis skipped by policy.\n"
 
 
 def _generate_basic_summary(meeting, timeline):
@@ -578,6 +602,9 @@ Return only the JSON object, no other text."""
 def process_meeting(meeting_id):
     """Full processing pipeline for a completed meeting."""
     logger.info(f"Processing meeting: {meeting_id}")
+    if not validate_meeting_id(meeting_id):
+        logger.error("Invalid meeting id: %s", meeting_id)
+        return False
 
     # 1. Load meeting data
     meeting = load_meeting(meeting_id)
@@ -590,7 +617,12 @@ def process_meeting(meeting_id):
     logger.info(f"Found {len(frames)} frames for meeting {meeting_id}")
 
     # 3. Get Claude client
-    client = get_anthropic_client()
+    external_processing_allowed = is_external_meeting_processing_allowed(
+        meeting_id, bool(meeting.get("allow_external_processing"))
+    )
+    if not external_processing_allowed:
+        logger.info("External analysis denied by policy for meeting %s", meeting_id)
+    client = get_anthropic_client() if external_processing_allowed else None
 
     # 4. Run expression analysis on frames
     expression_results = {}
@@ -607,7 +639,11 @@ def process_meeting(meeting_id):
     logger.info(f"Unified timeline: {len(timeline)} events")
 
     # 6. Generate summary
-    summary_md = generate_summary(client, meeting, timeline)
+    summary_md = (
+        generate_summary(client, meeting, timeline)
+        if client
+        else generate_policy_blocked_summary(meeting, timeline)
+    )
     logger.info(f"Generated summary: {len(summary_md)} chars")
 
     # 7. Store summary

@@ -12,15 +12,23 @@ ENV_FILE="/home/user/clawrelay/.env"
 
 # --- Token rotation subcommand ---
 if [ "${1:-}" = "rotate-token" ]; then
-  NEW_TOKEN=$(openssl rand -hex 32)
-  sed -i "s/^CONTEXT_BRIDGE_TOKEN=.*/CONTEXT_BRIDGE_TOKEN=$NEW_TOKEN/" "$ENV_FILE"
-  echo "Token rotated. New token: $NEW_TOKEN"
+  DAEMON_TOKEN=$(openssl rand -hex 32)
+  HELPER_TOKEN=$(openssl rand -hex 32)
+  AGENT_TOKEN=$(openssl rand -hex 32)
+  DB_KEY=$(openssl rand -hex 32)
+  sed -i "s/^CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=.*/CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=$DAEMON_TOKEN/" "$ENV_FILE"
+  sed -i "s/^CONTEXT_BRIDGE_HELPER_TOKEN=.*/CONTEXT_BRIDGE_HELPER_TOKEN=$HELPER_TOKEN/" "$ENV_FILE"
+  sed -i "s/^CONTEXT_BRIDGE_AGENT_TOKEN=.*/CONTEXT_BRIDGE_AGENT_TOKEN=$AGENT_TOKEN/" "$ENV_FILE"
+  sed -i "s/^CONTEXT_BRIDGE_DB_KEY=.*/CONTEXT_BRIDGE_DB_KEY=$DB_KEY/" "$ENV_FILE"
+  echo "Tokens rotated."
   echo ""
   echo "Next steps:"
   echo "  1. Restart the service: sudo systemctl restart context-bridge"
-  echo "  2. On the operator's Mac, update the Keychain:"
-  echo "     security delete-generic-password -s context-bridge -a token 2>/dev/null"
-  echo "     security add-generic-password -s context-bridge -a token -w \"$NEW_TOKEN\""
+  echo "  2. On the operator's Mac, update the Keychain entries:"
+  echo "     security delete-generic-password -s context-bridge-daemon -a token 2>/dev/null"
+  echo "     security add-generic-password -s context-bridge-daemon -a token -w \"$DAEMON_TOKEN\""
+  echo "     security delete-generic-password -s context-bridge-helper -a token 2>/dev/null"
+  echo "     security add-generic-password -s context-bridge-helper -a token -w \"$HELPER_TOKEN\""
   exit 0
 fi
 
@@ -29,17 +37,24 @@ echo "=== Context Bridge Server Setup ==="
 touch "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
-# 1. Generate auth token if not exists
-if ! grep -q "^CONTEXT_BRIDGE_TOKEN=" "$ENV_FILE" 2>/dev/null; then
-  TOKEN=$(openssl rand -hex 32)
+# 1. Generate scoped auth tokens if not exist
+if ! grep -q "^CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=" "$ENV_FILE" 2>/dev/null; then
+  DAEMON_TOKEN=$(openssl rand -hex 32)
+  HELPER_TOKEN=$(openssl rand -hex 32)
+  AGENT_TOKEN=$(openssl rand -hex 32)
+  DB_KEY=$(openssl rand -hex 32)
   echo "" >> "$ENV_FILE"
   echo "# Context Bridge" >> "$ENV_FILE"
-  echo "CONTEXT_BRIDGE_TOKEN=$TOKEN" >> "$ENV_FILE"
-  echo "[1/5] Generated auth token and stored it in $ENV_FILE"
-  echo "  Retrieve it when needed with: grep '^CONTEXT_BRIDGE_TOKEN=' $ENV_FILE | cut -d= -f2"
+  echo "CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=$DAEMON_TOKEN" >> "$ENV_FILE"
+  echo "CONTEXT_BRIDGE_HELPER_TOKEN=$HELPER_TOKEN" >> "$ENV_FILE"
+  echo "CONTEXT_BRIDGE_AGENT_TOKEN=$AGENT_TOKEN" >> "$ENV_FILE"
+  echo "CONTEXT_BRIDGE_DB_KEY=$DB_KEY" >> "$ENV_FILE"
+  echo "[1/5] Generated scoped auth tokens and stored them in $ENV_FILE"
 else
-  TOKEN=$(grep "^CONTEXT_BRIDGE_TOKEN=" "$ENV_FILE" | cut -d= -f2)
-  echo "[1/5] Auth token already exists: ${TOKEN:0:8}..."
+  DAEMON_TOKEN=$(grep "^CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=" "$ENV_FILE" | cut -d= -f2)
+  HELPER_TOKEN=$(grep "^CONTEXT_BRIDGE_HELPER_TOKEN=" "$ENV_FILE" | cut -d= -f2)
+  AGENT_TOKEN=$(grep "^CONTEXT_BRIDGE_AGENT_TOKEN=" "$ENV_FILE" | cut -d= -f2)
+  echo "[1/5] Scoped auth tokens already exist: daemon=${DAEMON_TOKEN:0:8}... helper=${HELPER_TOKEN:0:8}... agent=${AGENT_TOKEN:0:8}..."
 fi
 
 # 2. Create data directory
@@ -97,9 +112,11 @@ echo "=== Server Setup Complete ==="
 echo ""
 echo "Service status: sudo systemctl status context-bridge"
 echo "Server URL:     https://$SERVER_IP:7890"
-echo "Auth token:     stored in $ENV_FILE"
+echo "Daemon token:   stored in $ENV_FILE"
+echo "Helper token:   stored in $ENV_FILE"
+echo "Agent token:    stored in $ENV_FILE"
 echo "Server cert:    $CERT_DIR/context-bridge.pem"
 echo ""
 echo "Next: On the operator's Mac, run:"
-echo "  bash mac-daemon/install.sh https://$SERVER_IP:7890/context/push /path/to/context-bridge.pem"
-echo "  The installer will prompt for the token securely if you do not pass it as an argument."
+echo "  bash mac-daemon/install.sh https://$SERVER_IP:7890/context/push <daemon-token> <helper-token> /path/to/context-bridge.pem"
+echo "  The installer will prompt for the tokens securely if you do not pass them as arguments."

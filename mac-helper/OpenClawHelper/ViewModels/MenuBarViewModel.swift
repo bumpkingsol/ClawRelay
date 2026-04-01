@@ -8,15 +8,24 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var whatsAppContacts: [WhatsAppStatusService.WhitelistContact] = []
     @Published var portfolioProjects: [String] = []
     private let runner: BridgeCommandRunner
+    private let appLifecycle: AppLifecycleControlling
     private let waService = WhatsAppStatusService()
     private var refreshTimer: RefreshTimer?
 
-    init(runner: BridgeCommandRunner = BridgeCommandRunner()) {
+    init(
+        runner: BridgeCommandRunner = BridgeCommandRunner(),
+        appLifecycle: AppLifecycleControlling = AppLifecycleService()
+    ) {
         self.runner = runner
+        self.appLifecycle = appLifecycle
     }
 
     var primaryActionTitle: String {
         snapshot.trackingState == .paused ? "Resume" : "Pause 15m"
+    }
+
+    var productLifecycleActionTitle: String {
+        snapshot.isProductStopped ? "Start ClawRelay" : "Shut Down ClawRelay"
     }
 
     func refresh() {
@@ -126,6 +135,32 @@ final class MenuBarViewModel: ObservableObject {
             }
         } catch {
             // Silently fail for menu bar quick actions
+        }
+    }
+
+    func quitApplication() {
+        appLifecycle.quit()
+    }
+
+    func relaunchApplication() {
+        appLifecycle.relaunch()
+    }
+
+    func startProduct() {
+        do {
+            snapshot = try runner.runSnapshotAction("start-bridge")
+        } catch {
+            refresh()
+        }
+    }
+
+    func shutdownProduct() {
+        do {
+            snapshot = try runner.runSnapshotAction("stop-bridge")
+            stopPolling()
+            appLifecycle.quit()
+        } catch {
+            refresh()
         }
     }
 }

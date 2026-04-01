@@ -10,8 +10,16 @@ cb_pause_file()         { printf '%s\n' "$(cb_dir)/pause-until"; }
 cb_sensitive_file()     { printf '%s\n' "$(cb_dir)/sensitive-mode"; }
 cb_privacy_rules_file() { printf '%s\n' "$(cb_dir)/privacy-rules.json"; }
 cb_handoff_outbox_dir() { printf '%s\n' "$(cb_dir)/handoff-outbox"; }
+cb_keychain_service_daemon() { printf '%s\n' "context-bridge-daemon"; }
+cb_keychain_service_helper() { printf '%s\n' "context-bridge-helper"; }
 
 cb_now_epoch() { date +%s; }
+
+cb_read_keychain_token() {
+  local service="${1:-}"
+  [ -n "$service" ] || return 1
+  security find-generic-password -s "$service" -a "token" -w 2>/dev/null || true
+}
 
 cb_is_paused() {
   local pause_file now until

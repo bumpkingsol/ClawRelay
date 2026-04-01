@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections import defaultdict
 from db_utils import get_db as _shared_get_db, DB_PATH
+from security import DIGEST_RETENTION_DAYS, is_google_doc_fetch_allowed
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s [digest] %(message)s"
@@ -140,6 +141,9 @@ def read_google_doc_content(url):
     doc_id = extract_doc_id(url)
     if not doc_id:
         return None
+    if not is_google_doc_fetch_allowed(url, doc_id):
+        logger.info("External Google doc fetch denied by policy for doc_id=%s", doc_id)
+        return "__SKIPPED_BY_POLICY__"
 
     doc_type = None
     if "/document/" in url:
@@ -186,6 +190,22 @@ def read_google_doc_content(url):
         pass
 
     return None
+
+
+def purge_old_digests():
+    """Delete digest markdown files older than retention policy."""
+    if DIGEST_RETENTION_DAYS <= 0 or not DIGEST_DIR.exists():
+        return
+
+    cutoff = datetime.now() - timedelta(days=DIGEST_RETENTION_DAYS)
+    for path in DIGEST_DIR.glob("*.md"):
+        if path.name == "latest.md":
+            continue
+        try:
+            if datetime.fromtimestamp(path.stat().st_mtime) < cutoff:
+                path.unlink()
+        except OSError:
+            logger.exception("Failed to purge digest %s", path)
 
 
 def get_recent_commits(since_ts):
@@ -839,7 +859,9 @@ def build_digest(hours_back=8):
         for u in sorted(google_urls):
             lines.append(f"### {u}")
             content = read_google_doc_content(u)
-            if content:
+            if content == "__SKIPPED_BY_POLICY__":
+                lines.append("*(External fetch skipped by policy)*")
+            elif content:
                 lines.append("```")
                 lines.append(content)
                 lines.append("```")
@@ -864,6 +886,7 @@ def build_digest(hours_back=8):
 def save_digest(content):
     """Save digest to file."""
     DIGEST_DIR.mkdir(parents=True, exist_ok=True)
+    purge_old_digests()
     today = datetime.now().strftime("%Y-%m-%d")
     hour = datetime.now().strftime("%H")
     path = DIGEST_DIR / f"{today}-{hour}.md"

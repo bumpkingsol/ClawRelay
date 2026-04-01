@@ -58,31 +58,53 @@ struct MenuBarPopoverView: View {
 
             Spacer(minLength: 0)
 
-            Button(viewModel.productLifecycleActionTitle) {
-                if viewModel.snapshot.isProductStopped {
-                    viewModel.startProduct()
-                    openControlCenter()
-                } else {
-                    viewModel.shutdownProduct()
+            Menu {
+                Button("About ClawRelay") {
+                    NSApp.orderFrontStandardAboutPanel(nil)
+                    NSApp.activate(ignoringOtherApps: true)
                 }
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(viewModel.snapshot.isProductStopped ? DarkUtilityGlass.activeGreen : .orange)
 
-            Button("Relaunch Helper") {
-                viewModel.relaunchApplication()
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+                Button("Show ClawRelay") {
+                    openControlCenter()
+                }
 
-            Button("Quit Helper") {
-                viewModel.quitApplication()
+                Divider()
+
+                Button(viewModel.productLifecycleActionTitle) {
+                    if viewModel.snapshot.isProductStopped {
+                        viewModel.startProduct()
+                        openControlCenter()
+                    } else {
+                        viewModel.shutdownProduct()
+                    }
+                }
+
+                Button("Relaunch Helper") {
+                    viewModel.relaunchApplication()
+                }
+
+                Divider()
+
+                Button("Quit ClawRelay") {
+                    viewModel.quitApplication()
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
             }
-            .font(.system(size: 11))
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
             .buttonStyle(.plain)
-            .foregroundStyle(.red.opacity(0.9))
         }
     }
 

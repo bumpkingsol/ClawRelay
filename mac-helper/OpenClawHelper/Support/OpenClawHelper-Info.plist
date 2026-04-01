@@ -6,7 +6,5 @@
     <string>ClawRelay</string>
     <key>CFBundleName</key>
     <string>ClawRelay</string>
-    <key>LSUIElement</key>
-    <true/>
 </dict>
 </plist>

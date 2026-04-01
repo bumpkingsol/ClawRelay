@@ -37,9 +37,14 @@ _USE_SQLCIPHER = False
 try:
     from pysqlcipher3 import dbapi2 as sqlcipher
     _USE_SQLCIPHER = True
-    logger.info("SQLCipher available — database encryption enabled")
+    logger.info("SQLCipher available via pysqlcipher3 — database encryption enabled")
 except ImportError:
-    logger.info("SQLCipher not available — using standard sqlite3 (unencrypted)")
+    try:
+        import sqlcipher3 as sqlcipher
+        _USE_SQLCIPHER = True
+        logger.info("SQLCipher available via sqlcipher3 — database encryption enabled")
+    except ImportError:
+        logger.info("SQLCipher not available — using standard sqlite3 (unencrypted)")
 
 
 def validate_db_configuration():

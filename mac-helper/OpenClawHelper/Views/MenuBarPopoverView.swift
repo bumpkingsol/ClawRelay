@@ -6,48 +6,50 @@ struct MenuBarPopoverView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(spacing: 14) {
-            // Zone 1: Status Header
-            StatusHeaderView(snapshot: viewModel.snapshot)
+        UtilityGlassContainer(spacing: 16) {
+            VStack(spacing: 14) {
+                // Zone 1: Status Header
+                StatusHeaderView(snapshot: viewModel.snapshot)
 
-            // Zone 2: Health Detail Card (conditional)
-            if !viewModel.snapshot.isFullyHealthy {
-                HealthDetailCard(snapshot: viewModel.snapshot)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                // Zone 2: Health Detail Card (conditional)
+                if !viewModel.snapshot.isFullyHealthy {
+                    HealthDetailCard(snapshot: viewModel.snapshot)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Zone 6: Meeting Status (between health and pause when active)
+                if meetingViewModel.state != .idle {
+                    MeetingStatusView(viewModel: meetingViewModel)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Zone 3 + 4: Pause Controls & Sensitive Toggle
+                QuickActionsGrid(viewModel: viewModel)
+
+                // Divider before handoff
+                DarkUtilityGlass.divider.frame(height: 1)
+
+                // Zone 5: Handoff Section
+                handoffSection
+
+                // Zone 7: Footer
+                Button(action: openControlCenter) {
+                    Text("Control Center \(Image(systemName: "arrow.up.right"))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
+                }
+                .buttonStyle(.plain)
             }
-
-            // Zone 6: Meeting Status (between health and pause when active)
-            if meetingViewModel.state != .idle {
-                MeetingStatusView(viewModel: meetingViewModel)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            // Zone 3 + 4: Pause Controls & Sensitive Toggle
-            QuickActionsGrid(viewModel: viewModel)
-
-            // Divider before handoff
-            DarkUtilityGlass.divider.frame(height: 1)
-
-            // Zone 5: Handoff Section
-            handoffSection
-
-            // Zone 7: Footer
-            Button(action: openControlCenter) {
-                Text("Control Center \(Image(systemName: "arrow.up.right"))")
-                    .font(.system(size: 11))
-                    .foregroundStyle(DarkUtilityGlass.sectionLabelColor)
-            }
-            .buttonStyle(.plain)
+            .padding(20)
+            .frame(width: 340)
+            .background(DarkUtilityGlass.background)
+            .environment(\.colorScheme, .dark)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.trackingState)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.isFullyHealthy)
+            .animation(.easeInOut(duration: 0.25), value: meetingViewModel.state)
+            .onAppear { viewModel.startPolling() }
+            .onDisappear { viewModel.stopPolling() }
         }
-        .padding(20)
-        .frame(width: 340)
-        .background(DarkUtilityGlass.background)
-        .environment(\.colorScheme, .dark)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.trackingState)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.snapshot.isFullyHealthy)
-        .animation(.easeInOut(duration: 0.25), value: meetingViewModel.state)
-        .onAppear { viewModel.startPolling() }
-        .onDisappear { viewModel.stopPolling() }
     }
 
     // MARK: - Handoff Section
@@ -64,11 +66,7 @@ struct MenuBarPopoverView: View {
         }
         .padding(.vertical, 7)
         .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(DarkUtilityGlass.cardBackground)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .popoverGlassSurface(interactive: true)
     }
 
     private var handoffSection: some View {
@@ -101,11 +99,7 @@ struct MenuBarPopoverView: View {
                     .font(.system(size: 11))
                     .padding(.vertical, 7)
                     .padding(.horizontal, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(DarkUtilityGlass.cardBackground)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                    )
+                    .popoverGlassSurface(interactive: true)
                     .onSubmit {
                         if !viewModel.handoffTask.isEmpty {
                             viewModel.sendQuickHandoff()
@@ -124,9 +118,11 @@ struct MenuBarPopoverView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(DarkUtilityGlass.accentBlue)
                         .frame(width: 30, height: 30)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(DarkUtilityGlass.accentBlue.opacity(0.10))
+                        .popoverGlassSurface(
+                            tint: DarkUtilityGlass.accentBlue.opacity(0.30),
+                            fallbackFill: DarkUtilityGlass.accentBlue.opacity(0.10),
+                            fallbackStroke: DarkUtilityGlass.accentBlue.opacity(0.18),
+                            interactive: true
                         )
                 }
                 .buttonStyle(.plain)

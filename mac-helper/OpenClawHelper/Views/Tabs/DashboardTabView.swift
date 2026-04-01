@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DashboardTabView: View {
-    @StateObject var viewModel: DashboardViewModel
+    @ObservedObject var viewModel: DashboardViewModel
 
     var body: some View {
         Group {
@@ -53,31 +53,33 @@ struct DashboardTabView: View {
 
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Stale daemon warning
-                if data.status.daemonStale, let lastActivity = data.status.lastActivity {
-                    staleBanner(lastActivity)
+            UtilityGlassContainer(spacing: 16) {
+                VStack(spacing: 16) {
+                    // Stale daemon warning
+                    if data.status.daemonStale, let lastActivity = data.status.lastActivity {
+                        staleBanner(lastActivity)
+                    }
+
+                    // Top row: 3 status cards
+                    HStack(spacing: 12) {
+                        nowCard(data)
+                        focusCard(data)
+                        jcCard(data)
+                    }
+
+                    // Middle: Time allocation
+                    timeAllocationCard(data)
+
+                    // Bottom row: 2 panels
+                    HStack(alignment: .top, spacing: 12) {
+                        needsAttentionPanel(data)
+                        recentHandoffsPanel(data)
+                    }
+
+                    historySection(data)
                 }
-
-                // Top row: 3 status cards
-                HStack(spacing: 12) {
-                    nowCard(data)
-                    focusCard(data)
-                    jcCard(data)
-                }
-
-                // Middle: Time allocation
-                timeAllocationCard(data)
-
-                // Bottom row: 2 panels
-                HStack(alignment: .top, spacing: 12) {
-                    needsAttentionPanel(data)
-                    recentHandoffsPanel(data)
-                }
-
-                historySection(data)
+                .padding(20)
             }
-            .padding(20)
         }
     }
 
@@ -368,7 +370,7 @@ struct DashboardTabView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 160)
-                .onChange(of: viewModel.historyDays) { _ in
+                .onChange(of: viewModel.historyDays) {
                     viewModel.refreshDashboard()
                 }
             }

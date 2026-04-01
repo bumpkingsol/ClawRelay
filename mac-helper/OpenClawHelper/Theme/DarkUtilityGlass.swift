@@ -40,17 +40,117 @@ enum DarkUtilityGlass {
     static let sectionLabelColor = Color(red: 0.282, green: 0.310, blue: 0.345) // #484f58
 }
 
-// Reusable card modifier
-struct GlassCard: ViewModifier {
+private struct AdaptiveGlassSurface: ViewModifier {
+    let cornerRadius: CGFloat
+    let glassTint: Color?
+    let fallbackFill: Color
+    let fallbackStroke: Color
+    let interactive: Bool
+    let shadow: Bool
+
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DarkUtilityGlass.cardCornerRadius))
-            .shadow(color: DarkUtilityGlass.shadow, radius: 8, y: 4)
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(configuredGlass, in: .rect(cornerRadius: cornerRadius))
+                .shadow(color: shadow ? DarkUtilityGlass.shadow : .clear, radius: shadow ? 8 : 0, y: shadow ? 4 : 0)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .background(fallbackFill, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(fallbackStroke, lineWidth: 1)
+                }
+                .shadow(color: shadow ? DarkUtilityGlass.shadow : .clear, radius: shadow ? 8 : 0, y: shadow ? 4 : 0)
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private var configuredGlass: Glass {
+        var glass = Glass.regular
+        if let glassTint {
+            glass = glass.tint(glassTint)
+        }
+        if interactive {
+            glass = glass.interactive()
+        }
+        return glass
+    }
+}
+
+struct UtilityGlassContainer<Content: View>: View {
+    private let spacing: CGFloat?
+    private let content: Content
+
+    init(spacing: CGFloat? = nil, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                content
+            }
+        } else {
+            content
+        }
     }
 }
 
 extension View {
-    func glassCard() -> some View {
-        modifier(GlassCard())
+    func glassCard(
+        glassTint: Color? = nil,
+        fallbackFill: Color = DarkUtilityGlass.cardBackground,
+        fallbackStroke: Color = DarkUtilityGlass.cardBorder
+    ) -> some View {
+        modifier(
+            AdaptiveGlassSurface(
+                cornerRadius: DarkUtilityGlass.cardCornerRadius,
+                glassTint: glassTint,
+                fallbackFill: fallbackFill,
+                fallbackStroke: fallbackStroke,
+                interactive: false,
+                shadow: true
+            )
+        )
+    }
+
+    func popoverGlassSurface(
+        tint: Color? = nil,
+        fallbackFill: Color = DarkUtilityGlass.cardBackground,
+        fallbackStroke: Color = DarkUtilityGlass.cardBorder,
+        interactive: Bool = false
+    ) -> some View {
+        modifier(
+            AdaptiveGlassSurface(
+                cornerRadius: DarkUtilityGlass.popoverCardRadius,
+                glassTint: tint,
+                fallbackFill: fallbackFill,
+                fallbackStroke: fallbackStroke,
+                interactive: interactive,
+                shadow: false
+            )
+        )
+    }
+
+    func popoverSegmentGlassSurface(
+        tint: Color? = nil,
+        fallbackFill: Color = Color.clear,
+        fallbackStroke: Color = Color.clear,
+        interactive: Bool = false
+    ) -> some View {
+        modifier(
+            AdaptiveGlassSurface(
+                cornerRadius: DarkUtilityGlass.popoverSegmentRadius,
+                glassTint: tint,
+                fallbackFill: fallbackFill,
+                fallbackStroke: fallbackStroke,
+                interactive: interactive,
+                shadow: false
+            )
+        )
     }
 }

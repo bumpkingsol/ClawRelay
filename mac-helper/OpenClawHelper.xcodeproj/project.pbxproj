@@ -617,6 +617,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_MODULE_NAME = OpenClawHelper;
 				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -643,6 +644,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.clawrelay;
+				PRODUCT_MODULE_NAME = OpenClawHelper;
 				PRODUCT_NAME = ClawRelay;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -659,10 +661,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
-				PRODUCT_NAME = ClawRelay;
+				PRODUCT_NAME = OpenClawHelperTests;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClawRelay.app/Contents/MacOS/ClawRelay";
 			};
 			name = Debug;
 		};
@@ -676,10 +678,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.helper.tests;
-				PRODUCT_NAME = ClawRelay;
+				PRODUCT_NAME = OpenClawHelperTests;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenClawHelper.app/Contents/MacOS/OpenClawHelper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClawRelay.app/Contents/MacOS/ClawRelay";
 			};
 			name = Release;
 		};

@@ -232,6 +232,26 @@ def init_db():
         db.execute("ALTER TABLE meeting_sessions ADD COLUMN summary_purge_at TEXT")
     except Exception:
         pass
+    try:
+        db.execute(
+            "ALTER TABLE meeting_sessions ADD COLUMN sensitive_during_session INTEGER DEFAULT 0"
+        )
+    except Exception:
+        pass
+    try:
+        db.execute("ALTER TABLE meeting_sessions ADD COLUMN frames_expected INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        db.execute("ALTER TABLE meeting_sessions ADD COLUMN frames_uploaded INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        db.execute(
+            "ALTER TABLE meeting_sessions ADD COLUMN processing_status TEXT DEFAULT 'pending'"
+        )
+    except Exception:
+        pass
     db.execute("""
         CREATE TABLE IF NOT EXISTS portfolio_projects (
             name TEXT PRIMARY KEY
@@ -254,6 +274,22 @@ def init_db():
         os.chmod(MEETING_FRAMES_DIR, 0o700)
     except OSError:
         pass
+
+
+def trigger_meeting_processor(meeting_id: str) -> None:
+    try:
+        import subprocess
+
+        processor_path = Path(__file__).parent / "meeting_processor.py"
+        if processor_path.exists():
+            subprocess.Popen(
+                [sys.executable, str(processor_path), "--meeting-id", meeting_id],
+                stdout=open("/tmp/meeting-processor.log", "a"),
+                stderr=subprocess.STDOUT,
+            )
+            logger.info("Triggered meeting processor for %s", meeting_id)
+    except Exception:
+        logger.exception("Failed to trigger meeting processor for %s", meeting_id)
     logger.info(f"Database initialized at {DB_PATH}")
 
 
@@ -578,7 +614,7 @@ def push_commit():
 
 
 @app.route("/context/handoff", methods=["POST"])
-@require_clients("agent")
+@require_clients("agent", "helper")
 def handoff():
     """Receive explicit task handoff from the operator.
 
@@ -632,10 +668,16 @@ def handoff():
         priority,
     )
 
+    source = "helper" if g.auth_client == "helper" else "agent"
+
     return jsonify(
         {
             "status": "ok",
             "id": hid,
+            "project": data.get("project", ""),
+            "task": data.get("task", ""),
+            "priority": priority,
+            "source": source,
             "message": f"Handoff received: {data.get('project')} - {data.get('task')}",
         }
     ), 201
@@ -1016,7 +1058,7 @@ def jc_work_log():
                     "project": r.get("project"),
                     "description": r.get("description"),
                     "status": r.get("status"),
-                    "result": r[4],
+                    "result": r.get("result"),
                     "started_at": r.get("started_at"),
                     "completed_at": r.get("completed_at"),
                     "duration_minutes": r.get("duration_minutes"),
@@ -1081,12 +1123,21 @@ def push_meeting_session():
 
     duration_seconds = data.get("duration_seconds", 0)
     app_name = data.get("app", "")
-    participants = data.get("participants", "")
+    participants = data.get("participants", [])
     transcript_json = data.get("transcript_json")
     visual_events_json = data.get("visual_events_json")
+    sensitive_during_session = bool(data.get("sensitive_during_session"))
+    frames_expected = max(int(data.get("frames_expected", 0) or 0), 0)
     allow_external_processing = is_external_meeting_processing_allowed(
         meeting_id, data.get("allow_external_processing")
     )
+    if sensitive_during_session:
+        transcript_json = None
+        visual_events_json = None
+        allow_external_processing = False
+
+    if not isinstance(participants, list):
+        participants = []
 
     if transcript_json:
         serialized_transcript = json.dumps(transcript_json)
@@ -1104,6 +1155,12 @@ def push_meeting_session():
     summary_purge_at = (
         datetime.now(timezone.utc) + timedelta(days=MEETING_SUMMARY_RETENTION_DAYS)
     ).isoformat()
+    processing_status = (
+        "ready"
+        if sensitive_during_session or frames_expected == 0
+        else "awaiting_frames"
+    )
+    frames_uploaded = 0 if frames_expected > 0 and not sensitive_during_session else 0
 
     db = get_db()
     db.execute(
@@ -1111,8 +1168,9 @@ def push_meeting_session():
         INSERT INTO meeting_sessions
         (id, started_at, ended_at, duration_seconds, app, participants,
          transcript_json, visual_events_json, summary_md, raw_data_purge_at,
-         allow_external_processing, summary_purge_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+         allow_external_processing, summary_purge_at, sensitive_during_session,
+         frames_expected, frames_uploaded, processing_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             started_at = excluded.started_at,
             ended_at = excluded.ended_at,
@@ -1123,7 +1181,10 @@ def push_meeting_session():
             visual_events_json = excluded.visual_events_json,
             raw_data_purge_at = excluded.raw_data_purge_at,
             allow_external_processing = excluded.allow_external_processing,
-            summary_purge_at = excluded.summary_purge_at
+            summary_purge_at = excluded.summary_purge_at,
+            sensitive_during_session = excluded.sensitive_during_session,
+            frames_expected = excluded.frames_expected,
+            processing_status = excluded.processing_status
     """,
         (
             meeting_id,
@@ -1131,39 +1192,30 @@ def push_meeting_session():
             ended_at,
             duration_seconds,
             app_name,
-            json.dumps(participants)
-            if isinstance(participants, list)
-            else participants,
+            json.dumps(participants),
             serialized_transcript,
             serialized_visual_events,
             purge_at,
             1 if allow_external_processing else 0,
             summary_purge_at,
+            1 if sensitive_during_session else 0,
+            frames_expected,
+            frames_uploaded,
+            processing_status,
         ),
     )
     db.commit()
     db.close()
 
-    # Trigger async processing (meeting_processor.py)
-    try:
-        import subprocess
-
-        processor_path = Path(__file__).parent / "meeting_processor.py"
-        if processor_path.exists():
-            subprocess.Popen(
-                [sys.executable, str(processor_path), "--meeting-id", meeting_id],
-                stdout=open("/tmp/meeting-processor.log", "a"),
-                stderr=subprocess.STDOUT,
-            )
-            logger.info(f"Triggered meeting processor for {meeting_id}")
-    except Exception:
-        logger.exception(f"Failed to trigger meeting processor for {meeting_id}")
+    if processing_status == "ready":
+        trigger_meeting_processor(meeting_id)
 
     return jsonify(
         {
             "status": "ok",
             "meeting_id": meeting_id,
             "purge_at": purge_at,
+            "processing_status": processing_status,
         }
     ), 201
 
@@ -1217,12 +1269,40 @@ def push_meeting_frames():
 
     logger.info(f"Saved {len(saved)} frames for meeting {meeting_id}")
 
+    db = get_db()
+    row = db.execute(
+        "SELECT frames_expected FROM meeting_sessions WHERE id = ?",
+        (meeting_id,),
+    ).fetchone()
+    total_saved = len(list(session_dir.glob("*.png")))
+    processing_status = "awaiting_frames"
+    if row:
+        frames_expected = int(row.get("frames_expected") or 0)
+        processing_status = "awaiting_frames"
+        if frames_expected == 0 or total_saved >= frames_expected:
+            processing_status = "ready"
+        db.execute(
+            """
+            UPDATE meeting_sessions
+            SET frames_uploaded = ?, processing_status = ?
+            WHERE id = ?
+        """,
+            (total_saved, processing_status, meeting_id),
+        )
+        db.commit()
+    db.close()
+
+    if processing_status == "ready":
+        trigger_meeting_processor(meeting_id)
+
     return jsonify(
         {
             "status": "ok",
             "meeting_id": meeting_id,
             "frames_saved": len(saved),
             "filenames": saved,
+            "frames_uploaded": total_saved,
+            "processing_status": processing_status,
         }
     ), 201
 

@@ -8,6 +8,8 @@ final class MeetingViewModel: ObservableObject {
     @Published var meetingHistory: [MeetingRecord] = []
     @Published var participantProfiles: [ParticipantRecord] = []
     @Published var selectedMeetingTranscript: TranscriptResponse?
+    @Published var transcriptFetchState: MeetingTranscriptFetchState = .idle
+    @Published var lastMeetingError: String?
     @Published var meetingsSubTab: MeetingsSubTab = .meetings
 
     enum MeetingsSubTab {
@@ -126,9 +128,12 @@ final class MeetingViewModel: ObservableObject {
                 let decoded = try JSONDecoder().decode(MeetingsResponse.self, from: raw)
                 await MainActor.run { [weak self] in
                     self?.meetingHistory = decoded.meetings
+                    self?.lastMeetingError = nil
                 }
             } catch {
-                // Silently fail — keep current list
+                await MainActor.run { [weak self] in
+                    self?.lastMeetingError = error.localizedDescription
+                }
             }
         }
     }
@@ -141,11 +146,45 @@ final class MeetingViewModel: ObservableObject {
                 let decoded = try JSONDecoder().decode(ParticipantsResponse.self, from: raw)
                 await MainActor.run { [weak self] in
                     self?.participantProfiles = decoded.participants
+                    self?.lastMeetingError = nil
                 }
             } catch {
-                // Silently fail
+                await MainActor.run { [weak self] in
+                    self?.lastMeetingError = error.localizedDescription
+                }
             }
         }
+    }
+
+    func fetchTranscript(for meetingId: String) {
+        transcriptFetchState = .loading
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                let raw = try capturedRunner.runActionWithOutput("transcript", meetingId)
+                let decoded = try JSONDecoder().decode(TranscriptResponse.self, from: raw)
+                await MainActor.run { [weak self] in
+                    self?.selectedMeetingTranscript = decoded
+                    if decoded.error == "purged" {
+                        self?.transcriptFetchState = .summaryOnly
+                    } else if let transcript = decoded.transcript, !transcript.isEmpty {
+                        self?.transcriptFetchState = .live
+                    } else {
+                        self?.transcriptFetchState = .missing
+                    }
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.selectedMeetingTranscript = nil
+                    self?.transcriptFetchState = .failed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func dismissTranscript() {
+        selectedMeetingTranscript = nil
+        transcriptFetchState = .idle
     }
 
     func shutdown() {
@@ -157,4 +196,13 @@ extension MeetingViewModel {
     static var preview: MeetingViewModel {
         MeetingViewModel()
     }
+}
+
+enum MeetingTranscriptFetchState: Equatable {
+    case idle
+    case loading
+    case live
+    case summaryOnly
+    case missing
+    case failed(String)
 }

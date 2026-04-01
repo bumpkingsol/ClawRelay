@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MeetingRowView: View {
     let meeting: MeetingRecord
+    let onViewTranscript: () -> Void
     @State private var isExpanded = false
 
     var body: some View {
@@ -46,7 +47,7 @@ struct MeetingRowView: View {
 
                     if meeting.hasTranscript {
                         Button("View transcript") {
-                            // TODO: fetch transcript
+                            onViewTranscript()
                         }
                         .font(.system(size: 10))
                         .buttonStyle(.bordered)

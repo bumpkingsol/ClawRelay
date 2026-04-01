@@ -10,6 +10,23 @@ struct HealthDetailCard: View {
             if let waState = snapshot.whatsappLaunchdState {
                 healthRow("WhatsApp", value: waState)
             }
+            if let serverHealth = snapshot.serverHealth {
+                healthRow(
+                    "Server",
+                    value: serverHealth.displayValue,
+                    isHealthy: serverHealth.isHealthy,
+                    warnColor: DarkUtilityGlass.errorRed
+                )
+                if let backlog = serverHealth.retentionBacklog,
+                   backlog.values.reduce(0, +) > 0 {
+                    healthRow(
+                        "Retention",
+                        value: "\(backlog.values.reduce(0, +)) pending",
+                        isHealthy: false,
+                        warnColor: DarkUtilityGlass.warningAmber
+                    )
+                }
+            }
             healthRow("Queue", value: "\(snapshot.queueDepth) pending",
                        isHealthy: snapshot.queueDepth <= 10,
                        warnColor: DarkUtilityGlass.warningAmber)

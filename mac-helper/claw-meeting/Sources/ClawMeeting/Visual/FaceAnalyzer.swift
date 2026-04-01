@@ -35,6 +35,7 @@ final class FaceAnalyzer {
                 gaze: gaze,
                 headTilt: headTilt,
                 bodyLean: bodyLean,
+                faceEmbeddingHash: stableFaceHash(gridPosition: gridPosition, headTilt: headTilt),
                 landmarksSummary: LandmarksSummary(
                     browRaised: false, // TODO: implement brow raise detection
                     browFurrowed: browFurrowed,
@@ -124,5 +125,10 @@ final class FaceAnalyzer {
         let col = centerX < 0.5 ? "left" : "right"
         let row = centerY < 0.5 ? "bottom" : "top"
         return "\(row)-\(col)"
+    }
+
+    private func stableFaceHash(gridPosition: String, headTilt: Double) -> String {
+        let quantizedTilt = Int((headTilt * 10).rounded())
+        return "\(gridPosition)-\(quantizedTilt)"
     }
 }

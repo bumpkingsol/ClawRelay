@@ -5,10 +5,14 @@ final class MeetingSession {
     let id: String
     let startedAt: Date
     let paths: SessionPaths
+    let callApp: String?
+    let allowExternalProcessing: Bool
 
     private(set) var segmentCount = 0
     private(set) var frameCount = 0
     private(set) var state: SessionState = .recording
+    private(set) var sensitiveModeUsed = false
+    private(set) var participants: [String] = []
 
     enum SessionState: String {
         case recording
@@ -18,10 +22,17 @@ final class MeetingSession {
         case completed
     }
 
-    init(id: String, paths: SessionPaths) {
+    init(
+        id: String,
+        paths: SessionPaths,
+        callApp: String? = ProcessInfo.processInfo.environment["CB_CALL_APP"],
+        allowExternalProcessing: Bool = false
+    ) {
         self.id = id
         self.startedAt = Date()
         self.paths = paths
+        self.callApp = callApp
+        self.allowExternalProcessing = allowExternalProcessing
     }
 
     var elapsedSeconds: Int {
@@ -40,5 +51,12 @@ final class MeetingSession {
 
     func transition(to newState: SessionState) {
         state = newState
+        if newState == .sensitive {
+            sensitiveModeUsed = true
+        }
+    }
+
+    func setParticipants(_ names: [String]) {
+        participants = names
     }
 }

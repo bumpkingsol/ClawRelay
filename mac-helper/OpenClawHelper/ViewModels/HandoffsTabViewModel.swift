@@ -28,7 +28,7 @@ final class HandoffsTabViewModel: ObservableObject {
         let capturedRunner = runner
         Task.detached {
             do {
-                try capturedRunner.runAction("queue-handoff", project, task, message, priority)
+                _ = try capturedRunner.runActionWithOutput("submit-handoff", project, task, message, priority)
                 await MainActor.run { [weak self] in
                     self?.draft = HandoffDraft()
                     self?.isSubmitting = false
@@ -56,9 +56,12 @@ final class HandoffsTabViewModel: ObservableObject {
                 let decoded = try JSONDecoder().decode([Handoff].self, from: data)
                 await MainActor.run { [weak self] in
                     self?.handoffs = decoded
+                    self?.lastError = nil
                 }
             } catch {
-                // Silently keep existing list on failure
+                await MainActor.run { [weak self] in
+                    self?.lastError = error.localizedDescription
+                }
             }
         }
     }

@@ -21,8 +21,25 @@ final class AppLifecycleService: AppLifecycleControlling {
 }
 
 enum BridgeCommandError: Error {
-    case actionFailed(action: String, exitCode: Int32)
+    case actionFailed(action: String, exitCode: Int32, message: String?)
     case statusUnavailable
+}
+
+extension BridgeCommandError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case let .actionFailed(_, _, message):
+            return message ?? "Bridge command failed"
+        case .statusUnavailable:
+            return "Bridge status unavailable"
+        }
+    }
+}
+
+private struct BridgeErrorPayload: Decodable {
+    let error: String?
+    let message: String?
+    let status: String?
 }
 
 final class BridgeCommandRunner {
@@ -33,18 +50,40 @@ final class BridgeCommandRunner {
         self.executablePath = executablePath
     }
 
+    private func execute(_ action: String, _ args: [String]) throws -> (Int32, Data) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [executablePath, action] + args
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return (process.terminationStatus, data)
+    }
+
+    private func bridgeErrorMessage(from data: Data, fallbackAction action: String, exitCode: Int32) -> String {
+        if let payload = try? JSONDecoder().decode(BridgeErrorPayload.self, from: data) {
+            if let message = payload.message, !message.isEmpty {
+                return message
+            }
+            if let error = payload.error, !error.isEmpty {
+                return error
+            }
+        }
+        if let text = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !text.isEmpty {
+            return text
+        }
+        return "\(action) failed (exit \(exitCode))"
+    }
+
     func fetchStatus() -> BridgeSnapshot {
         do {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/bash")
-            process.arguments = [executablePath, "status"]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else {
+            let (status, data) = try execute("status", [])
+            guard status == 0 else {
                 return .needsAttentionPlaceholder
             }
             return try JSONDecoder().decode(BridgeSnapshot.self, from: data)
@@ -54,46 +93,36 @@ final class BridgeCommandRunner {
     }
 
     func runAction(_ action: String, _ args: String...) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [executablePath, action] + args
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
+        let (status, data) = try execute(action, args)
+        guard status == 0 else {
+            throw BridgeCommandError.actionFailed(
+                action: action,
+                exitCode: status,
+                message: bridgeErrorMessage(from: data, fallbackAction: action, exitCode: status)
+            )
         }
     }
 
     func runActionWithOutput(_ action: String, _ args: String...) throws -> Data {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [executablePath, action] + args
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
+        let (status, data) = try execute(action, args)
+        guard status == 0 else {
+            throw BridgeCommandError.actionFailed(
+                action: action,
+                exitCode: status,
+                message: bridgeErrorMessage(from: data, fallbackAction: action, exitCode: status)
+            )
         }
         return data
     }
 
     func runSnapshotAction(_ action: String, _ args: String...) throws -> BridgeSnapshot {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [executablePath, action] + args
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw BridgeCommandError.actionFailed(action: action, exitCode: process.terminationStatus)
+        let (status, data) = try execute(action, args)
+        guard status == 0 else {
+            throw BridgeCommandError.actionFailed(
+                action: action,
+                exitCode: status,
+                message: bridgeErrorMessage(from: data, fallbackAction: action, exitCode: status)
+            )
         }
         return try JSONDecoder().decode(BridgeSnapshot.self, from: data)
     }

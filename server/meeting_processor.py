@@ -48,6 +48,17 @@ VISION_MODEL = os.environ.get("MEETING_VISION_MODEL", "claude-sonnet-4-20250514"
 SUMMARY_MODEL = os.environ.get("MEETING_SUMMARY_MODEL", "claude-sonnet-4-20250514")
 
 
+def participant_text(value):
+    try:
+        participants = json.loads(value) if isinstance(value, str) else value
+    except Exception:
+        participants = value
+    if isinstance(participants, list):
+        cleaned = [str(item).strip() for item in participants if str(item).strip()]
+        return ", ".join(cleaned) if cleaned else "Unknown"
+    return redact_text(str(participants or "Unknown"), 200)
+
+
 def get_anthropic_client():
     """Get Anthropic client. Returns None if API key not set."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -274,7 +285,7 @@ def generate_summary(client, meeting, timeline):
         else "No visual analysis available."
     )
 
-    participants_str = redact_text(str(meeting.get("participants", "Unknown")), 200)
+    participants_str = participant_text(meeting.get("participants", "Unknown"))
     app_name = meeting.get("app", "Unknown")
     started_at = meeting.get("started_at", "")
     ended_at = meeting.get("ended_at", "")
@@ -346,7 +357,7 @@ def _generate_basic_summary(meeting, timeline):
 
     header = f"""# Meeting: {meeting.get("id", "Unknown")}
 **Date:** {started_at[:10] if started_at else "Unknown"} | **Duration:** {duration_min} min
-**Participants:** {meeting.get("participants", "Unknown")}
+**Participants:** {participant_text(meeting.get("participants", "Unknown"))}
 **App:** {meeting.get("app", "Unknown")}
 
 """
@@ -396,7 +407,7 @@ def match_face_embeddings(meeting_id, visual_events_json):
     known = {}
     for p in profiles:
         if p["face_embedding"]:
-            known[p["id"]] = p["face_embedding"]
+            known[p["face_embedding"]] = p["id"]
 
     matches = {}
     new_faces = set()
@@ -419,9 +430,9 @@ def match_face_embeddings(meeting_id, visual_events_json):
                 """
                 INSERT OR IGNORE INTO participant_profiles
                 (id, display_name, face_embedding, meetings_observed, profile_json, last_updated)
-                VALUES (?, ?, NULL, 1, '{}', ?)
+                VALUES (?, ?, ?, 1, '{}', ?)
             """,
-                (profile_id, face_id, datetime.now(timezone.utc).isoformat()),
+                (profile_id, face_id, emb_hash, datetime.now(timezone.utc).isoformat()),
             )
             matches[face_id] = profile_id
         except Exception:
@@ -615,6 +626,10 @@ def process_meeting(meeting_id):
     # 2. Load frames
     frames = load_frames(meeting_id)
     logger.info(f"Found {len(frames)} frames for meeting {meeting_id}")
+
+    if meeting.get("processing_status") == "awaiting_frames":
+        logger.info("Meeting %s is still awaiting frame upload", meeting_id)
+        return False
 
     # 3. Get Claude client
     external_processing_allowed = is_external_meeting_processing_allowed(

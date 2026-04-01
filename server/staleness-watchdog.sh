@@ -16,22 +16,26 @@ fi
 
 # Use Python with db_utils to support encrypted DBs
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGE_SECONDS=$(cd "$SCRIPT_DIR" && python3 -c "
+LATEST_AND_AGE=$(cd "$SCRIPT_DIR" && python3 -c "
 from datetime import datetime, timezone
 from db_utils import get_db
 try:
     db = get_db()
-    row = db.execute('SELECT MAX(created_at) FROM activity_stream').fetchone()
+    row = db.execute('SELECT MAX(created_at) AS latest FROM activity_stream').fetchone()
     db.close()
-    latest = row[0] if row else None
+    latest = row['latest'] if row else None
     if not latest:
-        print('no_data')
+        print('no_data|')
     else:
         ts = datetime.fromisoformat(latest).replace(tzinfo=timezone.utc)
-        print(int((datetime.now(timezone.utc) - ts).total_seconds()))
+        age_seconds = int((datetime.now(timezone.utc) - ts).total_seconds())
+        print(f'{age_seconds}|{latest}')
 except Exception as e:
-    print('9999')
-" 2>/dev/null || echo "9999")
+    print('9999|')
+" 2>/dev/null || echo "9999|")
+
+AGE_SECONDS="${LATEST_AND_AGE%%|*}"
+LATEST="${LATEST_AND_AGE#*|}"
 
 if [ "$AGE_SECONDS" = "no_data" ]; then
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stale=true reason=no_data" > "$STALE_FLAG"
@@ -39,7 +43,7 @@ if [ "$AGE_SECONDS" = "no_data" ]; then
 fi
 
 if [ "$AGE_SECONDS" -gt $((THRESHOLD_MINUTES * 60)) ]; then
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stale=true age_seconds=$AGE_SECONDS last=$LATEST" > "$STALE_FLAG"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stale=true age_seconds=$AGE_SECONDS last=${LATEST:-unknown}" > "$STALE_FLAG"
 else
   rm -f "$STALE_FLAG"
 fi

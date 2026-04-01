@@ -34,28 +34,29 @@ struct ParticipantRowView: View {
 
             // Expanded profile
             if isExpanded, let profile = participant.profile {
+                let patterns = profile["patterns"]?.objectValue ?? profile
                 VStack(alignment: .leading, spacing: 10) {
                     Divider().padding(.vertical, 8)
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         profileQuadrant(
                             title: "Decision Style",
-                            text: [profile["decision_style"], profile["authority_deference"]]
-                                .compactMap { $0 }.joined(separator: " ")
+                            text: [patterns["decision_style"], patterns["authority_deference"]]
+                                .compactMap { $0?.stringValue }.joined(separator: " ")
                         )
                         profileQuadrant(
                             title: "Stress Triggers",
-                            text: [profile["stress_triggers"], profile["money_reaction"]]
-                                .compactMap { $0 }.joined(separator: " ")
+                            text: [patterns["stress_triggers"], patterns["money_reaction"]]
+                                .compactMap { $0?.stringValue }.joined(separator: " ")
                         )
                         profileQuadrant(
                             title: "Engagement",
-                            text: [profile["engagement_peak"], profile["commitment_signals"]]
-                                .compactMap { $0 }.joined(separator: " ")
+                            text: [patterns["engagement_peak"], patterns["commitment_signals"]]
+                                .compactMap { $0?.stringValue }.joined(separator: " ")
                         )
                         profileQuadrant(
                             title: "Reliability",
-                            text: profile["reliability"] ?? ""
+                            text: patterns["reliability"]?.stringValue ?? ""
                         )
                     }
                 }

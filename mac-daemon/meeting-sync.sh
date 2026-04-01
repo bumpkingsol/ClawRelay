@@ -3,7 +3,6 @@
 # Called by the daemon after a meeting ends.
 #
 # Usage: meeting-sync.sh <session-dir>
-# Example: meeting-sync.sh ~/.context-bridge/meeting-session/2026-03-31-140000
 
 set -euo pipefail
 
@@ -16,8 +15,63 @@ if [ -z "$SESSION_DIR" ] || [ ! -d "$SESSION_DIR" ]; then
   exit 1
 fi
 
-# Already synced?
-if [ -f "$SESSION_DIR/.synced" ]; then
+SYNC_STATE_FILE="$SESSION_DIR/.sync-state.json"
+SYNC_MARKER_FILE="$SESSION_DIR/.synced"
+
+read_sync_state() {
+  local key="$1"
+  python3 - "$SYNC_STATE_FILE" "$key" <<'PY'
+import json
+import os
+import sys
+
+path, key = sys.argv[1], sys.argv[2]
+if not os.path.exists(path):
+    print("")
+    raise SystemExit(0)
+try:
+    with open(path) as f:
+        data = json.load(f)
+except Exception:
+    print("")
+    raise SystemExit(0)
+value = data.get(key, "")
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif value is None:
+    print("")
+else:
+    print(value)
+PY
+}
+
+write_sync_state() {
+  local session_uploaded="$1"
+  local frames_uploaded="$2"
+  local fully_synced="$3"
+  python3 - "$SYNC_STATE_FILE" "$session_uploaded" "$frames_uploaded" "$fully_synced" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+
+path = sys.argv[1]
+data = {
+    "session_uploaded": sys.argv[2] == "true",
+    "frames_uploaded": sys.argv[3] == "true",
+    "fully_synced": sys.argv[4] == "true",
+    "updated_at": datetime.now(timezone.utc).isoformat(),
+}
+with open(path, "w") as f:
+    json.dump(data, f, indent=2, sort_keys=True)
+PY
+}
+
+mark_fully_synced() {
+  write_sync_state "true" "true" "true"
+  touch "$SYNC_MARKER_FILE"
+}
+
+if [ -f "$SYNC_MARKER_FILE" ] && [ "$(read_sync_state fully_synced)" = "true" ]; then
   exit 0
 fi
 
@@ -27,16 +81,12 @@ SERVER_URL=""
 if [ -f "$SERVER_URL_FILE" ]; then
   SERVER_URL=$(cat "$SERVER_URL_FILE" 2>/dev/null || echo "")
 fi
-
 if [ -z "$SERVER_URL" ]; then
   echo "ERROR: No server URL configured" >&2
   exit 1
 fi
-
-# Derive base URL from push URL
 BASE_URL=$(echo "$SERVER_URL" | sed 's|/context/push||')
 
-# Auth token from Keychain
 AUTH_TOKEN=$(cb_read_keychain_token "$(cb_keychain_service_daemon)")
 if [ -z "$AUTH_TOKEN" ]; then
   AUTH_TOKEN="${CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN:-}"
@@ -46,7 +96,6 @@ if [ -z "$AUTH_TOKEN" ]; then
   exit 1
 fi
 
-# TLS args
 curl_tls_args() {
   if [ -f "$CB_DIR/server-ca.pem" ] && [[ "$BASE_URL" == https://* ]]; then
     echo "--cacert"
@@ -54,25 +103,63 @@ curl_tls_args() {
   fi
 }
 
+TLS_ARGS=()
+while IFS= read -r arg; do
+  TLS_ARGS+=("$arg")
+done < <(curl_tls_args)
+
 MEETING_ID=$(basename "$SESSION_DIR")
-
-# Read session metadata from state file
 STATE_FILE="$SESSION_DIR/session-state.json"
-STARTED_AT=""
-ENDED_AT=""
-DURATION_SECONDS=0
-CALL_APP=""
-ALLOW_EXTERNAL_PROCESSING="false"
 
-if [ -f "$STATE_FILE" ]; then
-  STARTED_AT=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('started_at',''))" 2>/dev/null || echo "")
-  ENDED_AT=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('ended_at',''))" 2>/dev/null || echo "")
-  DURATION_SECONDS=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('elapsed_seconds',0))" 2>/dev/null || echo "0")
-  CALL_APP=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('call_app',''))" 2>/dev/null || echo "")
-  ALLOW_EXTERNAL_PROCESSING=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print('true' if d.get('allow_external_processing') else 'false')" 2>/dev/null || echo "false")
-fi
+STATE_JSON=$(python3 - "$STATE_FILE" <<'PY'
+import json
+import os
+import sys
+path = sys.argv[1]
+if not os.path.exists(path):
+    print("{}")
+    raise SystemExit(0)
+with open(path) as f:
+    print(json.dumps(json.load(f)))
+PY
+)
 
-# Fallback: derive timestamps from directory creation/modification
+state_value() {
+  local key="$1"
+  python3 - "$STATE_JSON" "$key" <<'PY'
+import json
+import sys
+data = json.loads(sys.argv[1])
+value = data.get(sys.argv[2], "")
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, list):
+    print(json.dumps(value))
+elif value is None:
+    print("")
+else:
+    print(value)
+PY
+}
+
+STARTED_AT="$(state_value started_at)"
+ENDED_AT="$(state_value ended_at)"
+DURATION_SECONDS="$(state_value elapsed_seconds)"
+CALL_APP="$(state_value call_app)"
+PARTICIPANTS_JSON="$(state_value participants)"
+ALLOW_EXTERNAL_PROCESSING="$(state_value allow_external_processing)"
+SENSITIVE_DURING_SESSION="$(state_value sensitive_during_session)"
+FRAMES_EXPECTED="$(state_value screenshots_taken)"
+
+STARTED_AT="${STARTED_AT:-}"
+ENDED_AT="${ENDED_AT:-}"
+DURATION_SECONDS="${DURATION_SECONDS:-0}"
+CALL_APP="${CALL_APP:-}"
+PARTICIPANTS_JSON="${PARTICIPANTS_JSON:-[]}"
+ALLOW_EXTERNAL_PROCESSING="${ALLOW_EXTERNAL_PROCESSING:-false}"
+SENSITIVE_DURING_SESSION="${SENSITIVE_DURING_SESSION:-false}"
+FRAMES_EXPECTED="${FRAMES_EXPECTED:-0}"
+
 if [ -z "$STARTED_AT" ]; then
   STARTED_AT=$(python3 -c "
 import os, datetime
@@ -84,104 +171,131 @@ if [ -z "$ENDED_AT" ]; then
   ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 fi
 
-# Read transcript and visual events from buffer.jsonl
 TRANSCRIPT_JSON="null"
 VISUAL_EVENTS_JSON="null"
 BUFFER_FILE="$SESSION_DIR/buffer.jsonl"
+FINAL_TRANSCRIPT="$SESSION_DIR/transcript.json"
 
-if [ -f "$BUFFER_FILE" ]; then
+if [ "$SENSITIVE_DURING_SESSION" != "true" ] && [ -f "$BUFFER_FILE" ]; then
   TRANSCRIPT_JSON=$(python3 -c "
-import json, sys
+import json
 segments = []
 for line in open('$BUFFER_FILE'):
     line = line.strip()
-    if not line: continue
+    if not line:
+        continue
     try:
         obj = json.loads(line)
-        if obj.get('type') == 'transcript':
-            del obj['type']
-            segments.append(obj)
-    except: pass
+    except Exception:
+        continue
+    if obj.get('type') == 'transcript':
+        obj.pop('type', None)
+        segments.append(obj)
 print(json.dumps(segments) if segments else 'null')
 " 2>/dev/null || echo "null")
 
   VISUAL_EVENTS_JSON=$(python3 -c "
-import json, sys
+import json
 events = []
 for line in open('$BUFFER_FILE'):
     line = line.strip()
-    if not line: continue
+    if not line:
+        continue
     try:
         obj = json.loads(line)
-        if obj.get('type') == 'visual':
-            del obj['type']
-            events.append(obj)
-    except: pass
+    except Exception:
+        continue
+    if obj.get('type') == 'visual':
+        obj.pop('type', None)
+        events.append(obj)
 print(json.dumps(events) if events else 'null')
 " 2>/dev/null || echo "null")
 fi
 
-# Also check for final transcript.json (from batch transcription)
-FINAL_TRANSCRIPT="$SESSION_DIR/transcript.json"
-if [ -f "$FINAL_TRANSCRIPT" ]; then
+if [ "$SENSITIVE_DURING_SESSION" != "true" ] && [ -f "$FINAL_TRANSCRIPT" ]; then
   TRANSCRIPT_JSON=$(cat "$FINAL_TRANSCRIPT")
 fi
 
-# Build session payload
-SESSION_PAYLOAD=$(python3 -c "
+SESSION_UPLOADED="$(read_sync_state session_uploaded)"
+FRAMES_UPLOADED="$(read_sync_state frames_uploaded)"
+FULLY_SYNCED="$(read_sync_state fully_synced)"
+
+SESSION_UPLOADED="${SESSION_UPLOADED:-false}"
+FRAMES_UPLOADED="${FRAMES_UPLOADED:-false}"
+FULLY_SYNCED="${FULLY_SYNCED:-false}"
+
+if [ "$FULLY_SYNCED" = "true" ]; then
+  touch "$SYNC_MARKER_FILE"
+  exit 0
+fi
+
+if [ "$SESSION_UPLOADED" != "true" ]; then
+  SESSION_PAYLOAD=$(python3 - "$MEETING_ID" "$STARTED_AT" "$ENDED_AT" "$DURATION_SECONDS" "$CALL_APP" "$ALLOW_EXTERNAL_PROCESSING" "$PARTICIPANTS_JSON" "$TRANSCRIPT_JSON" "$VISUAL_EVENTS_JSON" "$SENSITIVE_DURING_SESSION" "$FRAMES_EXPECTED" <<'PY'
 import json
-data = {
-    'meeting_id': '$MEETING_ID',
-    'started_at': '$STARTED_AT',
-    'ended_at': '$ENDED_AT',
-    'duration_seconds': $DURATION_SECONDS,
-    'app': '$CALL_APP',
-    'allow_external_processing': $ALLOW_EXTERNAL_PROCESSING,
-    'participants': '',
-    'transcript_json': $TRANSCRIPT_JSON,
-    'visual_events_json': $VISUAL_EVENTS_JSON,
+import sys
+
+def parse_json(value, fallback):
+    try:
+        return json.loads(value)
+    except Exception:
+        return fallback
+
+payload = {
+    "meeting_id": sys.argv[1],
+    "started_at": sys.argv[2],
+    "ended_at": sys.argv[3],
+    "duration_seconds": int(sys.argv[4] or 0),
+    "app": sys.argv[5],
+    "allow_external_processing": sys.argv[6] == "true",
+    "participants": parse_json(sys.argv[7], []),
+    "transcript_json": None if sys.argv[10] == "true" else parse_json(sys.argv[8], None),
+    "visual_events_json": None if sys.argv[10] == "true" else parse_json(sys.argv[9], None),
+    "sensitive_during_session": sys.argv[10] == "true",
+    "frames_expected": int(sys.argv[11] or 0),
 }
-print(json.dumps(data))
-" 2>/dev/null)
+print(json.dumps(payload))
+PY
+)
 
-if [ -z "$SESSION_PAYLOAD" ]; then
-  echo "ERROR: Failed to build session payload" >&2
-  exit 1
+  HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
+    -X POST "$BASE_URL/context/meeting/session" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$SESSION_PAYLOAD" \
+    --connect-timeout 10 \
+    --max-time 30 \
+    "${TLS_ARGS[@]}" \
+    2>/dev/null || echo "000")
+
+  if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+    echo "ERROR: Session push failed (HTTP $HTTP_CODE)" >&2
+    exit 1
+  fi
+
+  SESSION_UPLOADED="true"
+  if [ "$SENSITIVE_DURING_SESSION" = "true" ] || [ "$FRAMES_EXPECTED" -eq 0 ]; then
+    FRAMES_UPLOADED="true"
+  fi
+  write_sync_state "$SESSION_UPLOADED" "$FRAMES_UPLOADED" "false"
 fi
 
-# Push session to server
-TLS_ARGS=()
-while IFS= read -r arg; do
-  TLS_ARGS+=("$arg")
-done < <(curl_tls_args)
+if [ "$FRAMES_UPLOADED" != "true" ] && [ "$SENSITIVE_DURING_SESSION" != "true" ] && [ "$FRAMES_EXPECTED" -gt 0 ]; then
+  FRAMES_DIR="$SESSION_DIR/frames"
+  if [ ! -d "$FRAMES_DIR" ]; then
+    echo "ERROR: Frames expected but frames directory is missing" >&2
+    exit 1
+  fi
 
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
-  -X POST "$BASE_URL/context/meeting/session" \
-  -H "Authorization: Bearer $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$SESSION_PAYLOAD" \
-  --connect-timeout 10 \
-  --max-time 30 \
-  "${TLS_ARGS[@]}" \
-  2>/dev/null || echo "000")
+  mapfile -t FRAME_FILES < <(find "$FRAMES_DIR" -name "*.png" -type f 2>/dev/null | sort | head -50)
+  if [ "${#FRAME_FILES[@]}" -eq 0 ]; then
+    echo "ERROR: Frames expected but no frame files were found" >&2
+    exit 1
+  fi
 
-if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
-  echo "ERROR: Session push failed (HTTP $HTTP_CODE)" >&2
-  exit 1
-fi
-
-echo "Session $MEETING_ID pushed (HTTP $HTTP_CODE)"
-
-# Push frames (up to 10 at a time)
-FRAMES_DIR="$SESSION_DIR/frames"
-if [ -d "$FRAMES_DIR" ]; then
-  FRAME_FILES=($(find "$FRAMES_DIR" -name "*.png" -type f 2>/dev/null | sort | head -50))
-
-  # Upload in batches of 10
   BATCH=()
   for frame in "${FRAME_FILES[@]}"; do
     BATCH+=("-F" "frames=@$frame")
-    if [ ${#BATCH[@]} -ge 20 ]; then  # 20 args = 10 files (each is -F + path)
+    if [ ${#BATCH[@]} -ge 20 ]; then
       curl -sf -o /dev/null \
         -X POST "$BASE_URL/context/meeting/frames" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
@@ -190,12 +304,15 @@ if [ -d "$FRAMES_DIR" ]; then
         "${TLS_ARGS[@]}" \
         --connect-timeout 10 \
         --max-time 60 \
-        2>/dev/null || echo "Warning: frame batch upload failed" >&2
+        2>/dev/null || {
+          echo "ERROR: frame batch upload failed" >&2
+          write_sync_state "$SESSION_UPLOADED" "false" "false"
+          exit 1
+        }
       BATCH=()
     fi
   done
 
-  # Upload remaining batch
   if [ ${#BATCH[@]} -gt 0 ]; then
     curl -sf -o /dev/null \
       -X POST "$BASE_URL/context/meeting/frames" \
@@ -205,12 +322,16 @@ if [ -d "$FRAMES_DIR" ]; then
       "${TLS_ARGS[@]}" \
       --connect-timeout 10 \
       --max-time 60 \
-      2>/dev/null || echo "Warning: frame batch upload failed" >&2
+      2>/dev/null || {
+        echo "ERROR: frame batch upload failed" >&2
+        write_sync_state "$SESSION_UPLOADED" "false" "false"
+        exit 1
+      }
   fi
 
-  echo "Uploaded ${#FRAME_FILES[@]} frames for $MEETING_ID"
+  FRAMES_UPLOADED="true"
+  write_sync_state "$SESSION_UPLOADED" "$FRAMES_UPLOADED" "false"
 fi
 
-# Mark as synced
-touch "$SESSION_DIR/.synced"
+mark_fully_synced
 echo "Meeting $MEETING_ID synced successfully"

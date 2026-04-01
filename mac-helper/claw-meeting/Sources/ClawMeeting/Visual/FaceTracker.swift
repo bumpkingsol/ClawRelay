@@ -19,6 +19,7 @@ final class FaceTracker {
                 gaze: obs.gaze,
                 headTilt: obs.headTilt,
                 bodyLean: obs.bodyLean,
+                faceEmbeddingHash: obs.faceEmbeddingHash ?? stableId,
                 landmarksSummary: obs.landmarksSummary
             )
         }

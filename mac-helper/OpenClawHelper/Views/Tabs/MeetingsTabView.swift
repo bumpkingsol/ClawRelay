@@ -28,6 +28,11 @@ struct MeetingsTabView: View {
             meetingVM.fetchMeetingHistory()
             meetingVM.fetchParticipants()
         }
+        .sheet(item: transcriptSheetBinding) { transcript in
+            MeetingTranscriptSheet(transcript: transcript, state: meetingVM.transcriptFetchState) {
+                meetingVM.dismissTranscript()
+            }
+        }
     }
 
     // MARK: - Live Banner
@@ -137,7 +142,9 @@ struct MeetingsTabView: View {
                     .padding(.top, 20)
             } else {
                 ForEach(meetingVM.meetingHistory) { meeting in
-                    MeetingRowView(meeting: meeting)
+                    MeetingRowView(meeting: meeting) {
+                        meetingVM.fetchTranscript(for: meeting.id)
+                    }
                 }
             }
         }
@@ -188,10 +195,84 @@ struct MeetingsTabView: View {
     private var topPattern: String {
         // Pull from the first participant profile that has patterns
         for p in meetingVM.participantProfiles {
-            if let patterns = p.profile?["patterns"], !patterns.isEmpty {
+            if let patterns = p.profile?["patterns"]?.stringValue, !patterns.isEmpty {
                 return String(patterns.prefix(60))
             }
         }
         return "—"
+    }
+
+    private var transcriptSheetBinding: Binding<TranscriptSheetItem?> {
+        Binding(
+            get: {
+                guard let transcript = meetingVM.selectedMeetingTranscript else { return nil }
+                return TranscriptSheetItem(response: transcript)
+            },
+            set: { newValue in
+                if newValue == nil {
+                    meetingVM.dismissTranscript()
+                }
+            }
+        )
+    }
+}
+
+private struct TranscriptSheetItem: Identifiable {
+    let id = UUID()
+    let response: TranscriptResponse
+}
+
+private struct MeetingTranscriptSheet: View {
+    let transcript: TranscriptSheetItem
+    let state: MeetingTranscriptFetchState
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    switch state {
+                    case .loading:
+                        ProgressView("Loading transcript…")
+                    case .summaryOnly:
+                        Text("Raw transcript was purged. Summary is still available.")
+                            .foregroundStyle(.secondary)
+                    case .missing:
+                        Text("Transcript is not available for this meeting.")
+                            .foregroundStyle(.secondary)
+                    case let .failed(message):
+                        Text(message)
+                            .foregroundStyle(.red)
+                    case .live, .idle:
+                        if let segments = transcript.response.transcript, !segments.isEmpty {
+                            ForEach(segments) { segment in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(segment.speaker)
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text(segment.text)
+                                        .font(.system(size: 12))
+                                    Text(segment.ts)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 8)
+                            }
+                        } else {
+                            Text("Transcript is not available for this meeting.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle("Transcript")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", action: onClose)
+                }
+            }
+        }
+        .frame(minWidth: 500, minHeight: 400)
     }
 }

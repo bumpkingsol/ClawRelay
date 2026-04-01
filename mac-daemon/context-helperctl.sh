@@ -11,6 +11,128 @@ helper_auth_token() {
   cb_read_keychain_token "$(cb_keychain_service_helper)"
 }
 
+json_error() {
+  local code="$1"
+  local message="$2"
+  python3 - "$code" "$message" <<'PY'
+import json
+import sys
+
+print(json.dumps({"status": "error", "error": sys.argv[1], "message": sys.argv[2]}))
+PY
+}
+
+configured_server_base_url() {
+  local server_url_file
+  server_url_file="$(cb_dir)/server-url"
+  if [ ! -f "$server_url_file" ]; then
+    json_error "missing_server_url" "No server URL configured"
+    return 1
+  fi
+
+  local server_url
+  server_url=$(cat "$server_url_file" 2>/dev/null || echo "")
+  if [ -z "$server_url" ]; then
+    json_error "missing_server_url" "No server URL configured"
+    return 1
+  fi
+
+  echo "$server_url" | sed 's|/context/push||'
+}
+
+configured_helper_token() {
+  local auth_token=""
+  auth_token=$(helper_auth_token)
+  if [ -z "$auth_token" ]; then
+    json_error "missing_helper_token" "No helper auth token configured"
+    return 1
+  fi
+  printf '%s\n' "$auth_token"
+}
+
+helper_api_request() {
+  local method="$1"
+  local path="$2"
+  local payload="${3:-}"
+  local content_type="${4:-application/json}"
+
+  local base_url
+  if ! base_url=$(configured_server_base_url); then
+    return 1
+  fi
+
+  local auth_token
+  if ! auth_token=$(configured_helper_token); then
+    return 1
+  fi
+
+  local url="${base_url}${path}"
+  local ca_cert="$(cb_dir)/server-ca.pem"
+  local tmp_body tmp_err http_code curl_status
+  tmp_body=$(mktemp)
+  tmp_err=$(mktemp)
+  trap 'rm -f "$tmp_body" "$tmp_err"' RETURN
+
+  local curl_args=(
+    -sS
+    -X "$method"
+    -H "Authorization: Bearer $auth_token"
+    --connect-timeout 5
+    --max-time 20
+    -o "$tmp_body"
+    -w "%{http_code}"
+  )
+
+  if [[ "$url" == https://* ]] && [ -f "$ca_cert" ]; then
+    curl_args+=(--cacert "$ca_cert")
+  fi
+  if [ -n "$payload" ]; then
+    curl_args+=(-H "Content-Type: $content_type" -d "$payload")
+  fi
+  curl_args+=("$url")
+
+  set +e
+  http_code=$(curl "${curl_args[@]}" 2>"$tmp_err")
+  curl_status=$?
+  set -e
+
+  if [ $curl_status -ne 0 ]; then
+    local err_text code message
+    err_text=$(tr '\n' ' ' < "$tmp_err" | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
+    code="request_failed"
+    message="${err_text:-request failed}"
+    case "$curl_status" in
+      6) code="dns_failure"; message="Failed to resolve server host" ;;
+      7) code="connection_failed"; message="Failed to connect to server" ;;
+      28) code="timeout"; message="Timed out contacting server" ;;
+      35|51|58|60) code="tls_failed"; message="TLS validation failed" ;;
+    esac
+    json_error "$code" "$message"
+    return 1
+  fi
+
+  if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+    cat "$tmp_body"
+    return 0
+  fi
+
+  if [ -s "$tmp_body" ]; then
+    cat "$tmp_body"
+  else
+    local code="server_error"
+    local message="Server returned HTTP $http_code"
+    case "$http_code" in
+      401) code="unauthorized"; message="Helper token was rejected" ;;
+      403) code="forbidden"; message="Helper token is not allowed for this action" ;;
+      404) code="not_found"; message="Server endpoint not found" ;;
+      408) code="timeout"; message="Server timed out" ;;
+      500|502|503|504) code="server_error"; message="Server failed while handling the request" ;;
+    esac
+    json_error "$code" "$message"
+  fi
+  return 1
+}
+
 launchd_state() {
   local label="$1"
   if launchctl list "$label" >/dev/null 2>&1; then
@@ -76,6 +198,11 @@ stop_active_meeting_worker() {
 # status  – JSON snapshot of the bridge's current state
 # ---------------------------------------------------------------------------
 status_json() {
+  local health_json='{}'
+  if ! health_json=$(helper_api_request "GET" "/context/health"); then
+    health_json="${health_json:-{}}"
+  fi
+  export CB_SERVER_HEALTH_JSON="$health_json"
   python3 - <<'PY'
 import json, os, sqlite3, subprocess, time
 
@@ -154,6 +281,7 @@ snapshot = {
     "meetingId": meeting_id,
     "meetingElapsedSeconds": meeting_elapsed_seconds,
     "meetingWorkerPid": meeting_worker_pid,
+    "serverHealth": json.loads(os.environ.get("CB_SERVER_HEALTH_JSON", "{}") or "{}"),
 }
 print(json.dumps(snapshot))
 PY
@@ -294,6 +422,7 @@ do_privacy_rules() {
 
 # ---------------------------------------------------------------------------
 # queue-handoff <project> <task> [message]
+# Legacy offline queue path; helper UI should use submit-handoff instead.
 # ---------------------------------------------------------------------------
 do_queue_handoff() {
   local project="${1:-}"
@@ -333,51 +462,40 @@ print(json.dumps(obj))
 }
 
 # ---------------------------------------------------------------------------
+# submit-handoff <project> <task> [message] [priority]
+# ---------------------------------------------------------------------------
+do_submit_handoff() {
+  local project="${1:-}"
+  local task="${2:-}"
+  local message="${3:-}"
+  local priority="${4:-normal}"
+  if [ -z "$project" ] || [ -z "$task" ]; then
+    json_error "invalid_request" "submit-handoff requires <project> <task> [message] [priority]"
+    exit 1
+  fi
+
+  local payload
+  payload=$(python3 - "$project" "$task" "$message" "$priority" <<'PY'
+import json
+import sys
+
+print(json.dumps({
+    "project": sys.argv[1],
+    "task": sys.argv[2],
+    "message": sys.argv[3],
+    "priority": sys.argv[4],
+}))
+PY
+)
+
+  helper_api_request "POST" "/context/handoff" "$payload"
+}
+
+# ---------------------------------------------------------------------------
 # list-handoffs  – fetch recent handoffs from the server
 # ---------------------------------------------------------------------------
 do_list_handoffs() {
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo "[]"
-    exit 0
-  fi
-
-  # Replace /push with /handoffs in the URL
-  # Assumes server-url contains the full push endpoint (e.g. https://host:7890/context/push)
-  local handoffs_url
-  handoffs_url=$(echo "$server_url" | sed 's|/context/push|/context/handoffs|')
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo "[]"
-    exit 0
-  fi
-
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$handoffs_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  local response
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$handoffs_url" 2>/dev/null || echo "[]")
-  else
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "$handoffs_url" 2>/dev/null || echo "[]")
-  fi
-
-  echo "$response"
+  helper_api_request "GET" "/context/handoffs"
 }
 
 # ---------------------------------------------------------------------------
@@ -385,46 +503,7 @@ do_list_handoffs() {
 # ---------------------------------------------------------------------------
 do_fetch_dashboard() {
   local history_days="${1:-7}"
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo "{}"
-    exit 0
-  fi
-
-  local dashboard_url
-  dashboard_url="$(echo "$server_url" | sed 's|/context/push|/context/dashboard|')?history_days=$history_days"
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo "{}"
-    exit 0
-  fi
-
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$dashboard_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  local response
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$dashboard_url" 2>/dev/null || echo "{}")
-  else
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "$dashboard_url" 2>/dev/null || echo "{}")
-  fi
-
-  echo "$response"
+  helper_api_request "GET" "/context/dashboard?history_days=$history_days"
 }
 
 # ---------------------------------------------------------------------------
@@ -437,47 +516,7 @@ do_mark_question_seen() {
     exit 1
   fi
 
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo "{}"
-    exit 0
-  fi
-
-  local question_url
-  question_url="$(echo "$server_url" | sed "s|/context/push|/context/jc-question/$qid|")"
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo "{}"
-    exit 0
-  fi
-
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$question_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    curl -sf -X PATCH \
-      -H "Authorization: Bearer $auth_token" \
-      -H "Content-Type: application/json" \
-      -d '{"seen": true}' \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$question_url" 2>/dev/null || echo "{}"
-  else
-    curl -sf -X PATCH \
-      -H "Authorization: Bearer $auth_token" \
-      -H "Content-Type: application/json" \
-      -d '{"seen": true}' \
-      --connect-timeout 5 --max-time 10 \
-      "$question_url" 2>/dev/null || echo "{}"
-  fi
+  helper_api_request "PATCH" "/context/jc-question/$qid" '{"seen": true}'
 }
 
 # ---------------------------------------------------------------------------
@@ -554,46 +593,7 @@ do_meeting_stop() {
 # projects  – fetch portfolio projects from the server
 # ---------------------------------------------------------------------------
 do_fetch_projects() {
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo '{}'
-    exit 0
-  fi
-
-  local projects_url
-  projects_url=$(echo "$server_url" | sed 's|/context/push|/context/projects|')
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo '{}'
-    exit 0
-  fi
-
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$projects_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  local response
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$projects_url" 2>/dev/null || echo '{}')
-  else
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "$projects_url" 2>/dev/null || echo '{}')
-  fi
-
-  echo "$response"
+  helper_api_request "GET" "/context/projects"
 }
 
 # ---------------------------------------------------------------------------
@@ -601,92 +601,33 @@ do_fetch_projects() {
 # ---------------------------------------------------------------------------
 do_fetch_meetings() {
   local days="${1:-7}"
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo '{}'
-    exit 0
-  fi
-
-  local meetings_url
-  meetings_url="$(echo "$server_url" | sed "s|/context/push|/context/meetings|")?days=$days"
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo '{}'
-    exit 0
-  fi
-
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$meetings_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  local response
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$meetings_url" 2>/dev/null || echo '{}')
-  else
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "$meetings_url" 2>/dev/null || echo '{}')
-  fi
-
-  echo "$response"
+  helper_api_request "GET" "/context/meetings?days=$days"
 }
 
 # ---------------------------------------------------------------------------
 # participants  – fetch participant profiles from the server
 # ---------------------------------------------------------------------------
 do_fetch_participants() {
-  local server_url=""
-  if [ -f "$(cb_dir)/server-url" ]; then
-    server_url=$(cat "$(cb_dir)/server-url" 2>/dev/null || echo "")
-  fi
-  if [ -z "$server_url" ]; then
-    echo '{}'
-    exit 0
-  fi
+  helper_api_request "GET" "/context/participants"
+}
 
-  local participants_url
-  participants_url=$(echo "$server_url" | sed 's|/context/push|/context/participants|')
-
-  local auth_token=""
-  auth_token=$(helper_auth_token)
-  if [ -z "$auth_token" ]; then
-    echo '{}'
-    exit 0
+# ---------------------------------------------------------------------------
+# transcript <meeting-id>  – fetch transcript and visual context
+# ---------------------------------------------------------------------------
+do_fetch_transcript() {
+  local meeting_id="${1:-}"
+  if [ -z "$meeting_id" ]; then
+    json_error "invalid_request" "transcript requires <meeting-id>"
+    exit 1
   fi
+  helper_api_request "GET" "/context/meetings/$meeting_id/transcript"
+}
 
-  local curl_args=()
-  local ca_cert="$(cb_dir)/server-ca.pem"
-  if [[ "$participants_url" == https://* ]] && [ -f "$ca_cert" ]; then
-    curl_args+=(--cacert "$ca_cert")
-  fi
-
-  local response
-  if [ ${#curl_args[@]} -gt 0 ]; then
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "${curl_args[@]}" \
-      "$participants_url" 2>/dev/null || echo '{}')
-  else
-    response=$(curl -sf \
-      -H "Authorization: Bearer $auth_token" \
-      --connect-timeout 5 --max-time 10 \
-      "$participants_url" 2>/dev/null || echo '{}')
-  fi
-
-  echo "$response"
+# ---------------------------------------------------------------------------
+# health  – fetch end-to-end server health
+# ---------------------------------------------------------------------------
+do_fetch_health() {
+  helper_api_request "GET" "/context/health"
 }
 
 # ---------------------------------------------------------------------------
@@ -706,8 +647,10 @@ case "$cmd" in
   restart-watcher) restart_launchd "com.openclaw.context-bridge-fswatch" ;;
   purge-local)     do_purge_local ;;
   queue-handoff)   do_queue_handoff "$@" ;;
+  submit-handoff)  do_submit_handoff "$@" ;;
   list-handoffs)   do_list_handoffs ;;
   dashboard)            do_fetch_dashboard "$@" ;;
+  health)               do_fetch_health ;;
   projects)             do_fetch_projects ;;
   mark-question-seen)   do_mark_question_seen "$@" ;;
   privacy-rules)        do_privacy_rules "$@" ;;
@@ -716,8 +659,9 @@ case "$cmd" in
   meeting-stop)         do_meeting_stop ;;
   meetings)             do_fetch_meetings "$@" ;;
   participants)         do_fetch_participants ;;
+  transcript)           do_fetch_transcript "$@" ;;
   *)
-    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|start-bridge|stop-bridge|restart-daemon|restart-watcher|purge-local|queue-handoff|list-handoffs|dashboard|projects|meetings|participants|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
+    echo '{"error":"unknown command","usage":"status|pause|resume|sensitive|start-bridge|stop-bridge|restart-daemon|restart-watcher|purge-local|queue-handoff|submit-handoff|list-handoffs|dashboard|health|projects|meetings|participants|transcript|mark-question-seen|privacy-rules|meeting-status|meeting-start|meeting-stop"}' >&2
     exit 1
     ;;
 esac

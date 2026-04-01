@@ -170,8 +170,9 @@ final class MeetingRecorder {
     // MARK: - Audio Handler
 
     private func handleMixedAudio(_ samples: [Float]) {
-        // In sensitive mode, audio still flows but we do NOT write transcript
-        // (the onSegment callback checks session state before writing)
+        guard !session.sensitiveModeUsed || session.state != .sensitive else {
+            return
+        }
         do {
             try liveTranscriber.processAudio(samples)
         } catch {
@@ -213,6 +214,7 @@ final class MeetingRecorder {
                     timestamp: Date().timeIntervalSince1970,
                     alignedTranscriptSegment: session.segmentCount,
                     trigger: "periodic",
+                    frameFilename: url.lastPathComponent,
                     participants: tracked
                 )
                 try bufferWriter.writeVisual(event)
@@ -299,11 +301,9 @@ final class MeetingRecorder {
         } else if pauseChecker.isSensitive {
             if !wasSensitive {
                 session.transition(to: .sensitive)
-                // Audio continues but transcript is suppressed (handled in handleTranscriptSegment)
-                // Screenshots stop
+                stopAudioCapture()
                 stopScreenCapture()
-                if !audioCapturing { startAudioCapture() }
-                log("Sensitive mode: screenshots stopped, transcript suppressed")
+                log("Sensitive mode: all meeting content capture stopped")
             }
         } else {
             // Neither paused nor sensitive
@@ -331,7 +331,9 @@ final class MeetingRecorder {
         let audioURL = URL(fileURLWithPath: session.paths.audioPath)
         var finalSegments: [TranscriptSegment] = []
 
-        if FileManager.default.fileExists(atPath: session.paths.audioPath) {
+        if session.sensitiveModeUsed {
+            log("Sensitive mode was used during this session; skipping transcript generation")
+        } else if FileManager.default.fileExists(atPath: session.paths.audioPath) {
             // Batch transcription
             do {
                 let batchTranscriber = BatchTranscriber()
@@ -409,6 +411,10 @@ final class MeetingRecorder {
             "elapsed_seconds": session.elapsedSeconds,
             "transcript_segments": session.segmentCount,
             "screenshots_taken": session.frameCount,
+            "call_app": session.callApp ?? "",
+            "participants": session.participants,
+            "allow_external_processing": session.allowExternalProcessing && !session.sensitiveModeUsed,
+            "sensitive_during_session": session.sensitiveModeUsed,
         ]
 
         let statePath = "\(session.paths.rootDir)/session-state.json"

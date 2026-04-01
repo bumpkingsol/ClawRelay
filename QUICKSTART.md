@@ -44,29 +44,30 @@ git clone <your-repo-url> openclaw-computer-vision
 pip3 install --break-system-packages -r /home/user/clawrelay/openclaw-computer-vision/server/requirements.txt
 ```
 
-### 1.3 Check for auth token
+### 1.3 Check for scoped auth tokens
 
-The auth token should already be in `/home/user/clawrelay/.env`. Verify:
+The server uses separate tokens for each client type. Verify:
 
 ```bash
-grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env
+grep '^CONTEXT_BRIDGE_.*TOKEN=' /home/user/clawrelay/.env
 ```
 
-If missing, generate one:
+If missing, generate them:
 ```bash
 umask 077
-TOKEN=$(openssl rand -hex 32)
+DAEMON_TOKEN=$(openssl rand -hex 32)
+HELPER_TOKEN=$(openssl rand -hex 32)
+AGENT_TOKEN=$(openssl rand -hex 32)
 touch /home/user/clawrelay/.env
 chmod 600 /home/user/clawrelay/.env
-echo "CONTEXT_BRIDGE_TOKEN=$TOKEN" >> /home/user/clawrelay/.env
-echo "CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db" >> /home/user/clawrelay/.env
-echo "CONTEXT_BRIDGE_PORT=7890" >> /home/user/clawrelay/.env
-echo "Generated token and stored it in /home/user/clawrelay/.env"
-```
-
-Retrieve the token when needed with:
-```bash
-grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2
+cat >> /home/user/clawrelay/.env <<EOF
+CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=$DAEMON_TOKEN
+CONTEXT_BRIDGE_HELPER_TOKEN=$HELPER_TOKEN
+CONTEXT_BRIDGE_AGENT_TOKEN=$AGENT_TOKEN
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db
+CONTEXT_BRIDGE_PORT=7890
+EOF
+echo "Generated scoped tokens and stored them in /home/user/clawrelay/.env"
 ```
 
 ### 1.4 Create data directory
@@ -122,7 +123,7 @@ sudo systemctl restart context-bridge
 ### 1.8 Verify the server is running
 
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+TOKEN=$(grep '^CONTEXT_BRIDGE_HELPER_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
 curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -H "Authorization: Bearer $TOKEN" \
   https://localhost:7890/context/health
@@ -136,7 +137,7 @@ Expected output:
 ### 1.9 Test with a simulated push
 
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+TOKEN=$(grep '^CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
 curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -X POST https://localhost:7890/context/push \
   -H "Authorization: Bearer $TOKEN" \
@@ -183,7 +184,9 @@ sudo ufw allow 7890/tcp
 
 You need two things from the server:
 1. **Server IP or hostname**: Check with `hostname -I` on the server
-2. **Auth token**: `grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2`
+2. **Scoped tokens**:
+   - Daemon installer: `grep '^CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2`
+   - Helper verification / UI calls: `grep '^CONTEXT_BRIDGE_HELPER_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2`
 3. **TLS cert PEM** (for self-signed deployments): `/home/user/clawrelay/data/certs/context-bridge.pem`
 
 ### 2.2 Clone the repo on Mac
@@ -246,7 +249,7 @@ tail -f /tmp/context-bridge.log
 
 On the **server**, run:
 ```bash
-TOKEN=$(grep '^CONTEXT_BRIDGE_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
+TOKEN=$(grep '^CONTEXT_BRIDGE_HELPER_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
 curl -sf --cacert /home/user/clawrelay/data/certs/context-bridge.pem \
   -H "Authorization: Bearer $TOKEN" \
   https://localhost:7890/context/health
@@ -279,7 +282,7 @@ open mac-helper/build/Build/Products/Debug/OpenClawHelper.app
 ### Or from Xcode
 Open `mac-helper/OpenClawHelper.xcodeproj` and hit Cmd+R.
 
-The helper reads from `~/.context-bridge/` (queue database, logs, pause state) and invokes `context-helperctl.sh` for actions like pause, resume, sensitive mode, restart, and local data purge.
+The helper reads from `~/.context-bridge/` (queue database, logs, pause state) and invokes `context-helperctl.sh` for actions like pause, resume, sensitive mode, direct handoff submission, transcript fetches, and local data purge.
 
 ---
 
@@ -304,13 +307,13 @@ CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 context-di
 
 ```bash
 cd /home/user/clawrelay/openclaw-computer-vision/server
-CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 watchdog.py
+CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db ./staleness-watchdog.sh
 ```
 
 ### 3.4 Test a handoff
 
 ```bash
-TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env | cut -d= -f2)
+TOKEN=$(grep '^CONTEXT_BRIDGE_HELPER_TOKEN=' /home/user/clawrelay/.env | cut -d= -f2)
 curl -sf -X POST http://localhost:7890/context/handoff \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -332,7 +335,7 @@ Add to crontab for 3x daily digests:
 
 Add to crontab for 15-minute watchdog checks:
 ```bash
-(crontab -l 2>/dev/null; echo "*/15 * * * * cd /home/user/clawrelay/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db python3 watchdog.py --json >> /tmp/context-watchdog.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/15 * * * * cd /home/user/clawrelay/openclaw-computer-vision/server && CONTEXT_BRIDGE_DB=/home/user/clawrelay/data/context-bridge.db ./staleness-watchdog.sh >> /tmp/context-watchdog.log 2>&1") | crontab -
 ```
 
 ### Stopping the daemon (Mac side)
@@ -396,7 +399,8 @@ print(f'Purged {deleted} rows')
 | `server/context-receiver.py` | Server | HTTP endpoint + SQLite |
 | `server/context-digest.py` | Server | Daily summary processor |
 | `server/context-query.py` | Server | CLI query tool |
-| `server/watchdog.py` | Server | Daemon health checker |
+| `server/watchdog.py` | Server | Queryable health helper |
+| `server/staleness-watchdog.sh` | Server | SQLCipher-safe cron watchdog |
 | `server/start.sh` | Server | Startup script |
 | `scripts/install-hooks.sh` | Run from repo on Mac | Git hook installer |
 
@@ -404,8 +408,10 @@ print(f'Purged {deleted} rows')
 
 | Credential | Location | Notes |
 |-----------|----------|-------|
-| Auth token (server) | `/home/user/clawrelay/.env` as `CONTEXT_BRIDGE_TOKEN` | Generated during setup |
-| Auth token (Mac) | macOS Keychain, service: `context-bridge`, account: `token` | Stored by installer |
+| Daemon token (server) | `/home/user/clawrelay/.env` as `CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN` | Used for `/context/push` and meeting sync |
+| Helper token (server) | `/home/user/clawrelay/.env` as `CONTEXT_BRIDGE_HELPER_TOKEN` | Used for helper UI and `/context/handoff` |
+| Agent token (server) | `/home/user/clawrelay/.env` as `CONTEXT_BRIDGE_AGENT_TOKEN` | Used by the agent-side read/update flows |
+| Auth token (Mac) | macOS Keychain, service-specific entries installed by setup | Stored by installer |
 | TLS cert | `/home/user/clawrelay/data/certs/context-bridge.pem` | Self-signed, 365 days |
 | TLS key | `/home/user/clawrelay/data/certs/context-bridge-key.pem` | Permissions: 600 |
 | DB | `/home/user/clawrelay/data/context-bridge.db` | Permissions: 600 |
@@ -414,7 +420,7 @@ print(f'Purged {deleted} rows')
 
 | Problem | Check | Fix |
 |---------|-------|-----|
-| No data arriving | `TOKEN=$(grep CONTEXT_BRIDGE_TOKEN /home/user/clawrelay/.env \| cut -d= -f2) && curl -H "Authorization: Bearer $TOKEN" localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
+| No data arriving | `TOKEN=$(grep CONTEXT_BRIDGE_HELPER_TOKEN /home/user/clawrelay/.env \| cut -d= -f2) && curl -H "Authorization: Bearer $TOKEN" localhost:7890/context/health` | Is receiver running? Check `/tmp/context-bridge-server.log` |
 | Auth failures | Check token matches on both sides | Regenerate: `openssl rand -hex 32` and update both |
 | AppleScript errors | `tail /tmp/context-bridge-error.log` | Grant Accessibility permission in System Settings |
 | Chrome URLs empty | Check Automation permission | System Settings > Privacy > Automation > Terminal > Chrome |

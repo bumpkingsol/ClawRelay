@@ -82,7 +82,7 @@ cp -R ~/Library/Developer/Xcode/DerivedData/OpenClawHelper-*/Build/Products/Rele
 ## Mac Daemon (`mac-daemon/`)
 
 - `context-daemon.sh` - Main capture script (runs every 2 min via launchd)
-- `context-helperctl.sh` - Control CLI (status, pause, resume, sensitive, restart, queue-handoff, list-handoffs, dashboard, mark-question-seen, meeting-status, meeting-start, meeting-stop)
+- `context-helperctl.sh` - Control CLI (status, pause, resume, sensitive, restart, submit-handoff, list-handoffs, dashboard, health, transcript, mark-question-seen, meeting-status, meeting-start, meeting-stop)
 - `context-common.sh` - Shared path helpers and state readers
 - `context-shell-hook.zsh` - Shell command logger
 - `fswatch-projects.sh` - File change watcher
@@ -94,7 +94,7 @@ bash mac-daemon/install.sh http://TAILSCALE_IP:7890/context/push
 
 **Calendar CLI** (`mac-helper/claw-calendar/`): Native Swift binary using EventKit. Queries calendar silently without launching Calendar.app.
 
-**Meeting Recorder** (`mac-helper/claw-meeting/`): Swift package for real-time meeting capture — system + mic audio with 16 kHz mixing, live transcription via FluidAudio, screen capture with face analysis (Vision framework), speaker diarisation, and session management via Unix domain socket. Pushes frames and session data to the server for processing.
+**Meeting Recorder** (`mac-helper/claw-meeting/`): Swift package for real-time meeting capture — system + mic audio with 16 kHz mixing, live transcription via FluidAudio, screen capture with face analysis (Vision framework), speaker diarisation, and session management via Unix domain socket. Session metadata and frames are synced in separate stages so frame retries do not lose the meeting.
 
 ## Server (`server/`)
 
@@ -147,7 +147,7 @@ All endpoints require Bearer token auth.
 ## Security
 
 - **Transport:** HTTP over Tailscale WireGuard tunnel (encrypted at the network layer, no TLS certs needed)
-- **Auth:** Bearer token (macOS Keychain on client, `.env` on server), HMAC-constant comparison
+- **Auth:** Scoped Bearer tokens (`CONTEXT_BRIDGE_DAEMON_WRITE_TOKEN`, `CONTEXT_BRIDGE_HELPER_TOKEN`, `CONTEXT_BRIDGE_AGENT_TOKEN`) with HMAC-constant comparison
 - **Data at rest:** SQLCipher AES-256 encryption (key derived from auth token via PBKDF2), 600 file permissions
 - **Retention:** Raw data purged after 48h, daily summaries persist for historical view
 - **Privacy:** 40+ sensitive apps, 48 URL patterns, and 8 title keywords auto-filtered
@@ -160,7 +160,7 @@ All endpoints require Bearer token auth.
 | Mode | Effect | Use case |
 |------|--------|----------|
 | **Pause** | Stops all local context generation | Personal time, sensitive meetings |
-| **Sensitive** | Reduces to heartbeat payloads; shell/git still flow | Confidential work |
+| **Sensitive** | If used during a meeting, no meeting transcript, screenshots, or derived meeting payload leave the Mac for that session | Confidential meetings |
 | **Auto-filter** | Banks, password managers, login pages blanked automatically | Always active |
 
 ## Documentation

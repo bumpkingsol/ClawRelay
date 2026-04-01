@@ -49,7 +49,7 @@ final class ControlCenterViewModel: ObservableObject {
     }
 
     func startPolling() {
-        refreshTimer = RefreshTimer(interval: 5.0) { [weak self] in
+        refreshTimer = RefreshTimer(interval: 15.0) { [weak self] in
             Task { @MainActor [weak self] in
                 self?.refresh()
             }

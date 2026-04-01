@@ -43,7 +43,28 @@ struct ParticipantObservation: Codable {
     let gaze: String
     let headTilt: Double
     let bodyLean: String
+    let faceEmbeddingHash: String?
     var landmarksSummary: LandmarksSummary?
+
+    init(
+        faceId: String,
+        gridPosition: String,
+        mouthOpen: Bool,
+        gaze: String,
+        headTilt: Double,
+        bodyLean: String,
+        faceEmbeddingHash: String? = nil,
+        landmarksSummary: LandmarksSummary? = nil
+    ) {
+        self.faceId = faceId
+        self.gridPosition = gridPosition
+        self.mouthOpen = mouthOpen
+        self.gaze = gaze
+        self.headTilt = headTilt
+        self.bodyLean = bodyLean
+        self.faceEmbeddingHash = faceEmbeddingHash
+        self.landmarksSummary = landmarksSummary
+    }
 
     enum CodingKeys: String, CodingKey {
         case faceId = "face_id"
@@ -52,6 +73,7 @@ struct ParticipantObservation: Codable {
         case gaze
         case headTilt = "head_tilt"
         case bodyLean = "body_lean"
+        case faceEmbeddingHash = "face_embedding_hash"
         case landmarksSummary = "landmarks_summary"
     }
 }
@@ -61,13 +83,32 @@ struct VisualEvent: Codable {
     let timestamp: Double
     let alignedTranscriptSegment: Int?
     let trigger: String
+    let frameFilename: String?
     let participants: [ParticipantObservation]
+
+    init(
+        meetingId: String,
+        timestamp: Double,
+        alignedTranscriptSegment: Int?,
+        trigger: String,
+        frameFilename: String? = nil,
+        participants: [ParticipantObservation]
+    ) {
+        self.meetingId = meetingId
+        self.timestamp = timestamp
+        self.alignedTranscriptSegment = alignedTranscriptSegment
+        self.trigger = trigger
+        self.frameFilename = frameFilename
+        self.participants = participants
+    }
 
     enum CodingKeys: String, CodingKey {
         case meetingId = "meeting_id"
         case timestamp
         case alignedTranscriptSegment = "aligned_transcript_segment"
-        case trigger, participants
+        case trigger
+        case frameFilename = "frame_filename"
+        case participants
     }
 }
 

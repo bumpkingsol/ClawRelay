@@ -105,7 +105,7 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     func startPolling() {
-        refreshTimer = RefreshTimer(interval: 5.0) { [weak self] in
+        refreshTimer = RefreshTimer(interval: 15.0) { [weak self] in
             Task { @MainActor [weak self] in
                 self?.refresh()
             }
@@ -122,19 +122,31 @@ final class MenuBarViewModel: ObservableObject {
     @Published var handoffProject: String = UserDefaults.standard.string(forKey: "lastHandoffProject") ?? ""
     @Published var handoffTask: String = ""
     @Published var handoffSent: Bool = false
+    @Published var handoffError: String?
 
     func sendQuickHandoff() {
         let project = handoffProject.isEmpty ? "general" : handoffProject
-        do {
-            try runner.runAction("queue-handoff", project, handoffTask, "", "normal")
-            UserDefaults.standard.set(handoffProject, forKey: "lastHandoffProject")
-            handoffTask = ""
-            handoffSent = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                self?.handoffSent = false
+        let task = handoffTask.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !task.isEmpty else { return }
+        handoffError = nil
+
+        let capturedRunner = runner
+        Task.detached {
+            do {
+                _ = try capturedRunner.runActionWithOutput("submit-handoff", project, task, "", "normal")
+                await MainActor.run { [weak self] in
+                    UserDefaults.standard.set(project, forKey: "lastHandoffProject")
+                    self?.handoffTask = ""
+                    self?.handoffSent = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                        self?.handoffSent = false
+                    }
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.handoffError = error.localizedDescription
+                }
             }
-        } catch {
-            // Silently fail for menu bar quick actions
         }
     }
 

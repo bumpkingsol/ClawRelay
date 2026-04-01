@@ -10,33 +10,26 @@ final class OpenClawHelperTests: XCTestCase {
     }
 
     @MainActor
-    func testPresentationControllerReopenWithoutVisibleWindowsRequestsControlCenter() {
+    func testPresentationControllerReopenWithoutVisibleWindowsFallsBackToSystemReopen() {
         let controller = AppPresentationController()
-        var showCount = 0
-        controller.onOpenControlCenter = {
-            showCount += 1
-        }
         controller.currentWindowsProvider = { [] }
         controller.activateApp = { }
 
-        controller.handleReopen(hasVisibleWindows: false)
+        let handled = controller.handleReopen(hasVisibleWindows: false)
 
-        XCTAssertEqual(showCount, 1)
+        XCTAssertFalse(handled)
     }
 
     @MainActor
-    func testPresentationControllerReopenWithVisibleWindowsDoesNotRequestNewWindow() {
+    func testPresentationControllerReopenWithVisibleWindowsReturnsHandled() {
         let controller = AppPresentationController()
-        var showCount = 0
-        controller.onOpenControlCenter = {
-            showCount += 1
-        }
-        controller.currentWindowsProvider = { [] }
+        let window = NSWindow()
+        controller.currentWindowsProvider = { [window] }
         controller.activateApp = { }
 
-        controller.handleReopen(hasVisibleWindows: true)
+        let handled = controller.handleReopen(hasVisibleWindows: true)
 
-        XCTAssertEqual(showCount, 0)
+        XCTAssertTrue(handled)
     }
 
     func testTrackingStateSymbols() {

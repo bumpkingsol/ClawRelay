@@ -188,7 +188,8 @@ struct MenuBarPopoverView: View {
     }
 
     private func openControlCenter() {
-        openWindow(id: "control-center")
-        NSApp.activate(ignoringOtherApps: true)
+        AppPresentationController.shared.showControlCenter {
+            openWindow(id: "control-center")
+        }
     }
 }

@@ -65,6 +65,7 @@
 		A10000200000000000000002 /* MeetingsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000002 /* MeetingsTabView.swift */; };
 		A10000200000000000000003 /* MeetingRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000003 /* MeetingRowView.swift */; };
 		A10000200000000000000004 /* ParticipantRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000004 /* ParticipantRowView.swift */; };
+		A10000220000000000000001 /* AppPresentationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000220000000000000001 /* AppPresentationControllerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -140,6 +141,7 @@
 		A20000200000000000000003 /* MeetingRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingRowView.swift; sourceTree = "<group>"; };
 		A20000200000000000000004 /* ParticipantRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipantRowView.swift; sourceTree = "<group>"; };
 		A20000210000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000220000000000000001 /* AppPresentationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPresentationControllerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,6 +195,7 @@
 				A20000050000000000000005 /* BridgeCommandRunnerTests.swift */,
 				A20000060000000000000006 /* MenuBarViewModelTests.swift */,
 				A20000080000000000000004 /* PermissionStatusTests.swift */,
+				A20000220000000000000001 /* AppPresentationControllerTests.swift */,
 				A70000050000000000000003 /* Fixtures */,
 			);
 			path = OpenClawHelperTests;
@@ -476,6 +479,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000003 /* OpenClawHelperTests.swift in Sources */,
+				A10000220000000000000001 /* AppPresentationControllerTests.swift in Sources */,
 				A10000050000000000000005 /* BridgeCommandRunnerTests.swift in Sources */,
 				A10000060000000000000006 /* MenuBarViewModelTests.swift in Sources */,
 				A10000080000000000000004 /* PermissionStatusTests.swift in Sources */,

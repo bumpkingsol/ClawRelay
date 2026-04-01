@@ -681,7 +681,7 @@ def _notify_handoff(hid, project, task, message, priority):
 @app.route("/context/handoffs", methods=["GET"])
 @require_clients("agent", "helper")
 def list_handoffs():
-    """List recent handoffs with status."""
+    """List recent handoffs with optional status filter."""
     db = get_db()
     db.execute("""
         CREATE TABLE IF NOT EXISTS handoffs (
@@ -694,9 +694,18 @@ def list_handoffs():
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    rows = db.execute(
-        "SELECT id, project, task, message, priority, status, created_at FROM handoffs ORDER BY created_at DESC LIMIT 50"
-    ).fetchall()
+    status_filter = request.args.get("status", "").strip()
+    if status_filter:
+        statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
+        placeholders = ",".join(["?"] * len(statuses))
+        rows = db.execute(
+            f"SELECT id, project, task, message, priority, status, created_at FROM handoffs WHERE status IN ({placeholders}) ORDER BY created_at DESC LIMIT 50",
+            statuses,
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT id, project, task, message, priority, status, created_at FROM handoffs ORDER BY created_at DESC LIMIT 50"
+        ).fetchall()
     db.close()
 
     return jsonify(

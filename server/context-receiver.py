@@ -1422,6 +1422,39 @@ def meeting_context_request():
     ), 200
 
 
+@app.route("/context/recent-activity", methods=["GET"])
+@require_clients("helper")
+def recent_activity():
+    """Return raw recent activity from the activity_stream."""
+    try:
+        db = get_db()
+        minutes = request.args.get("minutes", 10, type=int)
+        minutes = min(minutes, 720)  # cap at 12 hours
+        limit = request.args.get("limit", 100, type=int)
+        since = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        rows = db.execute(
+            "SELECT app, window_title, url, file_path, git_repo, git_branch, idle_state, ts "
+            "FROM activity_stream WHERE ts >= ? ORDER BY ts DESC LIMIT ?",
+            (since, limit),
+        ).fetchall()
+        results = []
+        for r in rows:
+            r = dict(r)
+            results.append({
+                "app": r.get("app"),
+                "window_title": r.get("window_title"),
+                "url": r.get("url"),
+                "file_path": r.get("file_path"),
+                "git_repo": r.get("git_repo"),
+                "git_branch": r.get("git_branch"),
+                "idle_state": r.get("idle_state"),
+                "ts": r.get("ts"),
+            })
+        return jsonify({"count": len(results), "minutes": minutes, "activity": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/context/dashboard", methods=["GET"])
 @require_clients("helper")
 def dashboard():

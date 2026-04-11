@@ -7,6 +7,7 @@ final class MeetingSessionManager: ObservableObject {
     @Published private(set) var state: MeetingLifecycleState = .idle
     @Published private(set) var sessionInfo: MeetingSessionInfo?
     @Published private(set) var elapsedSeconds: Int = 0
+    @Published private(set) var lastError: String?
 
     let detector: MeetingDetectorService
     let workerManager: MeetingWorkerManager
@@ -39,14 +40,16 @@ final class MeetingSessionManager: ObservableObject {
         self.briefingCache = briefingCache ?? BriefingCacheService()
 
         setupAutoDetection()
+        observeWorkerHealth()
     }
 
     func startMeeting(meetingId: String? = nil, app: String? = nil, manual: Bool = false) {
-        guard state == .idle else { return }
+        guard state == .idle || state == .failed else { return }
         let id = meetingId ?? generateMeetingId(app: app)
         pendingMeetingId = id
         pendingMeetingApp = app
         state = .awaitingConsent
+        lastError = nil
 
         if manual {
             manuallyStarted = true
@@ -77,6 +80,7 @@ final class MeetingSessionManager: ObservableObject {
     private func beginPreparing(meetingId: String, app: String?) {
         guard state == .awaitingConsent else { return }
         state = .preparing
+        lastError = nil
         sessionInfo = MeetingSessionInfo(
             meetingId: meetingId,
             startedAt: Date(),
@@ -98,7 +102,8 @@ final class MeetingSessionManager: ObservableObject {
             sessionInfo?.workerPid = workerManager.workerPid
             transitionToRecording()
         } catch {
-            transitionToIdle()
+            state = .failed
+            lastError = "Meeting capture failed to start: \(error.localizedDescription)"
         }
     }
 
@@ -117,6 +122,7 @@ final class MeetingSessionManager: ObservableObject {
 
     private func beginFinalizing() {
         state = .finalizing
+        lastError = nil
         elapsedTimer?.invalidate()
         elapsedTimer = nil
         briefingCache.stopBufferWatch()
@@ -142,6 +148,7 @@ final class MeetingSessionManager: ObservableObject {
         pendingMeetingApp = nil
         sessionInfo = nil
         elapsedSeconds = 0
+        lastError = nil
         manuallyStarted = false
         briefingCache.reset()
     }
@@ -181,13 +188,39 @@ final class MeetingSessionManager: ObservableObject {
                 self.beginPreparing(meetingId: id, app: self.pendingMeetingApp)
             } else {
                 self.transitionToIdle()
-                self.suppressDetectionUntilAppCloses()
+                self.detector.suppressCurrentMeetingDetection()
             }
         }
     }
 
-    private func suppressDetectionUntilAppCloses() {
-        NotificationCenter.default.post(name: .meetingConsentDeclined, object: nil)
+    private func observeWorkerHealth() {
+        workerManager.$health
+            .removeDuplicates()
+            .sink { [weak self] health in
+                guard let self else { return }
+                switch health {
+                case .running, .idle, .stoppedIntentionally:
+                    if health == .running {
+                        self.sessionInfo?.workerPid = self.workerManager.workerPid
+                    }
+                case .restartedAfterCrash:
+                    self.sessionInfo?.workerPid = self.workerManager.workerPid
+                case let .launchFailed(message):
+                    if self.state == .preparing {
+                        self.state = .failed
+                        self.lastError = "Meeting capture failed to start: \(message)"
+                    }
+                case let .restartFailed(message):
+                    if self.state == .recording || self.state == .preparing || self.state == .finalizing {
+                        self.elapsedTimer?.invalidate()
+                        self.elapsedTimer = nil
+                        self.briefingCache.stopBufferWatch()
+                        self.state = .failed
+                        self.lastError = "Meeting capture stopped unexpectedly: \(message)"
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func setupAutoDetection() {
@@ -220,8 +253,4 @@ final class MeetingSessionManager: ObservableObject {
         let seconds = elapsedSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
-}
-
-extension Notification.Name {
-    static let meetingConsentDeclined = Notification.Name("meetingConsentDeclined")
 }

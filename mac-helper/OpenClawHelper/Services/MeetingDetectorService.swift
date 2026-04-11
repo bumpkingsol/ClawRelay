@@ -16,15 +16,13 @@ final class MeetingDetectorService: ObservableObject {
     private let silenceTimeoutSeconds: TimeInterval = 60.0
     private var micActiveSince: Date?
     private var micSilentSince: Date?
-    private var suppressedUntilAppCloses: Bool = false
-    private var consentDeclinedObserver: NSObjectProtocol?
-    private var appTerminationObserver: NSObjectProtocol?
+    private var detectedMeetingSignature: String?
+    private var suppressedMeetingSignature: String?
 
     func startMonitoring() {
         listenToMicrophoneState()
         startAppPolling()
-        observeConsentDeclined()
-        observeAppTermination()
+        scanForMeetingApps()
     }
 
     func stopMonitoring() {
@@ -33,14 +31,13 @@ final class MeetingDetectorService: ObservableObject {
         pollTimer = nil
         debounceTask?.cancel()
         debounceTask = nil
-        if let observer = consentDeclinedObserver {
-            NotificationCenter.default.removeObserver(observer)
-            consentDeclinedObserver = nil
-        }
-        if let observer = appTerminationObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            appTerminationObserver = nil
-        }
+        detectedMeetingSignature = nil
+        suppressedMeetingSignature = nil
+    }
+
+    func suppressCurrentMeetingDetection() {
+        suppressedMeetingSignature = detectedMeetingSignature
+        isMeetingDetected = false
     }
 
     private func listenToMicrophoneState() {
@@ -115,91 +112,83 @@ final class MeetingDetectorService: ObservableObject {
         let apps = NSWorkspace.shared.runningApplications
 
         if apps.contains(where: { $0.bundleIdentifier == "us.zoom.xos" }) {
-            if isZoomInMeeting() {
+            if let signature = zoomMeetingSignature() {
                 detectedApp = "zoom"
+                detectedMeetingSignature = signature
+                if suppressedMeetingSignature != signature {
+                    suppressedMeetingSignature = nil
+                }
                 return
             }
         }
 
         if apps.contains(where: { $0.bundleIdentifier == "com.google.Chrome" }) {
-            if isChromeOnGoogleMeet() {
+            if let signature = chromeGoogleMeetSignature() {
                 detectedApp = "google-meet"
+                detectedMeetingSignature = signature
+                if suppressedMeetingSignature != signature {
+                    suppressedMeetingSignature = nil
+                }
                 return
             }
         }
 
         detectedApp = nil
+        detectedMeetingSignature = nil
+        suppressedMeetingSignature = nil
     }
 
-    private func isZoomInMeeting() -> Bool {
+    private func zoomMeetingSignature() -> String? {
         guard let windowList = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] else { return false }
+        ) as? [[String: Any]] else { return nil }
 
         // Zoom window titles vary by version and locale ("Zoom Meeting", "Zoom Workplace",
         // meeting topic, etc). Just check for any zoom.us window at normal layer — if Zoom
         // is running and the mic is active, the user is in a meeting.
-        return windowList.contains { info in
+        for info in windowList {
             guard let owner = info[kCGWindowOwnerName as String] as? String,
                   owner == "zoom.us",
                   let layer = info[kCGWindowLayer as String] as? Int,
-                  layer == 0 else { return false }
-            return true
+                  layer == 0 else { continue }
+            let title = (info[kCGWindowName as String] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if let title, !title.isEmpty {
+                return "zoom:\(title)"
+            }
+            return "zoom:active"
         }
+        return nil
     }
 
-    private func isChromeOnGoogleMeet() -> Bool {
+    private func chromeGoogleMeetSignature() -> String? {
         guard let windowList = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] else { return false }
+        ) as? [[String: Any]] else { return nil }
 
-        return windowList.contains { info in
+        for info in windowList {
             guard let owner = info[kCGWindowOwnerName as String] as? String,
                   owner == "Google Chrome",
-                  let title = info[kCGWindowName as String] as? String else { return false }
-            return title.lowercased().contains("meet.google.com")
+                  let title = info[kCGWindowName as String] as? String else { continue }
+            let normalized = title.lowercased()
+            if normalized.contains("meet.google.com") {
+                return "google-meet:\(normalized)"
+            }
         }
+        return nil
     }
 
     private func debounceMeetingCheck() {
-        guard !suppressedUntilAppCloses else { return }
+        guard suppressedMeetingSignature == nil || suppressedMeetingSignature != detectedMeetingSignature else { return }
         debounceTask?.cancel()
         debounceTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: .seconds(self?.debounceSeconds ?? 5))
             guard !Task.isCancelled else { return }
             guard let self else { return }
-            guard !self.suppressedUntilAppCloses else { return }
-            if self.micActiveSince != nil && self.detectedApp != nil {
+            guard self.suppressedMeetingSignature == nil || self.suppressedMeetingSignature != self.detectedMeetingSignature else { return }
+            if self.micActiveSince != nil && self.detectedApp != nil && self.detectedMeetingSignature != nil {
                 self.isMeetingDetected = true
-            }
-        }
-    }
-
-    private func observeConsentDeclined() {
-        consentDeclinedObserver = NotificationCenter.default.addObserver(
-            forName: .meetingConsentDeclined,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.suppressedUntilAppCloses = true
-            }
-        }
-    }
-
-    private func observeAppTermination() {
-        appTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didTerminateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            Task { @MainActor [weak self] in
-                guard let self, self.suppressedUntilAppCloses else { return }
-                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-                let meetingBundleIds = ["us.zoom.xos", "com.google.Chrome"]
-                if let bundleId = app.bundleIdentifier, meetingBundleIds.contains(bundleId) {
-                    self.suppressedUntilAppCloses = false
-                }
             }
         }
     }
@@ -207,10 +196,10 @@ final class MeetingDetectorService: ObservableObject {
     private func debounceMeetingEnd() {
         debounceTask?.cancel()
         debounceTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(60))
+            try? await Task.sleep(for: .seconds(self?.silenceTimeoutSeconds ?? 60))
             guard !Task.isCancelled else { return }
             guard let self else { return }
-            if self.micSilentSince != nil && self.detectedApp == nil {
+            if self.micSilentSince != nil && self.detectedMeetingSignature == nil {
                 self.isMeetingDetected = false
             }
         }

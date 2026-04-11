@@ -35,6 +35,37 @@ final class ControlCenterViewModelTests: XCTestCase {
         return url.path
     }
 
+    private func failingActionRunnerScript(message: String = "boom") throws -> String {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sh")
+        let script = """
+        #!/bin/bash
+        if [ "$1" = "status" ]; then
+          cat <<'EOF'
+        {
+          "productState": "running",
+          "trackingState": "active",
+          "pauseUntil": null,
+          "sensitiveMode": false,
+          "queueDepth": 0,
+          "daemonLaunchdState": "loaded",
+          "watcherLaunchdState": "loaded"
+        }
+        EOF
+          exit 0
+        fi
+        cat <<'EOF' >&2
+        {"status":"error","message":"\(message)"}
+        EOF
+        exit 1
+        """
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return url.path
+    }
+
     @MainActor
     func testFeatureViewModelsStayStableAcrossTabSelectionChanges() {
         let viewModel = ControlCenterViewModel()
@@ -124,5 +155,31 @@ final class ControlCenterViewModelTests: XCTestCase {
         viewModel.shutdownProduct()
 
         XCTAssertEqual(lifecycle.quitCallCount, 1)
+    }
+
+    @MainActor
+    func testPauseFailureSurfacesError() throws {
+        let scriptPath = try failingActionRunnerScript(message: "pause failed")
+        let viewModel = ControlCenterViewModel(
+            runner: BridgeCommandRunner(executablePath: scriptPath),
+            appLifecycle: AppLifecycleSpy()
+        )
+
+        viewModel.pause(seconds: 900)
+
+        XCTAssertEqual(viewModel.lastActionError, "Pause failed: pause failed")
+    }
+
+    @MainActor
+    func testSensitiveModeFailureSurfacesError() throws {
+        let scriptPath = try failingActionRunnerScript(message: "toggle failed")
+        let viewModel = ControlCenterViewModel(
+            runner: BridgeCommandRunner(executablePath: scriptPath),
+            appLifecycle: AppLifecycleSpy()
+        )
+
+        viewModel.setSensitiveMode(true)
+
+        XCTAssertEqual(viewModel.lastActionError, "Sensitive mode failed: toggle failed")
     }
 }

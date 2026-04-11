@@ -45,7 +45,7 @@ final class ControlCenterViewModel: ObservableObject {
     }
 
     func recheckPermissions() {
-        permissions = permissionService.checkAll()
+        permissions = permissionService.checkAll(snapshot: snapshot)
     }
 
     func startPolling() {
@@ -90,32 +90,62 @@ final class ControlCenterViewModel: ObservableObject {
     // MARK: - Privacy Controls
 
     func pause(seconds: Int) {
-        try? runner.runAction("pause", "\(seconds)")
+        lastActionError = nil
+        do {
+            try runner.runAction("pause", "\(seconds)")
+        } catch {
+            lastActionError = "Pause failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func pauseUntilTomorrow() {
-        try? runner.runAction("pause", "until-tomorrow")
+        lastActionError = nil
+        do {
+            try runner.runAction("pause", "until-tomorrow")
+        } catch {
+            lastActionError = "Pause failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func pauseIndefinite() {
-        try? runner.runAction("pause", "indefinite")
+        lastActionError = nil
+        do {
+            try runner.runAction("pause", "indefinite")
+        } catch {
+            lastActionError = "Pause failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func resume() {
-        try? runner.runAction("resume")
+        lastActionError = nil
+        do {
+            try runner.runAction("resume")
+        } catch {
+            lastActionError = "Resume failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func setSensitiveMode(_ enabled: Bool) {
-        try? runner.runAction("sensitive", enabled ? "on" : "off")
+        lastActionError = nil
+        do {
+            try runner.runAction("sensitive", enabled ? "on" : "off")
+        } catch {
+            lastActionError = "Sensitive mode failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func purgeLocal() {
-        try? runner.runAction("purge-local")
+        lastActionError = nil
+        do {
+            try runner.runAction("purge-local")
+        } catch {
+            lastActionError = "Purge failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 

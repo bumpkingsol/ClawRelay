@@ -3,11 +3,22 @@ import Foundation
 /// Manages the claw-meeting worker process lifecycle.
 @MainActor
 final class MeetingWorkerManager: ObservableObject {
+    enum WorkerHealth: Equatable {
+        case idle
+        case running
+        case launchFailed(String)
+        case restartedAfterCrash
+        case restartFailed(String)
+        case stoppedIntentionally
+    }
+
     @Published private(set) var isRunning: Bool = false
     @Published private(set) var workerPid: Int32? = nil
+    @Published private(set) var health: WorkerHealth = .idle
 
     private var process: Process?
     private var monitorTask: Task<Void, Never>?
+    private var stopRequested = false
 
     private let binaryPath: String
     private let pidPath: String
@@ -28,6 +39,7 @@ final class MeetingWorkerManager: ObservableObject {
         guard !isRunning else { return }
 
         cleanupOrphanedWorker()
+        stopRequested = false
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binaryPath)
@@ -36,10 +48,16 @@ final class MeetingWorkerManager: ObservableObject {
         proc.standardError = FileHandle(forWritingAtPath: "/tmp/claw-meeting-error.log")
             ?? FileHandle.nullDevice
 
-        try proc.run()
+        do {
+            try proc.run()
+        } catch {
+            health = .launchFailed(error.localizedDescription)
+            throw error
+        }
         process = proc
         workerPid = proc.processIdentifier
         isRunning = true
+        health = .running
 
         try String(proc.processIdentifier).write(
             toFile: pidPath, atomically: true, encoding: .utf8
@@ -49,6 +67,8 @@ final class MeetingWorkerManager: ObservableObject {
     }
 
     func stopWorker() {
+        stopRequested = true
+        health = .stoppedIntentionally
         sendSocketCommand("stop")
 
         Task {
@@ -93,14 +113,27 @@ final class MeetingWorkerManager: ObservableObject {
             await MainActor.run {
                 guard let self else { return }
                 let exitCode = proc.terminationStatus
+                let intentionalStop = self.stopRequested
+                self.process = nil
+                self.isRunning = false
+                self.workerPid = nil
+                try? FileManager.default.removeItem(atPath: self.pidPath)
 
-                if exitCode != 0 && self.isRunning {
-                    try? self.startWorker(meetingId: meetingId)
+                if intentionalStop {
+                    self.stopRequested = false
+                    self.health = .stoppedIntentionally
+                    return
+                }
+
+                if exitCode != 0 {
+                    do {
+                        try self.startWorker(meetingId: meetingId)
+                        self.health = .restartedAfterCrash
+                    } catch {
+                        self.health = .restartFailed(error.localizedDescription)
+                    }
                 } else {
-                    self.isRunning = false
-                    self.workerPid = nil
-                    self.process = nil
-                    try? FileManager.default.removeItem(atPath: self.pidPath)
+                    self.health = .idle
                 }
             }
         }
@@ -113,6 +146,8 @@ final class MeetingWorkerManager: ObservableObject {
         process = nil
         isRunning = false
         workerPid = nil
+        stopRequested = false
+        health = .stoppedIntentionally
         try? FileManager.default.removeItem(atPath: pidPath)
     }
 

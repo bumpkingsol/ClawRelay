@@ -15,6 +15,12 @@ struct MeetingRowView: View {
                     Text("\(meeting.formattedDate) · \(meeting.app ?? "") · \(meeting.formattedDuration)")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                    if let progress = meeting.captureProgressDescription,
+                       meeting.processingStatus == "awaiting_frames" || meeting.processingStatus == "ready" {
+                        Text(progress)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Spacer()
@@ -66,10 +72,21 @@ struct MeetingRowView: View {
 
     private var statusBadge: some View {
         let (text, color): (String, Color) = {
-            switch meeting.purgeStatus {
-            case "live": return ("Summary ready", .green)
-            case "summary_only": return ("Raw purged", .gray)
-            default: return ("Processing", .blue)
+            switch meeting.processingStatus {
+            case "awaiting_frames":
+                return ("Awaiting frames", .orange)
+            case "ready":
+                return ("Ready to process", .blue)
+            case "processed":
+                return (meeting.purgeStatus == "summary_only" ? "Raw purged" : "Summary ready",
+                        meeting.purgeStatus == "summary_only" ? .gray : .green)
+            case "failed":
+                return ("Capture failed", .red)
+            default:
+                if meeting.hasTranscript || meeting.summaryMd != nil {
+                    return ("Summary ready", .green)
+                }
+                return ("Processing", .blue)
             }
         }()
 

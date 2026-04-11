@@ -2,10 +2,10 @@ import Foundation
 import ApplicationServices
 
 final class PermissionService {
-    func checkAll() -> [PermissionStatus] {
+    func checkAll(snapshot: BridgeSnapshot = .placeholder) -> [PermissionStatus] {
         [
             accessibilityStatus(),
-            automationStatus(),
+            automationStatus(snapshot: snapshot),
             fullDiskAccessStatus(),
         ]
     }
@@ -40,32 +40,33 @@ final class PermissionService {
         )
     }
 
-    func automationStatus() -> PermissionStatus {
-        // Automation permission (Terminal -> Chrome) cannot be checked reliably
-        // from a third-party app. Best effort: try an AppleScript check.
-        let script = "tell application \"System Events\" to return name of first process"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
+    func automationStatus(snapshot: BridgeSnapshot) -> PermissionStatus {
+        if let diagnostic = snapshot.chromeAutomationDiagnostic {
+            switch diagnostic.status {
+            case .available:
                 return PermissionStatus(
                     kind: .automation,
                     state: .granted,
-                    detail: "System Events automation available"
+                    detail: diagnostic.detail
+                )
+            case .unavailable:
+                return PermissionStatus(
+                    kind: .automation,
+                    state: .missing,
+                    detail: diagnostic.detail
+                )
+            case .notRunning, .missing, .unlaunchable:
+                return PermissionStatus(
+                    kind: .automation,
+                    state: .needsReview,
+                    detail: diagnostic.detail
                 )
             }
-        } catch {
-            // Process launch failed; fall through to needsReview
         }
         return PermissionStatus(
             kind: .automation,
             state: .needsReview,
-            detail: "Automation permission needs review"
+            detail: "Chrome URL capture has not been verified yet"
         )
     }
 

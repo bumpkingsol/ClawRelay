@@ -16,6 +16,9 @@ struct MeetingRecord: Codable, Identifiable {
     let summaryMd: String?
     let hasTranscript: Bool
     let purgeStatus: String
+    let processingStatus: String
+    let framesExpected: Int
+    let framesUploaded: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -26,6 +29,9 @@ struct MeetingRecord: Codable, Identifiable {
         case summaryMd = "summary_md"
         case hasTranscript = "has_transcript"
         case purgeStatus = "purge_status"
+        case processingStatus = "processing_status"
+        case framesExpected = "frames_expected"
+        case framesUploaded = "frames_uploaded"
     }
 
     var displayTitle: String {
@@ -49,6 +55,11 @@ struct MeetingRecord: Codable, Identifiable {
         let display = DateFormatter()
         display.dateFormat = "E HH:mm"
         return display.string(from: date)
+    }
+
+    var captureProgressDescription: String? {
+        guard framesExpected > 0 else { return nil }
+        return "\(min(framesUploaded, framesExpected))/\(framesExpected) frames"
     }
 }
 

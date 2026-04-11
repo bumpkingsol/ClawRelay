@@ -10,7 +10,7 @@ struct PermissionsTabView: View {
                     .font(.title2)
                     .padding(.bottom, 4)
 
-                Text("The Context Bridge daemon needs these permissions to capture your activity. Grant them to the terminal app that runs the daemon (usually Terminal).")
+                Text("The Context Bridge daemon needs these permissions to capture your activity. Grant them to the terminal app that runs the daemon (usually Terminal). A granted status here means the daemon capture path is usable, not just that this helper app can talk to macOS.")
                     .font(DarkUtilityGlass.compactBody)
                     .foregroundStyle(.secondary)
 

@@ -290,7 +290,6 @@ def trigger_meeting_processor(meeting_id: str) -> None:
             logger.info("Triggered meeting processor for %s", meeting_id)
     except Exception:
         logger.exception("Failed to trigger meeting processor for %s", meeting_id)
-    logger.info(f"Database initialized at {DB_PATH}")
 
 
 def scrub_raw_payloads(db):
@@ -886,7 +885,8 @@ def get_meetings():
         rows = db.execute(
             """
             SELECT id, started_at, ended_at, duration_seconds, app,
-                   participants, summary_md, transcript_json
+                   participants, summary_md, transcript_json,
+                   processing_status, frames_expected, frames_uploaded
             FROM meeting_sessions
             WHERE started_at >= ?
             ORDER BY started_at DESC
@@ -915,6 +915,9 @@ def get_meetings():
                     "participants": participants,
                     "summary_md": r["summary_md"],
                     "has_transcript": r["transcript_json"] is not None,
+                    "processing_status": r["processing_status"] or "pending",
+                    "frames_expected": r["frames_expected"] or 0,
+                    "frames_uploaded": r["frames_uploaded"] or 0,
                     "purge_status": "live"
                     if r["transcript_json"] is not None
                     else "summary_only",

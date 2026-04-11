@@ -212,6 +212,7 @@ sensitive_path = os.path.join(home, "sensitive-mode")
 db_path = os.path.join(home, "local.db")
 meeting_pid_path = os.path.join(home, "meeting-worker.pid")
 meeting_state_path = os.path.join(home, "meeting-state.json")
+meeting_bin_path = os.path.join(home, "bin", "claw-meeting")
 
 queue_depth = 0
 if os.path.exists(db_path):
@@ -265,6 +266,83 @@ if os.path.exists(meeting_state_path):
 if meeting_worker_pid and meeting_state == "idle":
     meeting_state = "preparing"
 
+def chrome_automation_diagnostic():
+    script = '''
+if application "Google Chrome" is running then
+    tell application "Google Chrome"
+        if (count of windows) is 0 then return "__NO_WINDOWS__"
+        return URL of active tab of front window
+    end tell
+else
+    return "__NOT_RUNNING__"
+end if
+'''
+    try:
+        proc = subprocess.run(
+            ["/usr/bin/osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception as exc:
+        return {"status": "unavailable", "detail": f"Chrome URL capture probe failed: {exc}"}
+
+    output = (proc.stdout or "").strip()
+    error = (proc.stderr or "").strip()
+    if proc.returncode == 0:
+        if output == "__NOT_RUNNING__":
+            return {
+                "status": "not_running",
+                "detail": "Google Chrome is not running, so the daemon URL capture path could not be verified",
+            }
+        return {
+            "status": "available",
+            "detail": "Terminal can read Google Chrome URLs",
+        }
+
+    return {
+        "status": "unavailable",
+        "detail": error or output or "Terminal cannot read Google Chrome URLs",
+    }
+
+def meeting_binary_diagnostic():
+    if not os.path.exists(meeting_bin_path):
+        return {
+            "status": "missing",
+            "detail": "claw-meeting is not installed in ~/.context-bridge/bin",
+            "path": meeting_bin_path,
+        }
+    if not os.access(meeting_bin_path, os.X_OK):
+        return {
+            "status": "unlaunchable",
+            "detail": "claw-meeting exists but is not executable",
+            "path": meeting_bin_path,
+        }
+    try:
+        proc = subprocess.run(
+            [meeting_bin_path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception as exc:
+        return {
+            "status": "unlaunchable",
+            "detail": f"claw-meeting failed to launch: {exc}",
+            "path": meeting_bin_path,
+        }
+    if proc.returncode == 0:
+        return {
+            "status": "available",
+            "detail": "claw-meeting is installed and launchable",
+            "path": meeting_bin_path,
+        }
+    return {
+        "status": "unlaunchable",
+        "detail": (proc.stderr or proc.stdout or "claw-meeting failed to launch").strip(),
+        "path": meeting_bin_path,
+    }
+
 snapshot = {
     "trackingState": "paused" if paused else (
         "sensitive" if os.path.exists(sensitive_path) else "active"),
@@ -282,6 +360,10 @@ snapshot = {
     "meetingElapsedSeconds": meeting_elapsed_seconds,
     "meetingWorkerPid": meeting_worker_pid,
     "serverHealth": json.loads(os.environ.get("CB_SERVER_HEALTH_JSON", "{}") or "{}"),
+    "diagnostics": {
+        "chrome_automation": chrome_automation_diagnostic(),
+        "meeting_binary": meeting_binary_diagnostic(),
+    },
 }
 print(json.dumps(snapshot))
 PY

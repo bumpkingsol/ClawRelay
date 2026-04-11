@@ -26,6 +26,11 @@ struct MenuBarPopoverView: View {
                 // Zone 3 + 4: Pause Controls & Sensitive Toggle
                 QuickActionsGrid(viewModel: viewModel)
 
+                if let actionError = viewModel.actionError, !actionError.isEmpty {
+                    inlineError(actionError)
+                        .transition(.opacity)
+                }
+
                 // Divider before handoff
                 DarkUtilityGlass.divider.frame(height: 1)
 
@@ -162,7 +167,12 @@ struct MenuBarPopoverView: View {
                         }
                     }
 
-                if viewModel.handoffSent {
+                if viewModel.handoffSending {
+                    Text("Sending...")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                } else if viewModel.handoffSent {
                     Text("Sent")
                         .font(.system(size: 10))
                         .foregroundStyle(DarkUtilityGlass.activeGreen)
@@ -184,7 +194,28 @@ struct MenuBarPopoverView: View {
                 .buttonStyle(.plain)
                 .disabled(viewModel.handoffTask.isEmpty)
             }
+
+            if let handoffError = viewModel.handoffError, !handoffError.isEmpty {
+                inlineError(handoffError)
+            }
         }
+    }
+
+    private func inlineError(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 10))
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.red.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.red.opacity(0.2), lineWidth: 1)
+            )
     }
 
     private func openControlCenter() {

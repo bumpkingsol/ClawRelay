@@ -36,6 +36,10 @@ struct MeetingStatusView: View {
                                     .foregroundStyle(.blue)
                             }
                         }
+                    } else if let error = viewModel.sessionManager.lastError, !error.isEmpty {
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundStyle(.red)
                     }
                 }
 
@@ -99,6 +103,14 @@ struct MeetingStatusView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+        case .failed:
+            Button(action: { viewModel.startMeeting() }) {
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .font(.caption)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
         }
     }
 
@@ -107,8 +119,9 @@ struct MeetingStatusView: View {
         case .idle:             return .secondary
         case .awaitingConsent:  return .orange
         case .preparing:        return .orange
-        case .recording:  return .red
-        case .finalizing: return .blue
+        case .recording:        return .red
+        case .finalizing:       return .blue
+        case .failed:           return .red
         }
     }
 }

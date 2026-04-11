@@ -623,74 +623,100 @@ def process_meeting(meeting_id):
         logger.error(f"Meeting {meeting_id} not found in database")
         return False
 
-    # 2. Load frames
-    frames = load_frames(meeting_id)
-    logger.info(f"Found {len(frames)} frames for meeting {meeting_id}")
-
-    if meeting.get("processing_status") == "awaiting_frames":
-        logger.info("Meeting %s is still awaiting frame upload", meeting_id)
-        return False
-
-    # 3. Get Claude client
-    external_processing_allowed = is_external_meeting_processing_allowed(
-        meeting_id, bool(meeting.get("allow_external_processing"))
-    )
-    if not external_processing_allowed:
-        logger.info("External analysis denied by policy for meeting %s", meeting_id)
-    client = get_anthropic_client() if external_processing_allowed else None
-
-    # 4. Run expression analysis on frames
-    expression_results = {}
-    if frames and client:
-        expression_results = batch_analyze_frames(client, frames)
-        logger.info(f"Analyzed {len(expression_results)} frames")
-
-    # 5. Merge into unified timeline
-    timeline = merge_timeline(
-        meeting.get("transcript_json"),
-        meeting.get("visual_events_json"),
-        expression_results,
-    )
-    logger.info(f"Unified timeline: {len(timeline)} events")
-
-    # 6. Generate summary
-    summary_md = (
-        generate_summary(client, meeting, timeline)
-        if client
-        else generate_policy_blocked_summary(meeting, timeline)
-    )
-    logger.info(f"Generated summary: {len(summary_md)} chars")
-
-    # 7. Store summary
     db = get_db()
     db.execute(
-        "UPDATE meeting_sessions SET summary_md = ? WHERE id = ?",
-        (summary_md, meeting_id),
+        "UPDATE meeting_sessions SET processing_status = ? WHERE id = ?",
+        ("processing", meeting_id),
     )
     db.commit()
     db.close()
 
-    # 8. Match face embeddings
-    match_face_embeddings(meeting_id, meeting.get("visual_events_json"))
-
-    # 9. Update participant profiles
-    update_participant_profiles(meeting_id, meeting.get("participants"))
-
-    # 10. Detect patterns (for participants with 3+ meetings)
     try:
-        participants = (
-            json.loads(meeting["participants"])
-            if isinstance(meeting["participants"], str)
-            else (meeting["participants"] or [])
-        )
-        if isinstance(participants, list):
-            for name in participants:
-                detect_patterns(client, name)
-    except (json.JSONDecodeError, TypeError):
-        pass
+        # 2. Load frames
+        frames = load_frames(meeting_id)
+        logger.info(f"Found {len(frames)} frames for meeting {meeting_id}")
 
-    logger.info(f"Meeting {meeting_id} processing complete")
-    return True
+        if meeting.get("processing_status") == "awaiting_frames":
+            logger.info("Meeting %s is still awaiting frame upload", meeting_id)
+            db = get_db()
+            db.execute(
+                "UPDATE meeting_sessions SET processing_status = ? WHERE id = ?",
+                ("awaiting_frames", meeting_id),
+            )
+            db.commit()
+            db.close()
+            return False
+
+        # 3. Get Claude client
+        external_processing_allowed = is_external_meeting_processing_allowed(
+            meeting_id, bool(meeting.get("allow_external_processing"))
+        )
+        if not external_processing_allowed:
+            logger.info("External analysis denied by policy for meeting %s", meeting_id)
+        client = get_anthropic_client() if external_processing_allowed else None
+
+        # 4. Run expression analysis on frames
+        expression_results = {}
+        if frames and client:
+            expression_results = batch_analyze_frames(client, frames)
+            logger.info(f"Analyzed {len(expression_results)} frames")
+
+        # 5. Merge into unified timeline
+        timeline = merge_timeline(
+            meeting.get("transcript_json"),
+            meeting.get("visual_events_json"),
+            expression_results,
+        )
+        logger.info(f"Unified timeline: {len(timeline)} events")
+
+        # 6. Generate summary
+        summary_md = (
+            generate_summary(client, meeting, timeline)
+            if client
+            else generate_policy_blocked_summary(meeting, timeline)
+        )
+        logger.info(f"Generated summary: {len(summary_md)} chars")
+
+        # 7. Store summary
+        db = get_db()
+        db.execute(
+            "UPDATE meeting_sessions SET summary_md = ?, processing_status = ? WHERE id = ?",
+            (summary_md, "processed", meeting_id),
+        )
+        db.commit()
+        db.close()
+
+        # 8. Match face embeddings
+        match_face_embeddings(meeting_id, meeting.get("visual_events_json"))
+
+        # 9. Update participant profiles
+        update_participant_profiles(meeting_id, meeting.get("participants"))
+
+        # 10. Detect patterns (for participants with 3+ meetings)
+        try:
+            participants = (
+                json.loads(meeting["participants"])
+                if isinstance(meeting["participants"], str)
+                else (meeting["participants"] or [])
+            )
+            if isinstance(participants, list):
+                for name in participants:
+                    detect_patterns(client, name)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        logger.info(f"Meeting {meeting_id} processing complete")
+        return True
+    except Exception:
+        logger.exception("Meeting %s processing failed", meeting_id)
+        db = get_db()
+        db.execute(
+            "UPDATE meeting_sessions SET processing_status = ? WHERE id = ?",
+            ("failed", meeting_id),
+        )
+        db.commit()
+        db.close()
+        return False
 
 
 def main():

@@ -7,6 +7,7 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var whatsAppStatus: String = "Not installed"
     @Published private(set) var whatsAppContacts: [WhatsAppStatusService.WhitelistContact] = []
     @Published var portfolioProjects: [String] = []
+    @Published var actionError: String?
     private let runner: BridgeCommandRunner
     private let appLifecycle: AppLifecycleControlling
     private let waService = WhatsAppStatusService()
@@ -85,22 +86,42 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     func pause(seconds: Int) {
-        try? runner.runAction("pause", "\(seconds)")
+        actionError = nil
+        do {
+            try runner.runAction("pause", "\(seconds)")
+        } catch {
+            actionError = "Pause failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func pauseUntilTomorrow() {
-        try? runner.runAction("pause", "until-tomorrow")
+        actionError = nil
+        do {
+            try runner.runAction("pause", "until-tomorrow")
+        } catch {
+            actionError = "Pause failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func resume() {
-        try? runner.runAction("resume")
+        actionError = nil
+        do {
+            try runner.runAction("resume")
+        } catch {
+            actionError = "Resume failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
     func setSensitiveMode(_ enabled: Bool) {
-        try? runner.runAction("sensitive", enabled ? "on" : "off")
+        actionError = nil
+        do {
+            try runner.runAction("sensitive", enabled ? "on" : "off")
+        } catch {
+            actionError = "Sensitive mode failed: \(error.localizedDescription)"
+        }
         refresh()
     }
 
@@ -122,13 +143,16 @@ final class MenuBarViewModel: ObservableObject {
     @Published var handoffProject: String = UserDefaults.standard.string(forKey: "lastHandoffProject") ?? ""
     @Published var handoffTask: String = ""
     @Published var handoffSent: Bool = false
+    @Published var handoffSending: Bool = false
     @Published var handoffError: String?
 
     func sendQuickHandoff() {
         let project = handoffProject.isEmpty ? "general" : handoffProject
         let task = handoffTask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !task.isEmpty else { return }
+        handoffSent = false
         handoffError = nil
+        handoffSending = true
 
         let capturedRunner = runner
         Task.detached {
@@ -137,6 +161,7 @@ final class MenuBarViewModel: ObservableObject {
                 await MainActor.run { [weak self] in
                     UserDefaults.standard.set(project, forKey: "lastHandoffProject")
                     self?.handoffTask = ""
+                    self?.handoffSending = false
                     self?.handoffSent = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                         self?.handoffSent = false
@@ -144,7 +169,8 @@ final class MenuBarViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run { [weak self] in
-                    self?.handoffError = error.localizedDescription
+                    self?.handoffSending = false
+                    self?.handoffError = "Handoff failed: \(error.localizedDescription)"
                 }
             }
         }
@@ -159,19 +185,23 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     func startProduct() {
+        actionError = nil
         do {
             snapshot = try runner.runSnapshotAction("start-bridge")
         } catch {
+            actionError = "ClawRelay start failed: \(error.localizedDescription)"
             refresh()
         }
     }
 
     func shutdownProduct() {
+        actionError = nil
         do {
             snapshot = try runner.runSnapshotAction("stop-bridge")
             stopPolling()
             appLifecycle.quit()
         } catch {
+            actionError = "ClawRelay shutdown failed: \(error.localizedDescription)"
             refresh()
         }
     }

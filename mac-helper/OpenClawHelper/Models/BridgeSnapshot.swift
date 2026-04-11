@@ -31,6 +31,7 @@ struct BridgeSnapshot: Decodable, Equatable {
     var meetingElapsedSeconds: Int?
     var meetingWorkerPid: Int?
     var serverHealth: ServerHealthSnapshot?
+    var diagnostics: BridgeDiagnostics?
 
     var totalServiceCount: Int {
         serverHealth == nil ? (whatsappLaunchdState != nil ? 3 : 2) : (whatsappLaunchdState != nil ? 4 : 3)
@@ -74,7 +75,8 @@ struct BridgeSnapshot: Decodable, Equatable {
         meetingId: String? = nil,
         meetingElapsedSeconds: Int? = nil,
         meetingWorkerPid: Int? = nil,
-        serverHealth: ServerHealthSnapshot? = nil
+        serverHealth: ServerHealthSnapshot? = nil,
+        diagnostics: BridgeDiagnostics? = nil
     ) {
         self.productState = productState
         self.trackingState = trackingState
@@ -89,6 +91,7 @@ struct BridgeSnapshot: Decodable, Equatable {
         self.meetingElapsedSeconds = meetingElapsedSeconds
         self.meetingWorkerPid = meetingWorkerPid
         self.serverHealth = serverHealth
+        self.diagnostics = diagnostics
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -105,6 +108,7 @@ struct BridgeSnapshot: Decodable, Equatable {
         case meetingElapsedSeconds
         case meetingWorkerPid
         case serverHealth
+        case diagnostics
     }
 
     init(from decoder: Decoder) throws {
@@ -121,6 +125,7 @@ struct BridgeSnapshot: Decodable, Equatable {
         meetingElapsedSeconds = try container.decodeIfPresent(Int.self, forKey: .meetingElapsedSeconds)
         meetingWorkerPid = try container.decodeIfPresent(Int.self, forKey: .meetingWorkerPid)
         serverHealth = try container.decodeIfPresent(ServerHealthSnapshot.self, forKey: .serverHealth)
+        diagnostics = try container.decodeIfPresent(BridgeDiagnostics.self, forKey: .diagnostics)
         productState = try container.decodeIfPresent(ProductState.self, forKey: .productState)
             ?? ((daemonLaunchdState == "missing" && watcherLaunchdState == "missing") ? .stopped : .running)
     }
@@ -138,7 +143,8 @@ struct BridgeSnapshot: Decodable, Equatable {
         meetingId: nil,
         meetingElapsedSeconds: nil,
         meetingWorkerPid: nil,
-        serverHealth: nil
+        serverHealth: nil,
+        diagnostics: nil
     )
 
     static let needsAttentionPlaceholder = BridgeSnapshot(
@@ -154,13 +160,46 @@ struct BridgeSnapshot: Decodable, Equatable {
         meetingId: nil,
         meetingElapsedSeconds: nil,
         meetingWorkerPid: nil,
-        serverHealth: nil
+        serverHealth: nil,
+        diagnostics: nil
     )
 
     var parsedMeetingState: MeetingLifecycleState {
         guard let raw = meetingState else { return .idle }
         return MeetingLifecycleState(rawValue: raw) ?? .idle
     }
+
+    var chromeAutomationDiagnostic: BridgeCapabilityDiagnostic? {
+        diagnostics?.chromeAutomation
+    }
+
+    var meetingBinaryDiagnostic: BridgeCapabilityDiagnostic? {
+        diagnostics?.meetingBinary
+    }
+}
+
+struct BridgeDiagnostics: Decodable, Equatable {
+    let chromeAutomation: BridgeCapabilityDiagnostic?
+    let meetingBinary: BridgeCapabilityDiagnostic?
+
+    enum CodingKeys: String, CodingKey {
+        case chromeAutomation = "chrome_automation"
+        case meetingBinary = "meeting_binary"
+    }
+}
+
+struct BridgeCapabilityDiagnostic: Decodable, Equatable {
+    enum Status: String, Decodable {
+        case available
+        case unavailable
+        case missing
+        case unlaunchable
+        case notRunning = "not_running"
+    }
+
+    let status: Status
+    let detail: String
+    let path: String?
 }
 
 struct ServerHealthSnapshot: Decodable, Equatable {

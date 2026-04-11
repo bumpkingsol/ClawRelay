@@ -54,6 +54,22 @@ struct OverviewTabView: View {
                     }
                 }
 
+                if let diagnostic = viewModel.snapshot.chromeAutomationDiagnostic,
+                   diagnostic.status == .unavailable {
+                    GroupBox("Capture Warning") {
+                        Label(diagnostic.detail, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+
+                if let diagnostic = viewModel.snapshot.meetingBinaryDiagnostic,
+                   diagnostic.status == .missing || diagnostic.status == .unlaunchable {
+                    GroupBox("Meeting Worker") {
+                        Label(diagnostic.detail, systemImage: "mic.badge.xmark")
+                            .foregroundStyle(.orange)
+                    }
+                }
+
                 // Sensitive mode
                 if viewModel.snapshot.sensitiveMode {
                     GroupBox {

@@ -211,8 +211,28 @@ def init_db():
         ON meeting_sessions(started_at)
     """)
     db.execute("""
+        CREATE TABLE IF NOT EXISTS meeting_participants (
+            meeting_id TEXT NOT NULL,
+            participant_name TEXT NOT NULL,
+            started_at TEXT,
+            PRIMARY KEY (meeting_id, participant_name)
+        )
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meeting_participants_name_started
+        ON meeting_participants(participant_name, started_at DESC)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meeting_participants_meeting
+        ON meeting_participants(meeting_id)
+    """)
+    db.execute("""
         CREATE INDEX IF NOT EXISTS idx_meeting_purge
         ON meeting_sessions(raw_data_purge_at)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meeting_summary_purge
+        ON meeting_sessions(summary_purge_at)
     """)
     try:
         db.execute("ALTER TABLE activity_stream ADD COLUMN whatsapp_messages TEXT")
@@ -222,6 +242,10 @@ def init_db():
         db.execute("ALTER TABLE participant_profiles ADD COLUMN last_seen TEXT")
     except Exception:
         pass  # Column already exists
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_participant_last_activity
+        ON participant_profiles(COALESCE(last_seen, last_updated))
+    """)
     try:
         db.execute(
             "ALTER TABLE meeting_sessions ADD COLUMN allow_external_processing INTEGER DEFAULT 0"
@@ -361,6 +385,14 @@ def purge_old_data():
     """,
         (utc_cutoff_days(PARTICIPANT_PROFILE_RETENTION_DAYS),),
     ).rowcount
+
+    # Remove participant mapping rows for meetings that no longer exist.
+    db.execute(
+        """
+        DELETE FROM meeting_participants
+        WHERE meeting_id NOT IN (SELECT id FROM meeting_sessions)
+    """
+    )
 
     # Purge screenshot files for expired meetings
     try:
@@ -885,7 +917,8 @@ def get_meetings():
         rows = db.execute(
             """
             SELECT id, started_at, ended_at, duration_seconds, app,
-                   participants, summary_md, transcript_json,
+                   participants, summary_md,
+                   (transcript_json IS NOT NULL) AS has_transcript,
                    processing_status, frames_expected, frames_uploaded
             FROM meeting_sessions
             WHERE started_at >= ?
@@ -914,12 +947,12 @@ def get_meetings():
                     "app": r["app"],
                     "participants": participants,
                     "summary_md": r["summary_md"],
-                    "has_transcript": r["transcript_json"] is not None,
+                    "has_transcript": bool(r["has_transcript"]),
                     "processing_status": r["processing_status"] or "pending",
                     "frames_expected": r["frames_expected"] or 0,
                     "frames_uploaded": r["frames_uploaded"] or 0,
                     "purge_status": "live"
-                    if r["transcript_json"] is not None
+                    if r["has_transcript"]
                     else "summary_only",
                 }
             )
@@ -1207,6 +1240,26 @@ def push_meeting_session():
             processing_status,
         ),
     )
+    # Keep participant lookup table in sync for indexed pattern searches.
+    db.execute("DELETE FROM meeting_participants WHERE meeting_id = ?", (meeting_id,))
+    participant_rows = [
+        (
+            meeting_id,
+            name.strip(),
+            started_at,
+        )
+        for name in participants
+        if isinstance(name, str) and name.strip()
+    ]
+    if participant_rows:
+        db.executemany(
+            """
+            INSERT OR IGNORE INTO meeting_participants
+            (meeting_id, participant_name, started_at)
+            VALUES (?, ?, ?)
+        """,
+            participant_rows,
+        )
     db.commit()
     db.close()
 

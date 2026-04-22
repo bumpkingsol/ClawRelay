@@ -1826,4 +1826,5 @@ configure_app()
 if __name__ == "__main__":
     port = int(os.environ.get("CONTEXT_BRIDGE_PORT", 7890))
     logger.info(f"Context Bridge receiver starting on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    bind_host = os.environ.get("CONTEXT_BRIDGE_BIND_HOST", "127.0.0.1")
+    app.run(host=bind_host, port=port, debug=False)

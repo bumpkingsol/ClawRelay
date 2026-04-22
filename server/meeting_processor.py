@@ -525,18 +525,34 @@ def detect_patterns(client, participant_name):
         db.close()
         return None
 
-    # Find all meetings with this participant
-    meetings = db.execute(
-        """
-        SELECT id, started_at, summary_md, participants
-        FROM meeting_sessions
-        WHERE participants LIKE ?
-        AND summary_md IS NOT NULL
-        ORDER BY started_at DESC
-        LIMIT 10
-    """,
-        (f"%{participant_name}%",),
-    ).fetchall()
+    # Find all meetings with this participant.
+    # Prefer indexed lookup via meeting_participants, fallback to legacy LIKE
+    # for backward compatibility with old schemas.
+    try:
+        meetings = db.execute(
+            """
+            SELECT ms.id, ms.started_at, ms.summary_md, ms.participants
+            FROM meeting_participants mp
+            JOIN meeting_sessions ms ON ms.id = mp.meeting_id
+            WHERE mp.participant_name = ?
+              AND ms.summary_md IS NOT NULL
+            ORDER BY ms.started_at DESC
+            LIMIT 10
+        """,
+            (participant_name,),
+        ).fetchall()
+    except Exception:
+        meetings = db.execute(
+            """
+            SELECT id, started_at, summary_md, participants
+            FROM meeting_sessions
+            WHERE participants LIKE ?
+            AND summary_md IS NOT NULL
+            ORDER BY started_at DESC
+            LIMIT 10
+        """,
+            (f"%{participant_name}%",),
+        ).fetchall()
     db.close()
 
     if len(meetings) < 3 or not client:

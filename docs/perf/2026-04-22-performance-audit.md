@@ -108,3 +108,7 @@ Run with:
 ```bash
 python3 server/scripts/perf_audit_snapshot.py
 ```
+
+## Follow-up
+
+Implementation plan: `docs/perf/2026-04-22-remediation-plan.md`.
